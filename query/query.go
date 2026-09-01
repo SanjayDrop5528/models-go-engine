@@ -4,19 +4,22 @@ package query
 type FilterOp string
 
 const (
-	OpEq        FilterOp = "EQ"
-	OpNeq       FilterOp = "NEQ"
-	OpGt        FilterOp = "GT"
-	OpGte       FilterOp = "GTE"
-	OpLt        FilterOp = "LT"
-	OpLte       FilterOp = "LTE"
-	OpIn        FilterOp = "IN"
-	OpNin       FilterOp = "NIN"
-	OpLike      FilterOp = "LIKE"
-	OpILike     FilterOp = "ILIKE"
-	OpIsNull    FilterOp = "IS_NULL"
-	OpIsNotNull FilterOp = "IS_NOT_NULL"
-	OpBetween   FilterOp = "BETWEEN"
+	OpEq         FilterOp = "EQ"
+	OpNeq        FilterOp = "NEQ"
+	OpGt         FilterOp = "GT"
+	OpGte        FilterOp = "GTE"
+	OpLt         FilterOp = "LT"
+	OpLte        FilterOp = "LTE"
+	OpIn         FilterOp = "IN"
+	OpNin        FilterOp = "NIN"
+	OpLike       FilterOp = "LIKE"
+	OpILike      FilterOp = "ILIKE"
+	OpNotLike    FilterOp = "NOT_LIKE"
+	OpStartsWith FilterOp = "STARTS_WITH"
+	OpEndsWith   FilterOp = "ENDS_WITH"
+	OpIsNull     FilterOp = "IS_NULL"
+	OpIsNotNull  FilterOp = "IS_NOT_NULL"
+	OpBetween    FilterOp = "BETWEEN"
 )
 
 // Filter represents a single field comparison criterion.

@@ -6,13 +6,39 @@ import (
 	"time"
 )
 
-// ModelRef uniquely identifies a model reference for adapter calls.
+// ModelRef uniquely identifies a model reference for adapter CRUD and execution calls.
+//
+// Example Usage:
+//
+//	ref := model.ModelRef{
+//	    ID:          "employee",
+//	    Name:        "Employee",
+//	    StorageName: "public.employees", // Schema-qualified table name
+//	    Database:    "meet_kriyatec_spark",
+//	    PrimaryKey:  "id",
+//	}
 type ModelRef struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	StorageName string `json:"storage_name"`
 	Database    string `json:"database"`
 	PrimaryKey  string `json:"primary_key,omitempty"`
+}
+
+// NewModelRef creates a ModelRef with standard default values.
+func NewModelRef(id, name, storageName, primaryKey string) ModelRef {
+	if storageName == "" {
+		storageName = id
+	}
+	if primaryKey == "" {
+		primaryKey = "id"
+	}
+	return ModelRef{
+		ID:          id,
+		Name:        name,
+		StorageName: storageName,
+		PrimaryKey:  primaryKey,
+	}
 }
 
 // OrbitalRefSpec defines complete reference parameters for foreign and orbital references.
@@ -198,9 +224,22 @@ func (m *Model) GetPrimaryKeyAttributes() []Attribute {
 }
 
 // ModelConfig defines the configuration of a model entity.
+//
+// Example Definition:
+//
+//	cfg := &model.ModelConfig{
+//	    ID:          "employee",
+//	    Schema:      "public",
+//	    Name:        "Employee",
+//	    Table:       "employees",
+//	    RefName:     "employees",
+//	    Description: "Auto-imported enterprise employee entity",
+//	    Status:      model.ModelConfigStatusActive,
+//	    Version:     1,
+//	}
 type ModelConfig struct {
 	ID                   string            `json:"id"`
-	Schema               string            `json:"schema,omitempty"`       // Database schema (e.g. company, hr, projects, finance, operations, audit)
+	Schema               string            `json:"schema,omitempty"`       // Database schema (e.g. public, tenant_a, hr, sales)
 	Name                 string            `json:"name"`                   // Name used by query engine
 	Table                string            `json:"table,omitempty"`        // Underlying table name
 	RefName              string            `json:"ref_name,omitempty"`      // Optional reference name
@@ -217,6 +256,20 @@ type ModelConfig struct {
 }
 
 // DataModel defines a field/column definition for a dynamic model.
+//
+// Example Definition:
+//
+//	field := &model.DataModel{
+//	    ID:           "employee_email",
+//	    ModelID:      "employee",
+//	    ColumnName:   "email",
+//	    JSONField:    "email",
+//	    DataType:     model.TypeString,
+//	    IsNullable:   false,
+//	    IsRequired:   true,
+//	    IsUnique:     true,
+//	    Status:       model.DataModelStatusActive,
+//	}
 type DataModel struct {
 	ID                         string                `json:"id"`                                        // Field ID
 	ModelID                    string                `json:"model_id"`                                  // model_config reference (FK)

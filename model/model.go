@@ -391,6 +391,9 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 			storageName = cfg.Name
 		}
 	}
+	if cfg.Schema != "" && cfg.Schema != "public" && !strings.Contains(storageName, ".") {
+		storageName = fmt.Sprintf("%s.%s", cfg.Schema, storageName)
+	}
 	if storageType == "" {
 		storageType = StorageRelational
 	}

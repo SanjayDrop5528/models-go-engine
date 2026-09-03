@@ -60,6 +60,17 @@ type Adapter interface {
 	Begin(ctx context.Context) (Transaction, error)
 }
 
+// DataSetCompiler abstracts converting QueryAST into target database code.
+type DataSetCompiler interface {
+	Compile(ctx context.Context, ast any, ds any) (any, error)
+}
+
+// DataSetAdapter is an optional interface implemented by adapters that support native dataset compilation.
+type DataSetAdapter interface {
+	Adapter
+	DataSetCompiler() DataSetCompiler
+}
+
 // Registry manages initialized database adapters.
 type Registry struct {
 	mu       sync.RWMutex

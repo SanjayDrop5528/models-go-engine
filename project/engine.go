@@ -233,10 +233,12 @@ func (e *Engine) GetModelConfig(ctx context.Context, idOrName string) (*model.Mo
 	return e.registry.GetModelConfig(idOrName)
 }
 
-// ListModelConfigs returns all ModelConfigs in the project, querying database table if available.
+// ListModelConfigs returns all ModelConfigs in the project.
+// Priority: DB metadata table → in-memory registry (after live import).
+// If DB has rows, they are synced into the registry and returned.
+// If DB is empty but registry has models (e.g. from a live schema import), those are returned directly.
 func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 	if e.adapter != nil {
-		log.Printf("[Engine] Querying model_configs via database adapter '%s'...", e.adapter.Name())
 		mcRef := model.ModelRef{StorageName: "model_configs", Name: "model_configs"}
 		rows, _, err := e.adapter.Find(ctx, mcRef, query.NewQuery().LimitOffset(10000, 0))
 		if err == nil && len(rows) > 0 {
@@ -254,9 +256,18 @@ func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 			}
 		}
 	}
-	log.Println("[Engine] Fallback: Listing model_configs from in-memory registry")
-	return e.registry.ListModelConfigs()
+	// DB table is empty or adapter unavailable — return from in-memory registry.
+	// This covers models loaded via live-import (ImportLiveMetadata) which populate
+	// the registry but do NOT write to the model_configs metadata table.
+	all := e.registry.ListModelConfigs()
+	if len(all) > 0 {
+		log.Printf("[Engine] Serving %d model_config(s) from in-memory registry (populated via live import)", len(all))
+	} else {
+		log.Println("[Engine] No model_configs found in database table or in-memory registry")
+	}
+	return all
 }
+
 
 // =========================================================================
 // 2. DataModel Field Management & Custom Type Checks
@@ -326,10 +337,32 @@ func (e *Engine) ListDataModels(ctx context.Context, modelID string) []*model.Da
 
 // DeleteDataModel removes a field definition from a model.
 func (e *Engine) DeleteDataModel(ctx context.Context, modelID, fieldID string) error {
-	if e.adapter != nil {
-		_ = e.adapter.Delete(ctx, model.ModelRef{StorageName: "data_models", Name: "data_models"}, fieldID)
+	dm, _ := e.GetDataModel(ctx, modelID, fieldID)
+	actualID := fieldID
+	if dm != nil && dm.ID != "" {
+		actualID = dm.ID
 	}
-	return e.registry.DeleteDataModel(modelID, fieldID)
+
+	if e.adapter != nil {
+		_ = e.adapter.Delete(ctx, model.ModelRef{StorageName: "data_models", Name: "data_models"}, actualID)
+	}
+
+	if err := e.registry.DeleteDataModel(modelID, fieldID); err != nil {
+		return err
+	}
+
+	// Rebuild and save draft model so schema diff accurately detects field removal
+	if cfg, err := e.registry.GetModelConfig(modelID); err == nil && cfg != nil {
+		fields := e.registry.ListDataModels(cfg.ID)
+		dbName := ""
+		if e.project != nil {
+			dbName = e.project.AdapterConfig.Database
+		}
+		execModel := model.BuildModel(cfg, fields, dbName, model.StorageRelational)
+		_, _ = e.registry.SaveDraft(execModel)
+	}
+
+	return nil
 }
 
 // DeleteModelConfig removes a model_config and its compiled model from registry.

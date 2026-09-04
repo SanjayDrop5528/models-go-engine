@@ -194,8 +194,34 @@ func (e *DiffEngine) Compare(current *schema.Schema, desired *schema.Schema, hin
 }
 
 func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr schema.SchemaAttribute, newAttr schema.SchemaAttribute, diff *SchemaDiff) {
-	// 1. Data Type change
-	if oldAttr.Type != newAttr.Type || oldAttr.Length != newAttr.Length || oldAttr.Precision != newAttr.Precision || oldAttr.Scale != newAttr.Scale {
+	// 1. Data Type change check
+	typeChanged := oldAttr.Type != newAttr.Type
+
+	lengthChanged := false
+	if newAttr.Type == model.TypeString || oldAttr.Type == model.TypeString {
+		oldLen := oldAttr.Length
+		if oldLen == 0 {
+			oldLen = 255
+		}
+		newLen := newAttr.Length
+		if newLen == 0 {
+			newLen = 255
+		}
+		lengthChanged = oldLen != newLen
+	} else if oldAttr.Length != newAttr.Length {
+		lengthChanged = true
+	}
+
+	precScaleChanged := false
+	if newAttr.Type == model.TypeDecimal || oldAttr.Type == model.TypeDecimal {
+		if oldAttr.Precision != newAttr.Precision || oldAttr.Scale != newAttr.Scale {
+			if newAttr.Precision > 0 || oldAttr.Precision > 0 {
+				precScaleChanged = true
+			}
+		}
+	}
+
+	if typeChanged || lengthChanged || precScaleChanged {
 		safety := SafetyPotentiallyUnsafe
 		if isNarrowingConversion(oldAttr.Type, newAttr.Type) {
 			safety = SafetyDestructive

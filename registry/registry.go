@@ -180,7 +180,7 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 	return &cp, nil
 }
 
-// GetDataModel retrieves a data_model field definition by model ID and field ID.
+// GetDataModel retrieves a data_model field definition by model ID and field ID (or column_name/json_field).
 func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -189,12 +189,17 @@ func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel,
 	if !ok {
 		return nil, fmt.Errorf("no data_model fields found for model '%s'", modelID)
 	}
-	dm, ok := fields[fieldID]
-	if !ok {
-		return nil, fmt.Errorf("data_model field '%s' not found in model '%s'", fieldID, modelID)
+	if dm, ok := fields[fieldID]; ok {
+		cp := *dm
+		return &cp, nil
 	}
-	cp := *dm
-	return &cp, nil
+	for _, dm := range fields {
+		if strings.EqualFold(dm.ColumnName, fieldID) || strings.EqualFold(dm.JSONField, fieldID) || strings.EqualFold(dm.ID, fieldID) {
+			cp := *dm
+			return &cp, nil
+		}
+	}
+	return nil, fmt.Errorf("data_model field '%s' not found in model '%s'", fieldID, modelID)
 }
 
 // ListDataModels returns all data_model fields for a model.
@@ -214,13 +219,22 @@ func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 	return result
 }
 
-// DeleteDataModel removes a data_model field definition.
+// DeleteDataModel removes a data_model field definition by ID or column_name.
 func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if fields, ok := r.dataModels[modelID]; ok {
-		delete(fields, fieldID)
+		if _, ok := fields[fieldID]; ok {
+			delete(fields, fieldID)
+			return nil
+		}
+		for id, dm := range fields {
+			if strings.EqualFold(dm.ColumnName, fieldID) || strings.EqualFold(dm.JSONField, fieldID) || strings.EqualFold(dm.ID, fieldID) {
+				delete(fields, id)
+				return nil
+			}
+		}
 	}
 	return nil
 }

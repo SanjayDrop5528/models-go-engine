@@ -71,7 +71,8 @@ type JoinCollection struct {
 	NamedAs             string                 `json:"namedAs"`
 	JoinType            JoinType               `json:"joinType,omitempty"` // Default is LEFT
 	ConvertToString     bool                   `json:"convert_To_String,omitempty"`
-	Filter              map[string]interface{} `json:"filter,omitempty"` // Join filter applied on the ON clause
+	CastMode            string                 `json:"cast_mode,omitempty"` // "BOTH", "FROM_ONLY", "TO_ONLY"
+	Filter              map[string]interface{} `json:"filter,omitempty"`    // Join filter applied on the ON clause
 }
 
 // DataSetCustomField defines a field reference within a custom column expression.

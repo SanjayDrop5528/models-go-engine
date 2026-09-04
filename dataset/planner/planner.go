@@ -57,6 +57,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			Alias:         alias,
 			JoinFilter:    j.Filter,
 			ConvertString: j.ConvertToString,
+			CastMode:      j.CastMode,
 		})
 	}
 

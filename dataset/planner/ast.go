@@ -39,6 +39,7 @@ type ASTJoin struct {
 	Alias         string
 	JoinFilter    map[string]any
 	ConvertString bool
+	CastMode      string
 }
 
 // ASTProjection represents a selected result column.

@@ -63,6 +63,7 @@ const (
 
 // JoinCollection defines a relationship join with table-level join filters.
 type JoinCollection struct {
+	Schema              string                 `json:"schema,omitempty"`
 	FromCollection      string                 `json:"fromCollection"`
 	FromCollectionField string                 `json:"fromCollectionField"`
 	ToCollection        string                 `json:"toCollection"`

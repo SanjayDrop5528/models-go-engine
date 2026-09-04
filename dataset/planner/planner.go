@@ -48,6 +48,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 
 		ast.Joins = append(ast.Joins, ASTJoin{
+			Schema:        j.Schema,
 			Type:          jType,
 			FromTable:     fromTbl,
 			FromField:     j.FromCollectionField,

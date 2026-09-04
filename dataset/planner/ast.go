@@ -30,6 +30,7 @@ type ASTBaseTable struct {
 
 // ASTJoin represents a relational JOIN with its specific ON join filter.
 type ASTJoin struct {
+	Schema        string
 	Type          domain.JoinType
 	FromTable     string
 	FromField     string

@@ -61,23 +61,86 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		})
 	}
 
-	// 2. Map Projections (SelectedList)
-	for _, sel := range ds.SelectedList {
-		tbl := ds.BaseCollection.Collection
-		fld := sel.Field
-		if idx := strings.Index(sel.Field, "."); idx >= 0 {
-			tbl = sel.Field[:idx]
-			fld = sel.Field[idx+1:]
+	// 2. Map Group By first to establish grouping criteria
+	for _, g := range ds.GroupByFields {
+		tbl := g.TableName
+		if tbl == "" {
+			tbl = ds.BaseCollection.Collection
 		}
-		ast.Projections = append(ast.Projections, ASTProjection{
-			SourceTable: tbl,
-			SourceField: fld,
-			Alias:       sel.HeaderName,
-			DataType:    sel.DataType,
-		})
+		fld := g.FieldName
+		if fld == "" {
+			fld = g.Name
+		}
+		if fld != "" {
+			ast.GroupBy = append(ast.GroupBy, ASTGroupBy{
+				Table: tbl,
+				Field: fld,
+			})
+		}
 	}
 
-	// 3. Map Custom Columns & Functions
+	// 3. Map Projections (SelectedList)
+	if len(ast.GroupBy) > 0 {
+		groupedMap := make(map[string]bool)
+		for _, g := range ast.GroupBy {
+			groupedMap[strings.ToLower(g.Field)] = true
+			groupedMap[strings.ToLower(g.Table+"."+g.Field)] = true
+		}
+
+		for _, sel := range ds.SelectedList {
+			tbl := ds.BaseCollection.Collection
+			fld := sel.Field
+			if idx := strings.Index(sel.Field, "."); idx >= 0 {
+				tbl = sel.Field[:idx]
+				fld = sel.Field[idx+1:]
+			}
+			fullKey := strings.ToLower(tbl + "." + fld)
+			shortKey := strings.ToLower(fld)
+			if groupedMap[fullKey] || groupedMap[shortKey] {
+				ast.Projections = append(ast.Projections, ASTProjection{
+					SourceTable: tbl,
+					SourceField: fld,
+					Alias:       sel.HeaderName,
+					DataType:    sel.DataType,
+				})
+			}
+		}
+
+		// Ensure all GroupBy dimensions are present in Projections if none were matched
+		for _, g := range ast.GroupBy {
+			alreadyMapped := false
+			for _, p := range ast.Projections {
+				if strings.EqualFold(p.SourceTable, g.Table) && strings.EqualFold(p.SourceField, g.Field) {
+					alreadyMapped = true
+					break
+				}
+			}
+			if !alreadyMapped {
+				ast.Projections = append(ast.Projections, ASTProjection{
+					SourceTable: g.Table,
+					SourceField: g.Field,
+					Alias:       g.Field,
+				})
+			}
+		}
+	} else {
+		for _, sel := range ds.SelectedList {
+			tbl := ds.BaseCollection.Collection
+			fld := sel.Field
+			if idx := strings.Index(sel.Field, "."); idx >= 0 {
+				tbl = sel.Field[:idx]
+				fld = sel.Field[idx+1:]
+			}
+			ast.Projections = append(ast.Projections, ASTProjection{
+				SourceTable: tbl,
+				SourceField: fld,
+				Alias:       sel.HeaderName,
+				DataType:    sel.DataType,
+			})
+		}
+	}
+
+	// 4. Map Custom Columns & Functions
 	for _, cc := range ds.CustomColumns {
 		astCol := ASTCustomColumn{
 			Alias:      cc.CustomColumnName,
@@ -109,22 +172,6 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 
 		ast.CustomColumns = append(ast.CustomColumns, astCol)
-	}
-
-	// 4. Map Group By
-	for _, g := range ds.GroupByFields {
-		tbl := g.TableName
-		if tbl == "" {
-			tbl = ds.BaseCollection.Collection
-		}
-		fld := g.FieldName
-		if fld == "" {
-			fld = g.Name
-		}
-		ast.GroupBy = append(ast.GroupBy, ASTGroupBy{
-			Table: tbl,
-			Field: fld,
-		})
 	}
 
 	// 5. Map Where Filters

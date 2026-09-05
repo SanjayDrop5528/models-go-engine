@@ -62,11 +62,29 @@ func (c *testPostgresCompiler) Compile(ctx context.Context, ast *planner.QueryAS
 		if cc.Function != nil && cc.Function.PostgresExpression != "" {
 			expr = cc.Function.PostgresExpression
 			for i, op := range cc.Operands {
-				expr = strings.ReplaceAll(expr, "{{"+string(rune('0'+i))+"}}", "\""+op.SourceTable+"\".\""+op.SourceField+"\"")
+				var opSql string
+				if op.SourceTable == "" || op.SourceTable == "_LITERAL_" {
+					if op.IsLiteral {
+						opSql = op.SourceField
+					} else {
+						opSql = "\"" + op.SourceField + "\""
+					}
+				} else {
+					opSql = "\"" + op.SourceTable + "\".\"" + op.SourceField + "\""
+				}
+				expr = strings.ReplaceAll(expr, "{{"+string(rune('0'+i))+"}}", opSql)
 			}
 			var allArgs []string
 			for _, op := range cc.Operands {
-				allArgs = append(allArgs, "\""+op.SourceTable+"\".\""+op.SourceField+"\"")
+				if op.SourceTable == "" || op.SourceTable == "_LITERAL_" {
+					if op.IsLiteral {
+						allArgs = append(allArgs, op.SourceField)
+					} else {
+						allArgs = append(allArgs, "\""+op.SourceField+"\"")
+					}
+				} else {
+					allArgs = append(allArgs, "\""+op.SourceTable+"\".\""+op.SourceField+"\"")
+				}
 			}
 			expr = strings.ReplaceAll(expr, "{{args}}", strings.Join(allArgs, ", "))
 		}
@@ -262,6 +280,85 @@ func TestDataSet_Calculations_NumericAndString(t *testing.T) {
 	}
 	if !strings.Contains(prev.Pipeline, "CONCAT_WS(\"employees\".\"first_name\", \"employees\".\"last_name\") AS \"full_name\"") {
 		t.Fatalf("expected CONCAT_WS expression in pipeline, got: %s", prev.Pipeline)
+	}
+}
+
+func TestDataSet_LiteralOperand_Divide(t *testing.T) {
+	ctx := context.Background()
+	svc := setupTestService()
+
+	ds := &domain.DataSet{
+		Name:          "Literal Divide Test",
+		ReferenceName: "literal_divide",
+		Driver:        "postgres",
+		BaseCollection: domain.BaseCollection{
+			Collection: "employees",
+		},
+		CustomColumns: []domain.CustomColumn{
+			{
+				CustomColumnName:      "monthly_leave",
+				CustomLabelName:       "Monthly Leave",
+				CustomAggregateFnName: "DIVIDE",
+				Fields: []domain.DataSetCustomField{
+					{TableName: "employees", FieldName: "leave_balance"},
+					{TableName: "", FieldName: "12", IsLiteral: true},
+				},
+			},
+		},
+	}
+
+	prev, err := svc.Preview(ctx, ds)
+	if err != nil {
+		t.Fatalf("preview failed: %v", err)
+	}
+
+	expectedExpr := "(\"employees\".\"leave_balance\" / NULLIF(12, 0)) AS \"monthly_leave\""
+	if !strings.Contains(prev.Pipeline, expectedExpr) {
+		t.Fatalf("expected literal divide expression %s in pipeline, got: %s", expectedExpr, prev.Pipeline)
+	}
+}
+
+func TestDataSet_ChainedCustomColumns(t *testing.T) {
+	ctx := context.Background()
+	svc := setupTestService()
+
+	ds := &domain.DataSet{
+		Name:          "Chained Custom Columns Test",
+		ReferenceName: "chained_custom_columns",
+		Driver:        "postgres",
+		BaseCollection: domain.BaseCollection{
+			Collection: "employees",
+		},
+		CustomColumns: []domain.CustomColumn{
+			{
+				CustomColumnName:      "monthly_leave",
+				CustomLabelName:       "Monthly Leave",
+				CustomAggregateFnName: "DIVIDE",
+				Fields: []domain.DataSetCustomField{
+					{TableName: "employees", FieldName: "leave_balance"},
+					{TableName: "", FieldName: "12", IsLiteral: true},
+				},
+			},
+			{
+				CustomColumnName:      "double_monthly_leave",
+				CustomLabelName:       "Double Monthly Leave",
+				CustomAggregateFnName: "MULTIPLY",
+				Fields: []domain.DataSetCustomField{
+					{TableName: "employees", FieldName: "monthly_leave"},
+					{TableName: "", FieldName: "2", IsLiteral: true},
+				},
+			},
+		},
+	}
+
+	prev, err := svc.Preview(ctx, ds)
+	if err != nil {
+		t.Fatalf("preview failed: %v", err)
+	}
+
+	expectedExpr := "(monthly_leave * 2) AS \"double_monthly_leave\""
+	if !strings.Contains(prev.Pipeline, expectedExpr) {
+		t.Fatalf("expected chained expression %s in pipeline, got: %s", expectedExpr, prev.Pipeline)
 	}
 }
 

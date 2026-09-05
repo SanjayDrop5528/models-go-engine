@@ -82,6 +82,8 @@ type DataSetCustomField struct {
 	ParentSchema string `json:"parentSchema,omitempty"`
 	TableName    string `json:"tableName"`
 	Type         string `json:"type"`
+	IsLiteral    bool   `json:"isLiteral,omitempty"`
+	Value        string `json:"value,omitempty"`
 }
 
 // CustomColumn defines calculated/virtual fields or function applications.

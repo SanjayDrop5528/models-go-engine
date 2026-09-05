@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/SanjayDrop5528/models-go-engine/dataset/domain"
@@ -79,6 +80,20 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 	}
 
+	// Check if any custom column contains aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.)
+	hasAggregate := false
+	for _, cc := range ds.CustomColumns {
+		fnName := strings.ToUpper(cc.CustomAggregateFnName)
+		if fnName == "SUM" || fnName == "AVG" || fnName == "COUNT" || fnName == "COUNT_DISTINCT" || fnName == "MIN" || fnName == "MAX" || fnName == "COUNT_ALL" {
+			hasAggregate = true
+			break
+		}
+		if fn, err := p.functionResolver.ResolveFunction(ctx, cc.CustomAggregateFnName); err == nil && fn.IsAggregate {
+			hasAggregate = true
+			break
+		}
+	}
+
 	// 3. Map Projections (SelectedList)
 	if len(ast.GroupBy) > 0 {
 		groupedMap := make(map[string]bool)
@@ -123,7 +138,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 				})
 			}
 		}
-	} else {
+	} else if !hasAggregate {
 		for _, sel := range ds.SelectedList {
 			tbl := ds.BaseCollection.Collection
 			fld := sel.Field
@@ -158,16 +173,44 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 
 		for _, f := range cc.Fields {
 			tbl := f.TableName
-			if tbl == "" {
-				tbl = ds.BaseCollection.Collection
-			}
 			fldName := f.FieldName
 			if fldName == "" {
 				fldName = f.Name
 			}
+			if fldName == "" && f.Value != "" {
+				fldName = f.Value
+			}
+			isLit := f.IsLiteral || tbl == "" || tbl == "_LITERAL_"
+			isCustomRef := false
+			if !isLit {
+				// Check if fldName references another custom column in ds.CustomColumns
+				for _, prevCC := range ds.CustomColumns {
+					if prevCC.CustomColumnName != "" && strings.EqualFold(prevCC.CustomColumnName, fldName) {
+						isCustomRef = true
+						break
+					}
+				}
+				if isCustomRef {
+					tbl = ""
+				} else {
+					// Check if fldName is a plain numeric constant (e.g. 5, 2, 12, 0.05)
+					trimmed := strings.TrimSpace(fldName)
+					if isNumericString(trimmed) {
+						isLit = true
+						tbl = ""
+					}
+				}
+			} else {
+				tbl = ""
+			}
+			if tbl == "" && !isLit && !isCustomRef {
+				tbl = ds.BaseCollection.Collection
+			}
 			astCol.Operands = append(astCol.Operands, ASTOperand{
 				SourceTable: tbl,
 				SourceField: fldName,
+				IsLiteral:   isLit || isCustomRef,
+				LiteralVal:  fldName,
 			})
 		}
 
@@ -213,4 +256,13 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 		conditions = append(conditions, cond)
 	}
 	return conditions
+}
+
+func isNumericString(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
+	datasetrepo "github.com/SanjayDrop5528/models-go-engine/dataset/repository"
+	datasetres "github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
+	datasetsvc "github.com/SanjayDrop5528/models-go-engine/dataset/service"
 	"github.com/SanjayDrop5528/models-go-engine/diff"
 	"github.com/SanjayDrop5528/models-go-engine/execution"
 	"github.com/SanjayDrop5528/models-go-engine/mapping"
@@ -24,21 +27,47 @@ import (
 // Engine is the base project engine orchestrating model metadata, schema lifecycle,
 // dynamic data CRUD operations, custom types, and orbital reference validation.
 type Engine struct {
-	mu         sync.RWMutex
-	project    *Project
-	adapter    adapter.Adapter
-	registry   *registry.ModelRegistry
-	diffEngine *diff.DiffEngine
+	mu               sync.RWMutex
+	project          *Project
+	adapter          adapter.Adapter
+	registry         *registry.ModelRegistry
+	diffEngine       *diff.DiffEngine
+	dataSetRepo      datasetrepo.DataSetRepository
+	functionRegistry *datasetres.InMemFunctionRegistry
+	dataSetService   *datasetsvc.DataSetService
 }
 
 // NewEngine creates a new base Engine for a Project.
 func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
+	dsRepo := datasetrepo.NewAdapterDataSetRepository(adp)
+	fnReg := datasetres.NewFunctionRegistry()
+	modelResolver := datasetres.NewModelResolver(nil)
+	dsSvc := datasetsvc.NewDataSetService(dsRepo, modelResolver, modelResolver, fnReg, adp)
+
 	return &Engine{
-		project:    proj,
-		adapter:    adp,
-		registry:   registry.NewModelRegistry(),
-		diffEngine: diff.NewDiffEngine(),
+		project:          proj,
+		adapter:          adp,
+		registry:         registry.NewModelRegistry(),
+		diffEngine:       diff.NewDiffEngine(),
+		dataSetRepo:      dsRepo,
+		functionRegistry: fnReg,
+		dataSetService:   dsSvc,
 	}
+}
+
+// GetDataSetService returns the dataset engine service instance.
+func (e *Engine) GetDataSetService() *datasetsvc.DataSetService {
+	return e.dataSetService
+}
+
+// GetDataSetRepository returns the dataset repository.
+func (e *Engine) GetDataSetRepository() datasetrepo.DataSetRepository {
+	return e.dataSetRepo
+}
+
+// GetFunctionRegistry returns the function registry for datasets.
+func (e *Engine) GetFunctionRegistry() *datasetres.InMemFunctionRegistry {
+	return e.functionRegistry
 }
 
 // GetProject returns the parent Project metadata.

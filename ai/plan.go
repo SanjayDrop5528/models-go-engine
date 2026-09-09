@@ -21,17 +21,20 @@ type AISelect struct {
 	Field      string `json:"field"`
 	HeaderName string `json:"header_name,omitempty"`
 	DataType   string `json:"data_type,omitempty"`
+	CastAs     string `json:"cast_as,omitempty"` // e.g. TEXT, VARCHAR, NUMERIC, DATE
 }
 
 // AIJoin defines a relational join link between tables.
 type AIJoin struct {
-	Schema    string `json:"schema,omitempty"`
-	FromTable string `json:"from_table"`
-	FromField string `json:"from_field"`
-	ToTable   string `json:"to_table"`
-	ToField   string `json:"to_field"`
-	NamedAs   string `json:"named_as,omitempty"`
-	JoinType  string `json:"join_type,omitempty"` // LEFT, INNER, RIGHT, FULL
+	Schema          string `json:"schema,omitempty"`
+	FromTable       string `json:"from_table"`
+	FromField       string `json:"from_field"`
+	ToTable         string `json:"to_table"`
+	ToField         string `json:"to_field"`
+	NamedAs         string `json:"named_as,omitempty"`
+	JoinType        string `json:"join_type,omitempty"` // LEFT, INNER, RIGHT, FULL
+	ConvertToString bool   `json:"convert_to_string,omitempty"`
+	CastMode        string `json:"cast_mode,omitempty"` // "BOTH", "FROM_ONLY", "TO_ONLY"
 }
 
 // AIFilter defines a filter condition on a field.
@@ -40,6 +43,7 @@ type AIFilter struct {
 	Field    string `json:"field"`
 	Operator string `json:"operator"` // =, !=, >, >=, <, <=, like, in, between, is_null
 	Value    any    `json:"value"`
+	CastAs   string `json:"cast_as,omitempty"` // e.g. TEXT, DATE, NUMERIC
 }
 
 // AIAggregate defines an aggregate metric calculation.

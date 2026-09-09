@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -123,7 +124,7 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 	}
 
 	// 1. Layer 1: Discover all relevant meta-tables matching the user intent and their relationships
-	discovered := s.DiscoverRelatedTables(req.Prompt, req.CurrentDataSet)
+	discovered := s.DiscoverRelatedTables(ctx, req.Prompt, req.CurrentDataSet)
 
 	// 2. Layer 2: Formulate enriched schema context containing those tables, all their attributes, and relationships
 	schemaContext, discoveredTableNames := s.BuildEnrichedSchemaContext(discovered)
@@ -244,11 +245,15 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 		return nil, fmt.Errorf("base_model cannot be empty")
 	}
 
-	// Resolve schema from ModelRegistry if not specified
+	// Pillar 1: Metadata Resolver - Resolve schema and model config from registry
 	baseSchema := plan.Schema
 	if s.registry != nil {
 		cfg, err := s.registry.GetModelConfig(baseTable)
 		if err == nil && cfg != nil {
+			// Pillar 3: Permission Validator
+			if strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusInactive)) || strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusArchived)) {
+				return nil, fmt.Errorf("permission denied: model '%s' is inactive", baseTable)
+			}
 			if baseSchema == "" && cfg.Schema != "" {
 				baseSchema = cfg.Schema
 			}
@@ -278,7 +283,7 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 		ds.SaveMode = domain.SaveMode(plan.SaveMode)
 	}
 
-	// 1. Convert Joins
+	// Pillar 2: Relationship Graph - Convert Joins & Auto-resolve Join Conditions
 	for _, j := range plan.Joins {
 		fromTbl := j.FromTable
 		if fromTbl == "" {
@@ -295,19 +300,76 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 		}
 		schema := j.Schema
 		if schema == "" && s.registry != nil {
-			if cfg, err := s.registry.GetModelConfig(toTbl); err == nil && cfg != nil && cfg.Schema != "" {
-				schema = cfg.Schema
+			if cfg, err := s.registry.GetModelConfig(toTbl); err == nil && cfg != nil {
+				// Permission Validator
+				if strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusInactive)) || strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusArchived)) {
+					return nil, fmt.Errorf("permission denied: joined model '%s' is inactive", toTbl)
+				}
+				if cfg.Schema != "" {
+					schema = cfg.Schema
+				}
+				toTbl = cfg.Table
+			}
+		}
+
+		// Auto-resolve join keys from Relationship Graph if omitted or empty
+		fromField := strings.TrimSpace(j.FromField)
+		toField := strings.TrimSpace(j.ToField)
+		if fromField == "" || toField == "" {
+			resFrom, resTo := s.resolveJoinPath(fromTbl, toTbl)
+			if fromField == "" {
+				fromField = resFrom
+			}
+			if toField == "" {
+				toField = resTo
+			}
+		}
+
+		convertToString := j.ConvertToString
+		castMode := j.CastMode
+		if castMode == "" {
+			castMode = "BOTH"
+		}
+
+		// Metadata Resolver: Automatically inspect data types of both join columns for casting requirement
+		if s.registry != nil {
+			var fromType, toType string
+			if dms := s.getFieldsForTable(fromTbl); len(dms) > 0 {
+				for _, dm := range dms {
+					if strings.EqualFold(dm.ColumnName, fromField) {
+						fromType = string(dm.DataType)
+						break
+					}
+				}
+			}
+			if dms := s.getFieldsForTable(toTbl); len(dms) > 0 {
+				for _, dm := range dms {
+					if strings.EqualFold(dm.ColumnName, toField) {
+						toType = string(dm.DataType)
+						break
+					}
+				}
+			}
+
+			// If data types exist and differ (e.g. UUID vs VARCHAR, INT vs VARCHAR), auto-enable casting
+			if fromType != "" && toType != "" && !strings.EqualFold(fromType, toType) {
+				convertToString = true
+				if castMode == "" {
+					castMode = "BOTH"
+				}
 			}
 		}
 
 		ds.JoinCollections = append(ds.JoinCollections, domain.JoinCollection{
 			Schema:              schema,
 			FromCollection:      fromTbl,
-			FromCollectionField: j.FromField,
+			FromCollectionField: fromField,
 			ToCollection:        toTbl,
-			ToCollectionField:   j.ToField,
+			ToCollectionField:   toField,
 			NamedAs:             namedAs,
 			JoinType:            jt,
+			ConvertToString:     convertToString,
+			CastMode:            castMode,
 		})
 	}
 
@@ -319,25 +381,26 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 			fieldKey = fmt.Sprintf("%s.%s", f.Table, f.Field)
 		}
 		op := strings.ToLower(strings.TrimSpace(f.Operator))
+		fVal := normalizeFilterValue(f.Value)
 		switch op {
 		case "!=", "<>":
-			filterMap[fieldKey] = map[string]any{"$ne": f.Value}
+			filterMap[fieldKey] = map[string]any{"$ne": fVal}
 		case ">":
-			filterMap[fieldKey] = map[string]any{"$gt": f.Value}
+			filterMap[fieldKey] = map[string]any{"$gt": fVal}
 		case ">=":
-			filterMap[fieldKey] = map[string]any{"$gte": f.Value}
+			filterMap[fieldKey] = map[string]any{"$gte": fVal}
 		case "<":
-			filterMap[fieldKey] = map[string]any{"$lt": f.Value}
+			filterMap[fieldKey] = map[string]any{"$lt": fVal}
 		case "<=":
-			filterMap[fieldKey] = map[string]any{"$lte": f.Value}
+			filterMap[fieldKey] = map[string]any{"$lte": fVal}
 		case "like", "contains":
-			filterMap[fieldKey] = map[string]any{"$regex": f.Value}
+			filterMap[fieldKey] = map[string]any{"$regex": fVal}
 		case "in":
-			filterMap[fieldKey] = map[string]any{"$in": f.Value}
+			filterMap[fieldKey] = map[string]any{"$in": fVal}
 		case "is_null":
 			filterMap[fieldKey] = nil
 		default:
-			filterMap[fieldKey] = f.Value
+			filterMap[fieldKey] = fVal
 		}
 	}
 	if len(filterMap) > 0 {
@@ -350,10 +413,20 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 		if tbl == "" {
 			tbl = baseTable
 		}
+		var dt string
+		if dms := s.getFieldsForTable(tbl); len(dms) > 0 {
+			for _, dm := range dms {
+				if strings.EqualFold(dm.ColumnName, g.Field) {
+					dt = string(dm.DataType)
+					break
+				}
+			}
+		}
 		ds.GroupByFields = append(ds.GroupByFields, domain.GroupByField{
 			TableName: tbl,
 			FieldName: g.Field,
 			Name:      g.Field,
+			DataType:  dt,
 		})
 	}
 
@@ -403,6 +476,16 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 			}
 			dt := sCol.DataType
 			if dt == "" {
+				if dms := s.getFieldsForTable(tbl); len(dms) > 0 {
+					for _, dm := range dms {
+						if strings.EqualFold(dm.ColumnName, sCol.Field) {
+							dt = string(dm.DataType)
+							break
+						}
+					}
+				}
+			}
+			if dt == "" {
 				dt = "string"
 			}
 			ds.SelectedList = append(ds.SelectedList, domain.SelectedField{
@@ -414,10 +497,14 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 	} else {
 		// Default projection: Group by fields + aggregation columns
 		for _, g := range ds.GroupByFields {
+			dt := g.DataType
+			if dt == "" {
+				dt = "string"
+			}
 			ds.SelectedList = append(ds.SelectedList, domain.SelectedField{
 				Field:      fmt.Sprintf("%s.%s", g.TableName, g.FieldName),
 				HeaderName: g.FieldName,
-				DataType:   "string",
+				DataType:   dt,
 			})
 		}
 		for _, agg := range ds.CustomColumns {
@@ -440,9 +527,9 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 	return ds, nil
 }
 
-// DiscoverRelatedTables (Layer 1): Scans the model catalog, scores candidates against user keywords,
-// and traverses relational links (FKs, Orbital References, name conventions) to find all connected meta-tables.
-func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataSet) []*DiscoveredTableMeta {
+// DiscoverRelatedTables (Layer 1): Sends all meta table names to the AI to identify relevant tables,
+// and traverses relational links (FKs, Orbital References, abbreviations) to gather all connected meta-tables.
+func (s *AIService) DiscoverRelatedTables(ctx context.Context, prompt string, currentDS *domain.DataSet) []*DiscoveredTableMeta {
 	if s.registry == nil {
 		return nil
 	}
@@ -455,19 +542,89 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 	keywords := extractPromptKeywords(prompt)
 	fieldsByTable := make(map[string][]*model.DataModel)
 	cfgByTable := make(map[string]*model.ModelConfig)
+	var tableCatalog strings.Builder
+
 	for _, cfg := range configs {
 		tLower := strings.ToLower(cfg.Table)
 		cfgByTable[tLower] = cfg
 		cfgByTable[strings.ToLower(cfg.ID)] = cfg
+		cfgByTable[fmt.Sprintf("%s.%s", strings.ToLower(cfg.Schema), tLower)] = cfg
 
 		fields := s.registry.ListDataModels(cfg.ID)
 		if len(fields) == 0 {
 			fields = s.registry.ListDataModels(cfg.Table)
 		}
 		fieldsByTable[tLower] = fields
+
+		tableCatalog.WriteString(fmt.Sprintf("- %s.%s\n", cfg.Schema, cfg.Table))
 	}
 
-	// 1. Score tables based on prompt relevance
+	selectedSet := make(map[string]*model.ModelConfig)
+	scores := make(map[string]int)
+
+	// Step 1: Send ALL meta table names to AI to discover relevant tables
+	if s.client != nil {
+		discoveryPrompt := fmt.Sprintf(`You are an expert database metadata routing assistant.
+Below is the list of ALL available database tables in the catalog.
+Analyze the user's natural language request (even with typos, abbreviations, or informal phrasing).
+Select all relevant tables needed to answer the query, including related tables required for JOINs (e.g. attendance records link to employees, orders link to customers).
+
+ALL AVAILABLE DATABASE TABLES:
+%s
+
+USER REQUEST:
+"%s"
+
+Return strictly a JSON object:
+{
+  "relevant_tables": ["<schema.table or table_name>", ...]
+}`, tableCatalog.String(), prompt)
+
+		discReq := &ChatRequest{
+			Messages: []ChatMessage{
+				{Role: "system", Content: "You are a database metadata routing assistant. Return only valid JSON."},
+				{Role: "user", Content: discoveryPrompt},
+			},
+			Effort: "low",
+		}
+
+		if discResp, err := s.client.Chat(ctx, discReq); err == nil {
+			raw := discResp.Response
+			if len(discResp.Choices) > 0 {
+				raw = discResp.Choices[0].Message.Content
+			}
+			clean := cleanJSONBlock(raw)
+			var parsed struct {
+				RelevantTables []string `json:"relevant_tables"`
+			}
+			if jsonErr := json.Unmarshal([]byte(clean), &parsed); jsonErr == nil {
+				for _, t := range parsed.RelevantTables {
+					tClean := strings.ToLower(strings.TrimSpace(t))
+					if cfg, ok := cfgByTable[tClean]; ok {
+						selectedSet[strings.ToLower(cfg.Table)] = cfg
+						scores[strings.ToLower(cfg.Table)] = 100
+					} else if idx := strings.Index(tClean, "."); idx >= 0 {
+						tblOnly := tClean[idx+1:]
+						if cfg, ok := cfgByTable[tblOnly]; ok {
+							selectedSet[strings.ToLower(cfg.Table)] = cfg
+							scores[strings.ToLower(cfg.Table)] = 100
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Current dataset base table receives strong anchor weight
+	if currentDS != nil && currentDS.BaseCollection.Collection != "" {
+		cCol := strings.ToLower(currentDS.BaseCollection.Collection)
+		if cfg, ok := cfgByTable[cCol]; ok {
+			selectedSet[strings.ToLower(cfg.Table)] = cfg
+			scores[strings.ToLower(cfg.Table)] = 150
+		}
+	}
+
+	// Step 2: Also run keyword scoring as safety net & supplement
 	type scoredTable struct {
 		cfg   *model.ModelConfig
 		score int
@@ -477,12 +634,6 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 	for _, cfg := range configs {
 		tLower := strings.ToLower(cfg.Table)
 		score := 0
-
-		// Current dataset base table receives strong anchor weight
-		if currentDS != nil && (strings.EqualFold(cfg.Table, currentDS.BaseCollection.Collection) || strings.EqualFold(cfg.ID, currentDS.BaseCollection.Collection)) {
-			score += 150
-		}
-
 		fields := fieldsByTable[tLower]
 
 		for _, kw := range keywords {
@@ -515,27 +666,19 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 		}
 	}
 
-	// Sort scored list descending
 	sort.Slice(scoredList, func(i, j int) bool {
 		return scoredList[i].score > scoredList[j].score
 	})
 
-	// Select top candidate tables (up to 5 initial seeds)
-	selectedSet := make(map[string]*model.ModelConfig)
-	scores := make(map[string]int)
-
-	if len(scoredList) > 0 {
-		limit := 5
-		if len(scoredList) < limit {
-			limit = len(scoredList)
-		}
-		for i := 0; i < limit; i++ {
-			tbl := strings.ToLower(scoredList[i].cfg.Table)
+	for i := 0; i < len(scoredList) && (len(selectedSet) < 4 || i < 2); i++ {
+		tbl := strings.ToLower(scoredList[i].cfg.Table)
+		if _, exists := selectedSet[tbl]; !exists {
 			selectedSet[tbl] = scoredList[i].cfg
 			scores[tbl] = scoredList[i].score
 		}
-	} else {
-		// Fallback: take top 3 active configs
+	}
+
+	if len(selectedSet) == 0 {
 		for i, cfg := range configs {
 			if i >= 3 {
 				break
@@ -546,8 +689,17 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 		}
 	}
 
-	// 2. Relational Graph Traversal: Expand with related tables (incoming & outgoing foreign keys)
-	// Check outgoing references from initial candidate tables
+	// Step 3: Relational Graph Traversal (Expand with related tables & common abbreviations)
+	commonAbbr := map[string]string{
+		"emp":  "employees",
+		"dept": "departments",
+		"org":  "organizations",
+		"cat":  "categories",
+		"usr":  "users",
+		"cust": "customers",
+		"prod": "products",
+	}
+
 	for tbl := range selectedSet {
 		for _, f := range fieldsByTable[tbl] {
 			var targetTbl string
@@ -561,6 +713,10 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 					targetTbl = strings.ToLower(cfg.Table)
 				} else if cfg, exists := cfgByTable[stem]; exists {
 					targetTbl = strings.ToLower(cfg.Table)
+				} else if mapped, hasAbbr := commonAbbr[stem]; hasAbbr {
+					if cfg, exists := cfgByTable[mapped]; exists {
+						targetTbl = strings.ToLower(cfg.Table)
+					}
 				}
 			}
 
@@ -575,7 +731,7 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 		}
 	}
 
-	// Check incoming references from other tables that mention prompt keywords
+	// Incoming references
 	for _, cfg := range configs {
 		tLower := strings.ToLower(cfg.Table)
 		if _, already := selectedSet[tLower]; already {
@@ -591,13 +747,14 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 				stem := strings.TrimSuffix(strings.ToLower(f.ColumnName), "_id")
 				if refCfg, exists := cfgByTable[pluralize(stem)]; exists {
 					targetTbl = strings.ToLower(refCfg.Table)
-				} else if refCfg, exists := cfgByTable[stem]; exists {
-					targetTbl = strings.ToLower(refCfg.Table)
+				} else if mapped, hasAbbr := commonAbbr[stem]; hasAbbr {
+					if refCfg, exists := cfgByTable[mapped]; exists {
+						targetTbl = strings.ToLower(refCfg.Table)
+					}
 				}
 			}
 			if targetTbl != "" {
 				if _, isTargetSelected := selectedSet[targetTbl]; isTargetSelected {
-					// Check if this referencing table shares prompt keywords
 					matchesKeyword := false
 					for _, kw := range keywords {
 						if strings.Contains(tLower, kw) || strings.Contains(kw, tLower) {
@@ -615,7 +772,7 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 		}
 	}
 
-	// 3. Assemble DiscoveredTableMeta with full attributes & relationships
+	// 4. Assemble DiscoveredTableMeta with full attributes & relationships
 	var results []*DiscoveredTableMeta
 	for tbl, cfg := range selectedSet {
 		meta := &DiscoveredTableMeta{
@@ -652,11 +809,17 @@ func (s *AIService) DiscoverRelatedTables(prompt string, currentDS *domain.DataS
 				}
 			} else if strings.HasSuffix(strings.ToLower(f.ColumnName), "_id") {
 				stem := strings.TrimSuffix(strings.ToLower(f.ColumnName), "_id")
-				if refCfg, exists := cfgByTable[pluralize(stem)]; exists {
-					col.IsForeignKey = true
-					col.RefTable = refCfg.Table
-					col.RefColumn = "id"
-				} else if refCfg, exists := cfgByTable[stem]; exists {
+				var refCfg *model.ModelConfig
+				if c, exists := cfgByTable[pluralize(stem)]; exists {
+					refCfg = c
+				} else if c, exists := cfgByTable[stem]; exists {
+					refCfg = c
+				} else if mapped, hasAbbr := commonAbbr[stem]; hasAbbr {
+					if c, exists := cfgByTable[mapped]; exists {
+						refCfg = c
+					}
+				}
+				if refCfg != nil {
 					col.IsForeignKey = true
 					col.RefTable = refCfg.Table
 					col.RefColumn = "id"
@@ -827,10 +990,10 @@ JSON SCHEMA:
     { "table": "<table name>", "field": "<column>", "header_name": "<alias>", "data_type": "<string|int|decimal|timestamp>" }
   ],
   "joins": [
-    { "from_table": "<table 1>", "from_field": "<col 1>", "to_table": "<table 2>", "to_field": "<col 2>", "join_type": "LEFT|INNER" }
+    { "from_table": "<table 1>", "from_field": "<col 1>", "to_table": "<table 2>", "to_field": "<col 2>", "join_type": "LEFT|INNER", "convert_to_string": false, "cast_mode": "BOTH|FROM_ONLY|TO_ONLY" }
   ],
   "filters": [
-    { "table": "<table name>", "field": "<column>", "operator": "=|!=|>|<|like|in|is_null", "value": <literal value> }
+    { "table": "<table name>", "field": "<column>", "operator": "=|!=|>|<|like|in|is_null", "value": <literal value>, "cast_as": "<optional sql type e.g. DATE|TEXT>" }
   ],
   "aggregations": [
     { "name": "<alias e.g. total_capacity>", "function": "SUM|AVG|COUNT|MIN|MAX", "table": "<table name>", "field": "<column>", "group_by_key": "<paired dimension column>" }
@@ -839,7 +1002,7 @@ JSON SCHEMA:
     { "table": "<table name>", "field": "<column>" }
   ],
   "filter_params": [
-    { "name": "<param_name>", "data_type": "string|int|date" }
+    { "name": "<param_name>", "data_type": "string|int|decimal|date|timestamp" }
   ],
   "driver": "%s",
   "save_mode": "PROCEDURE",
@@ -848,14 +1011,27 @@ JSON SCHEMA:
 
 RULES:
 1. ONLY use tables and columns present in the AVAILABLE DATABASE TABLES & FIELDS schema above.
-2. If computing totals, averages, or counts across groups, add them to "aggregations" AND include the grouping columns in "group_by".
-3. When joining tables, choose foreign key matches from the schema (e.g. stores.id = store_spares.store_id).
-4. For multi-turn conversations, preserve existing selections and filters unless the user explicitly asks to replace or remove them.
-5. Provide a clear, concise "explanation" summarizing the action taken.
-6. Return ONLY the raw JSON object.`, driver, schemaContext, driver)
+2. DATA TYPES & CASTING:
+   - Always pay attention to the column data types displayed in the schema (e.g. UUID, VARCHAR, INTEGER, TIMESTAMP).
+   - In scenarios where joining columns have divergent or mismatched types (e.g. UUID to VARCHAR, or INTEGER to VARCHAR), set "convert_to_string": true and "cast_mode": "BOTH" so safe type-casting (CAST(... AS TEXT)) is performed.
+   - For filter parameters and projections, assign the exact matching "data_type".
+3. RELATIVE DATE FILTERS (Custom Options Macro):
+   - For relative date or timestamp filters (e.g. "last 7 days", "past 30 days", "yesterday", "today"), use the dynamic macro syntax "C[<offset>]":
+     * "last 7 days" -> operator: ">=", value: "C[-7d]"
+     * "yesterday" / "past 1 day" -> operator: ">=", value: "C[-1d]"
+     * "today" -> operator: ">=", value: "C[0d]"
+     * "last 30 days" / "past month" -> operator: ">=", value: "C[-30d]" or "C[-1m]"
+     * "last year" -> operator: ">=", value: "C[-1y]"
+     * "next 7 days" -> operator: "<=", value: "C[+7d]"
+   - The engine automatically compiles "C[-Nd]" into native SQL "(CURRENT_DATE - INTERVAL 'N days')".
+4. If computing totals, averages, or counts across groups, add them to "aggregations" AND include the grouping columns in "group_by".
+5. When joining tables, choose foreign key matches from the schema (e.g. stores.id = store_spares.store_id).
+6. For multi-turn conversations, preserve existing selections and filters unless the user explicitly asks to replace or remove them.
+7. Provide a clear, concise "explanation" summarizing the action taken.
+8. Return ONLY the raw JSON object.`, driver, schemaContext, driver)
 }
 
-func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
+func cleanJSONBlock(content string) string {
 	clean := strings.TrimSpace(content)
 	if idx := strings.Index(clean, "```json"); idx != -1 {
 		clean = clean[idx+7:]
@@ -868,12 +1044,140 @@ func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
 			clean = clean[:endIdx]
 		}
 	}
-	clean = strings.TrimSpace(clean)
+	return strings.TrimSpace(clean)
+}
 
+func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
+	clean := cleanJSONBlock(content)
 	var plan AIQueryPlan
 	if err := json.Unmarshal([]byte(clean), &plan); err != nil {
 		return nil, fmt.Errorf("invalid json: %w (content: %s)", err, clean)
 	}
-
 	return &plan, nil
+}
+
+// normalizeFilterValue checks if the filter value is an interval expression and normalizes it to C[...] macro syntax.
+func normalizeFilterValue(val any) any {
+	if s, ok := val.(string); ok {
+		sTrim := strings.TrimSpace(s)
+		sLower := strings.ToLower(sTrim)
+		// Check for expressions like now() - interval '7 days' or current_date - interval '7 days'
+		if strings.Contains(sLower, "interval") {
+			re := regexp.MustCompile(`(?i)(?:now\(\)|current_date|current_timestamp)\s*([+-])\s*interval\s*'(\d+)\s*([a-zA-Z]+)'`)
+			if matches := re.FindStringSubmatch(sTrim); len(matches) == 4 {
+				sign := matches[1]
+				num := matches[2]
+				unitRaw := strings.ToLower(matches[3])
+				unit := "d"
+				if strings.HasPrefix(unitRaw, "day") {
+					unit = "d"
+				} else if strings.HasPrefix(unitRaw, "month") {
+					unit = "m"
+				} else if strings.HasPrefix(unitRaw, "year") {
+					unit = "y"
+				} else if strings.HasPrefix(unitRaw, "hour") {
+					unit = "h"
+				} else if strings.HasPrefix(unitRaw, "week") {
+					unit = "w"
+				}
+				return fmt.Sprintf("C[%s%s%s]", sign, num, unit)
+			}
+		}
+		return sTrim
+	}
+	return val
+}
+
+// getFieldsForTable returns all DataModel fields for a given table name or model ID, resolving aliases and configs.
+func (s *AIService) getFieldsForTable(tbl string) []*model.DataModel {
+	if s.registry == nil {
+		return nil
+	}
+	tbl = strings.TrimSpace(tbl)
+	if tbl == "" {
+		return nil
+	}
+	if cfg, err := s.registry.GetModelConfig(tbl); err == nil && cfg != nil {
+		if fields := s.registry.ListDataModels(cfg.ID); len(fields) > 0 {
+			return fields
+		}
+	}
+	if fields := s.registry.ListDataModels(tbl); len(fields) > 0 {
+		return fields
+	}
+	// Try without schema prefix (e.g. "iam.users" -> "users")
+	if idx := strings.LastIndex(tbl, "."); idx != -1 {
+		short := tbl[idx+1:]
+		if cfg, err := s.registry.GetModelConfig(short); err == nil && cfg != nil {
+			if fields := s.registry.ListDataModels(cfg.ID); len(fields) > 0 {
+				return fields
+			}
+		}
+		return s.registry.ListDataModels(short)
+	}
+	return nil
+}
+
+// resolveJoinPath (Relationship Graph):
+// Determines the join keys between fromTable and toTable using the metadata registry's foreign keys,
+// orbital references, and naming conventions.
+func (s *AIService) resolveJoinPath(fromTable, toTable string) (string, string) {
+	if s.registry == nil {
+		return "id", fmt.Sprintf("%s_id", singularize(fromTable))
+	}
+
+	fromFields := s.getFieldsForTable(fromTable)
+	toFields := s.getFieldsForTable(toTable)
+
+	// Check if fromTable references toTable
+	for _, f := range fromFields {
+		if f.Reference != nil && strings.EqualFold(f.Reference.Model, toTable) {
+			attr := f.Reference.Attribute
+			if attr == "" {
+				attr = "id"
+			}
+			return f.ColumnName, attr
+		}
+		if f.IsOrbitalReference && f.OrbitalReferenceModelID != nil && strings.EqualFold(*f.OrbitalReferenceModelID, toTable) {
+			attr := "id"
+			if f.OrbitalReferenceFieldID != nil && *f.OrbitalReferenceFieldID != "" {
+				attr = *f.OrbitalReferenceFieldID
+			}
+			return f.ColumnName, attr
+		}
+		colLower := strings.ToLower(f.ColumnName)
+		if strings.HasSuffix(colLower, "_id") {
+			stem := strings.TrimSuffix(colLower, "_id")
+			if strings.EqualFold(stem, singularize(toTable)) || strings.EqualFold(pluralize(stem), toTable) || (stem == "emp" && strings.HasPrefix(toTable, "employee")) {
+				return f.ColumnName, "id"
+			}
+		}
+	}
+
+	// Check if toTable references fromTable
+	for _, f := range toFields {
+		if f.Reference != nil && strings.EqualFold(f.Reference.Model, fromTable) {
+			attr := f.Reference.Attribute
+			if attr == "" {
+				attr = "id"
+			}
+			return attr, f.ColumnName
+		}
+		if f.IsOrbitalReference && f.OrbitalReferenceModelID != nil && strings.EqualFold(*f.OrbitalReferenceModelID, fromTable) {
+			attr := "id"
+			if f.OrbitalReferenceFieldID != nil && *f.OrbitalReferenceFieldID != "" {
+				attr = *f.OrbitalReferenceFieldID
+			}
+			return attr, f.ColumnName
+		}
+		colLower := strings.ToLower(f.ColumnName)
+		if strings.HasSuffix(colLower, "_id") {
+			stem := strings.TrimSuffix(colLower, "_id")
+			if strings.EqualFold(stem, singularize(fromTable)) || strings.EqualFold(pluralize(stem), fromTable) || (stem == "emp" && strings.HasPrefix(fromTable, "employee")) {
+				return "id", f.ColumnName
+			}
+		}
+	}
+
+	return "id", fmt.Sprintf("%s_id", singularize(fromTable))
 }

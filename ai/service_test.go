@@ -280,7 +280,7 @@ func TestTwoLayerMetadataDiscoveryAndEnrichedContext(t *testing.T) {
 
 	// Layer 1 Test: User asks for stores and spares inventory
 	prompt := "Show store capacity with store spares"
-	discovered := svc.DiscoverRelatedTables(prompt, nil)
+	discovered := svc.DiscoverRelatedTables(context.Background(), prompt, nil)
 	if len(discovered) == 0 {
 		t.Fatalf("expected discovered tables, got 0")
 	}
@@ -323,5 +323,85 @@ func TestTwoLayerMetadataDiscoveryAndEnrichedContext(t *testing.T) {
 		t.Errorf("expected response to have DiscoveredTables")
 	}
 }
+
+func TestDataTypeAndCastingResolution(t *testing.T) {
+	reg := registry.NewModelRegistry()
+
+	_, _ = reg.SaveModelConfig(&model.ModelConfig{
+		ID:     "iam_users",
+		Name:   "users",
+		Table:  "users",
+		Schema: "iam",
+	})
+	_, _ = reg.SaveModelConfig(&model.ModelConfig{
+		ID:     "audit_logs",
+		Name:   "logs",
+		Table:  "logs",
+		Schema: "audit",
+	})
+
+	// users.id is UUID
+	_, _ = reg.SaveDataModel(&model.DataModel{
+		ModelID:      "iam_users",
+		ColumnName:   "id",
+		DataType:     "UUID",
+		IsPrimaryKey: true,
+	})
+	// logs.user_id is VARCHAR (divergent data type scenario!)
+	_, _ = reg.SaveDataModel(&model.DataModel{
+		ModelID:    "audit_logs",
+		ColumnName: "user_id",
+		DataType:   "VARCHAR",
+	})
+
+	svc := NewAIService(nil, reg, nil)
+
+	plan := &AIQueryPlan{
+		BaseModel: "logs",
+		Schema:    "audit",
+		Joins: []AIJoin{
+			{
+				FromTable: "logs",
+				FromField: "user_id",
+				ToTable:   "users",
+				ToField:   "id",
+			},
+		},
+		Select: []AISelect{
+			{Table: "users", Field: "id"},
+			{Table: "logs", Field: "user_id"},
+		},
+	}
+
+	ds, err := svc.PlanToDataSet(plan, "postgres")
+	if err != nil {
+		t.Fatalf("PlanToDataSet failed: %v", err)
+	}
+
+	if len(ds.JoinCollections) != 1 {
+		t.Fatalf("expected 1 join collection, got %d", len(ds.JoinCollections))
+	}
+
+	join := ds.JoinCollections[0]
+	// Type mismatch (VARCHAR vs UUID) must trigger ConvertToString = true and CastMode = "BOTH"
+	if !join.ConvertToString {
+		t.Errorf("expected join.ConvertToString to be true due to UUID vs VARCHAR mismatch, got false")
+	}
+	if join.CastMode != "BOTH" {
+		t.Errorf("expected join.CastMode to be 'BOTH', got '%s'", join.CastMode)
+	}
+
+	// Verify DataModel authentic types were propagated to SelectedList
+	if len(ds.SelectedList) != 2 {
+		t.Fatalf("expected 2 selected fields, got %d", len(ds.SelectedList))
+	}
+	if ds.SelectedList[0].DataType != "UUID" {
+		t.Errorf("expected users.id to have DataType 'UUID', got '%s'", ds.SelectedList[0].DataType)
+	}
+	if ds.SelectedList[1].DataType != "VARCHAR" {
+		t.Errorf("expected logs.user_id to have DataType 'VARCHAR', got '%s'", ds.SelectedList[1].DataType)
+	}
+}
+
 
 

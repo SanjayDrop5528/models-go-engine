@@ -19,6 +19,7 @@ type DataSet struct {
 	Name              string                 `json:"name"`
 	ReferenceName     string                 `json:"reference_name"`
 	Driver            string                 `json:"driver"` // "postgres", "mysql", "mongodb", "memory"
+	ConversationID    string                 `json:"conversation_id,omitempty"`
 	BaseCollection    BaseCollection         `json:"base_collection"`
 	JoinCollections   []JoinCollection       `json:"join_collections,omitempty"`
 	CustomColumns     []CustomColumn         `json:"custom_columns,omitempty"`

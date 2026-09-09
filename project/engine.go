@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
+	"github.com/SanjayDrop5528/models-go-engine/ai"
 	datasetrepo "github.com/SanjayDrop5528/models-go-engine/dataset/repository"
 	datasetres "github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
 	datasetsvc "github.com/SanjayDrop5528/models-go-engine/dataset/service"
@@ -35,6 +36,7 @@ type Engine struct {
 	dataSetRepo      datasetrepo.DataSetRepository
 	functionRegistry *datasetres.InMemFunctionRegistry
 	dataSetService   *datasetsvc.DataSetService
+	aiService        *ai.AIService
 }
 
 // NewEngine creates a new base Engine for a Project.
@@ -43,15 +45,49 @@ func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 	fnReg := datasetres.NewFunctionRegistry()
 	modelResolver := datasetres.NewModelResolver(nil)
 	dsSvc := datasetsvc.NewDataSetService(dsRepo, modelResolver, modelResolver, fnReg, adp)
+	reg := registry.NewModelRegistry()
+	aiSvc := ai.NewAIService(nil, reg, dsSvc)
 
 	return &Engine{
 		project:          proj,
 		adapter:          adp,
-		registry:         registry.NewModelRegistry(),
+		registry:         reg,
 		diffEngine:       diff.NewDiffEngine(),
 		dataSetRepo:      dsRepo,
 		functionRegistry: fnReg,
 		dataSetService:   dsSvc,
+		aiService:        aiSvc,
+	}
+}
+
+// GetAIService returns the AI query planner service.
+func (e *Engine) GetAIService() *ai.AIService {
+	return e.aiService
+}
+
+// GenerateDataSetFromPrompt translates natural language to an executable DataSet with persistent conversation memory.
+func (e *Engine) GenerateDataSetFromPrompt(ctx context.Context, req *ai.GenerateRequest) (*ai.GenerateResponse, error) {
+	if e.aiService == nil {
+		return nil, fmt.Errorf("AI service not initialized")
+	}
+	if req.Driver == "" && e.adapter != nil {
+		req.Driver = e.adapter.Name()
+	}
+	return e.aiService.GenerateDataSet(ctx, req)
+}
+
+// GetActiveAIConversationID returns the current active conversation ID tracked inside the engine.
+func (e *Engine) GetActiveAIConversationID() string {
+	if e.aiService != nil {
+		return e.aiService.GetActiveConversationID()
+	}
+	return ""
+}
+
+// ResetAIConversation clears the conversation memory tracked inside the engine.
+func (e *Engine) ResetAIConversation() {
+	if e.aiService != nil {
+		e.aiService.ResetConversation()
 	}
 }
 

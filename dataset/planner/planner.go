@@ -1,3 +1,12 @@
+// Package planner converts validated domain datasets into query abstract syntax trees (QueryAST).
+//
+// File: planner.go
+// Usage:
+//   This file implements the core query planner (DataSetPlanner) for Dataset Studio.
+//   It takes a validated DataSet domain model, resolves table aliases, organizes relational
+//   joins, separates scalar projections from grouped/aggregate dimensions, builds custom
+//   column calculation ASTs, parses WHERE filter conditions and runtime parameters, and emits
+//   an optimized, dialect-independent QueryAST ready for adapter compilation.
 package planner
 
 import (
@@ -15,6 +24,16 @@ type DataSetPlanner struct {
 }
 
 // NewPlanner creates a new DataSetPlanner.
+//
+// Purpose:
+//   Initializes a DataSetPlanner with the provided FunctionResolver for function and aggregation introspection.
+//
+// Where it is used:
+//   - Instantiated in DataSetService.NewDataSetService.
+//   - Used in unit tests for planning and query AST generation.
+//
+// When can it be used:
+//   - Can be used whenever dataset definitions need to be compiled into executable query plans.
 func NewPlanner(fnr resolver.FunctionResolver) *DataSetPlanner {
 	return &DataSetPlanner{
 		functionResolver: fnr,
@@ -22,6 +41,18 @@ func NewPlanner(fnr resolver.FunctionResolver) *DataSetPlanner {
 }
 
 // BuildAST creates the QueryAST from a dataset definition.
+//
+// Purpose:
+//   Transforms an abstract DataSet domain struct into a fully-resolved, vendor-independent QueryAST.
+//   Resolves aliases, organizes joins, normalizes GROUP BY fields, and binds parameter definitions.
+//
+// Where it is used:
+//   - Called by DataSetService.Preview to prepare AST for live preview compilation.
+//   - Called by DataSetService.Save to compile DDL routines or parameterized queries for storage.
+//   - Called by DataSetService.Execute for direct query evaluation.
+//
+// When can it be used:
+//   - Can be used after a DataSet definition has passed validator.Validate.
 func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*QueryAST, error) {
 	ast := &QueryAST{
 		BaseTable: ASTBaseTable{
@@ -261,6 +292,16 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 	return ast, nil
 }
 
+// resolveTableAlias determines the effective alias or table name for a collection reference.
+//
+// Purpose:
+//   Maps schema-qualified names or raw table names to their registered join aliases.
+//
+// Where it is used:
+//   - Used throughout BuildAST when resolving join targets, projection sources, and custom column fields.
+//
+// When can it be used:
+//   - Can be used whenever resolving an ambiguous column's source table or alias.
 func resolveTableAlias(table string, aliases map[string]string) string {
 	if table == "" {
 		return table
@@ -276,6 +317,16 @@ func resolveTableAlias(table string, aliases map[string]string) string {
 	return table
 }
 
+// isAggregateFunctionName checks if a function name represents a standard SQL aggregate function.
+//
+// Purpose:
+//   Quickly identifies aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.) without registry lookup.
+//
+// Where it is used:
+//   - Used by BuildAST to determine if a query requires GROUP BY semantics and projection pruning.
+//
+// When can it be used:
+//   - Can be used during AST building to detect aggregation vs scalar function calls.
 func isAggregateFunctionName(name string) bool {
 	switch strings.ToUpper(strings.TrimSpace(name)) {
 	case "SUM", "AVG", "COUNT", "COUNT_DISTINCT", "MIN", "MAX", "COUNT_ALL", "COUNT(*)", "COUNT_IF", "SUM_IF":
@@ -285,6 +336,17 @@ func isAggregateFunctionName(name string) bool {
 	}
 }
 
+// parseFilterMap converts a raw map-based filter definition into a list of ASTCondition structs.
+//
+// Purpose:
+//   Deconstructs key-value filters (e.g. "employees.department_id": {"paramName": "dept_id", ...})
+//   into strongly-typed ASTCondition objects, detecting whether a value is a static literal or a parameter reference.
+//
+// Where it is used:
+//   - Called by BuildAST to parse WHERE filter dictionaries from ds.Filter.
+//
+// When can it be used:
+//   - When translating raw JSON filter maps into relational filter AST nodes.
 func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable string, tableAliases map[string]string) []ASTCondition {
 	var conditions []ASTCondition
 	for k, v := range filter {
@@ -327,6 +389,16 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 	return conditions
 }
 
+// isNumericString determines if a string literal contains a purely numeric value.
+//
+// Purpose:
+//   Distinguishes numeric literals (e.g. "100", "0.05") from column identifiers in custom expressions.
+//
+// Where it is used:
+//   - Used in BuildAST when analyzing custom column formula operands.
+//
+// When can it be used:
+//   - When determining whether a custom formula token is a table column or a constant multiplier/threshold.
 func isNumericString(s string) bool {
 	s = strings.TrimSpace(s)
 	if s == "" {

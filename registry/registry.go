@@ -1,3 +1,9 @@
+// Package registry manages in-memory catalogs of active models, drafts, field definitions, and custom operation configurations.
+//
+// File: registry.go
+// Usage:
+//   Provides the thread-safe ModelRegistry which stores and coordinates model lifecycles
+//   (draft -> applying -> active), column definitions, and operations.
 package registry
 
 import (
@@ -22,6 +28,15 @@ type ModelRegistry struct {
 }
 
 // NewModelRegistry creates a new ModelRegistry.
+//
+// Purpose:
+//   Instantiates the thread-safe in-memory model and operation catalog.
+//
+// Where it is used:
+//   - Initialized during server bootstrap and used across services and adapters.
+//
+// When can it be used:
+//   - Call when initializing the engine runtime or isolated test suites.
 func NewModelRegistry() *ModelRegistry {
 	return &ModelRegistry{
 		active:           make(map[string]*model.Model),
@@ -34,6 +49,15 @@ func NewModelRegistry() *ModelRegistry {
 }
 
 // SaveOperationConfig stores an operation definition.
+//
+// Purpose:
+//   Persists or updates custom procedure, function, or command configuration in the registry.
+//
+// Where it is used:
+//   - Called by operation registration APIs and project initializers.
+//
+// When can it be used:
+//   - Call whenever defining or modifying an executable operation.
 func (r *ModelRegistry) SaveOperationConfig(op *operation.OperationConfig) (*operation.OperationConfig, error) {
 	if op == nil {
 		return nil, errors.New("operation_config cannot be nil")
@@ -56,6 +80,15 @@ func (r *ModelRegistry) SaveOperationConfig(op *operation.OperationConfig) (*ope
 }
 
 // GetOperationConfig retrieves an operation definition by name or ID.
+//
+// Purpose:
+//   Looks up a registered procedure, function, or command configuration.
+//
+// Where it is used:
+//   - Called by execution handlers and function resolvers.
+//
+// When can it be used:
+//   - Call before executing a custom procedure or function.
 func (r *ModelRegistry) GetOperationConfig(nameOrID string) (*operation.OperationConfig, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -69,6 +102,15 @@ func (r *ModelRegistry) GetOperationConfig(nameOrID string) (*operation.Operatio
 }
 
 // ListOperationConfigs returns all registered operation definitions.
+//
+// Purpose:
+//   Lists all registered procedures, functions, and commands in the system.
+//
+// Where it is used:
+//   - Called by GET /api/operations endpoints and documentation generators.
+//
+// When can it be used:
+//   - Call when cataloging available operations.
 func (r *ModelRegistry) ListOperationConfigs() []*operation.OperationConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -86,8 +128,16 @@ func (r *ModelRegistry) ListOperationConfigs() []*operation.OperationConfig {
 	return result
 }
 
-
 // SaveModelConfig saves or updates a model_config.
+//
+// Purpose:
+//   Stores high-level model metadata (refName, database, description, version).
+//
+// Where it is used:
+//   - Called by project management services and schema designers.
+//
+// When can it be used:
+//   - Call when creating or updating model configuration entities.
 func (r *ModelRegistry) SaveModelConfig(cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	if cfg == nil {
 		return nil, errors.New("model_config cannot be nil")
@@ -120,6 +170,15 @@ func (r *ModelRegistry) SaveModelConfig(cfg *model.ModelConfig) (*model.ModelCon
 }
 
 // GetModelConfig retrieves a model_config by ID or Name.
+//
+// Purpose:
+//   Finds model configuration by identifier, name, or refName.
+//
+// Where it is used:
+//   - Called by API controllers and project synchronization services.
+//
+// When can it be used:
+//   - Call when fetching model metadata.
 func (r *ModelRegistry) GetModelConfig(idOrName string) (*model.ModelConfig, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -134,6 +193,15 @@ func (r *ModelRegistry) GetModelConfig(idOrName string) (*model.ModelConfig, err
 }
 
 // ListModelConfigs returns all stored model_configs.
+//
+// Purpose:
+//   Retrieves a slice of all registered model_config objects.
+//
+// Where it is used:
+//   - Called by GET /api/models endpoints.
+//
+// When can it be used:
+//   - Call when listing configured models.
 func (r *ModelRegistry) ListModelConfigs() []*model.ModelConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -147,6 +215,15 @@ func (r *ModelRegistry) ListModelConfigs() []*model.ModelConfig {
 }
 
 // SaveDataModel saves or updates a data_model field definition.
+//
+// Purpose:
+//   Stores field-level attribute metadata (type, length, precision, scale, constraints).
+//
+// Where it is used:
+//   - Called when configuring or modifying model attributes.
+//
+// When can it be used:
+//   - Call when adding or editing a model column or field.
 func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, error) {
 	if dm == nil {
 		return nil, errors.New("data_model cannot be nil")
@@ -181,6 +258,15 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 }
 
 // GetDataModel retrieves a data_model field definition by model ID and field ID (or column_name/json_field).
+//
+// Purpose:
+//   Looks up field metadata within a model scope.
+//
+// Where it is used:
+//   - Called by field inspection endpoints and validators.
+//
+// When can it be used:
+//   - Call when fetching metadata for a specific column or field.
 func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -203,6 +289,15 @@ func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel,
 }
 
 // ListDataModels returns all data_model fields for a model.
+//
+// Purpose:
+//   Returns all column and field definitions for a specified model.
+//
+// Where it is used:
+//   - Called by GET /api/models/:model/fields endpoints.
+//
+// When can it be used:
+//   - Call when viewing all columns of a model.
 func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -220,6 +315,15 @@ func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 }
 
 // DeleteDataModel removes a data_model field definition by ID or column_name.
+//
+// Purpose:
+//   Deletes a column or field definition from a model.
+//
+// Where it is used:
+//   - Called by DELETE /api/models/:model/fields/:field endpoints.
+//
+// When can it be used:
+//   - Call when dropping a field definition.
 func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -239,8 +343,16 @@ func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 	return nil
 }
 
-
 // SaveDraft saves or updates a model draft in DRAFT state.
+//
+// Purpose:
+//   Stores an unapplied model definition in draft state pending schema migration.
+//
+// Where it is used:
+//   - Called when editing models in UI or creating new models.
+//
+// When can it be used:
+//   - Call prior to previewing or applying schema migrations.
 func (r *ModelRegistry) SaveDraft(m *model.Model) (*model.Model, error) {
 	if m == nil {
 		return nil, errors.New("model cannot be nil")
@@ -269,6 +381,15 @@ func (r *ModelRegistry) SaveDraft(m *model.Model) (*model.Model, error) {
 }
 
 // GetDraft returns the draft version of a model.
+//
+// Purpose:
+//   Retrieves the pending draft definition of a model (falling back to active if no draft exists).
+//
+// Where it is used:
+//   - Called by SchemaService during diffing, previewing, and applying.
+//
+// When can it be used:
+//   - Call when reading the desired state of a model before migration.
 func (r *ModelRegistry) GetDraft(idOrName string) (*model.Model, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -287,6 +408,15 @@ func (r *ModelRegistry) GetDraft(idOrName string) (*model.Model, error) {
 }
 
 // GetActive returns the active, published version of a model.
+//
+// Purpose:
+//   Retrieves the currently live, verified model definition.
+//
+// Where it is used:
+//   - Called by CRUD operations, query planners, and dataset resolvers.
+//
+// When can it be used:
+//   - Call when executing data queries against active tables or collections.
 func (r *ModelRegistry) GetActive(idOrName string) (*model.Model, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -300,6 +430,15 @@ func (r *ModelRegistry) GetActive(idOrName string) (*model.Model, error) {
 }
 
 // SetStatus updates the status of a draft/active model.
+//
+// Purpose:
+//   Mutates the lifecycle status (DRAFT, APPLYING, ACTIVE, FAILED, DEGRADED) of a model.
+//
+// Where it is used:
+//   - Called by SchemaService during migration workflows.
+//
+// When can it be used:
+//   - Call during migration progress tracking.
 func (r *ModelRegistry) SetStatus(idOrName string, status model.ModelStatus) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -317,6 +456,15 @@ func (r *ModelRegistry) SetStatus(idOrName string, status model.ModelStatus) err
 }
 
 // SetActive promotes a draft model to ACTIVE status upon successful database migration.
+//
+// Purpose:
+//   Promotes a verified draft to active status, bumps version counter, and deletes the draft entry.
+//
+// Where it is used:
+//   - Called by SchemaService.Apply upon migration success.
+//
+// When can it be used:
+//   - Call when schema modifications are verified in the database.
 func (r *ModelRegistry) SetActive(idOrName string, m *model.Model) (*model.Model, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -345,6 +493,15 @@ func (r *ModelRegistry) SetActive(idOrName string, m *model.Model) (*model.Model
 }
 
 // List returns all models (preferring active, or draft if active does not exist).
+//
+// Purpose:
+//   Lists all registered models in the registry.
+//
+// Where it is used:
+//   - Called by GET /api/models endpoints and validation engines.
+//
+// When can it be used:
+//   - Call when listing all data models.
 func (r *ModelRegistry) List() []*model.Model {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -367,6 +524,15 @@ func (r *ModelRegistry) List() []*model.Model {
 }
 
 // Delete removes a model and its draft/active instances from registry.
+//
+// Purpose:
+//   Removes a model, its drafts, model_config, data_models, and alias entries from the registry.
+//
+// Where it is used:
+//   - Called by DELETE /api/models/:model endpoints.
+//
+// When can it be used:
+//   - Call when purging a model metadata definition.
 func (r *ModelRegistry) Delete(idOrName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -381,6 +547,16 @@ func (r *ModelRegistry) Delete(idOrName string) error {
 	return nil
 }
 
+// resolveID resolves an identifier or name into a canonical model ID.
+//
+// Purpose:
+//   Performs case-insensitive lookup across aliases, table names, and refNames.
+//
+// Where it is used:
+//   - Used internally by GetDraft, GetActive, SetActive, Delete, etc.
+//
+// When can it be used:
+//   - Internal helper for ID resolution.
 func (r *ModelRegistry) resolveID(idOrName string) string {
 	lower := strings.ToLower(idOrName)
 	if id, ok := r.byName[lower]; ok {
@@ -410,6 +586,16 @@ func (r *ModelRegistry) resolveID(idOrName string) string {
 	return idOrName
 }
 
+// cloneModel creates a deep clone of a Model to ensure immutability outside mutex blocks.
+//
+// Purpose:
+//   Safely duplicates attributes, indexes, relations, and metadata maps.
+//
+// Where it is used:
+//   - Used internally by SaveDraft, GetDraft, GetActive, SetActive, and List.
+//
+// When can it be used:
+//   - Internal cloning helper for model instances.
 func cloneModel(m *model.Model) *model.Model {
 	if m == nil {
 		return nil

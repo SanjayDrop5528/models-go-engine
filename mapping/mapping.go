@@ -1,3 +1,9 @@
+// Package mapping handles data type coercion, UUID generation, input sanitization, and payload normalization against model schemas.
+//
+// File: mapping.go
+// Usage:
+//   Provides type coercion and validation functions (CoerceValue, SanitizeInput, SanitizePartialInput)
+//   to ensure database payloads adhere to model schemas across inserts, updates, and reads.
 package mapping
 
 import (
@@ -11,6 +17,15 @@ import (
 )
 
 // GenerateUUID generates a compact 32-character hex RFC 4122 version 4 UUID string without hyphens.
+//
+// Purpose:
+//   Creates a cryptographically secure random UUID string for record primary keys.
+//
+// Where it is used:
+//   - Used by SanitizeInput for models requiring generated IDs, and by test suites.
+//
+// When can it be used:
+//   - Call whenever generating a unique primary key identifier for new records.
 func GenerateUUID() string {
 	var uuid [16]byte
 	_, _ = rand.Read(uuid[:])
@@ -25,6 +40,15 @@ func GenerateUUID() string {
 }
 
 // CoerceValue safely converts an arbitrary input value (e.g. from JSON payload) to the target model DataType.
+//
+// Purpose:
+//   Transforms raw payload representations (strings, numbers, maps) into their strongly typed target model types.
+//
+// Where it is used:
+//   - Called by SanitizeInput, SanitizePartialInput, query filters, and dataset compilers.
+//
+// When can it be used:
+//   - Call whenever converting untyped JSON or form input to match an attribute's required DataType.
 func CoerceValue(val any, targetType model.DataType) (any, error) {
 	if val == nil {
 		return nil, nil
@@ -172,6 +196,16 @@ func CoerceValue(val any, targetType model.DataType) (any, error) {
 	}
 }
 
+// isSequenceOrAuto checks if an attribute uses auto-increment, serial sequences, or identity generation.
+//
+// Purpose:
+//   Prevents overwriting database-managed auto-incrementing identity keys with synthetic UUIDs.
+//
+// Where it is used:
+//   - Used internally by SanitizeInput when checking primary key defaults.
+//
+// When can it be used:
+//   - Internal helper to detect if a column relies on database-generated sequence counters.
 func isSequenceOrAuto(attr *model.Attribute) bool {
 	if attr == nil {
 		return false
@@ -192,7 +226,15 @@ func isSequenceOrAuto(attr *model.Attribute) bool {
 }
 
 // SanitizeInput validates and coerces incoming record payload according to Model attribute definitions.
-// If an 'id' attribute (or string/UUID primary key) is not provided or empty, a UUID string is generated automatically.
+//
+// Purpose:
+//   Validates required fields, applies defaults, generates missing IDs, and coerces all attribute types for inserts.
+//
+// Where it is used:
+//   - Called by CRUD service Insert / Create operations across adapters.
+//
+// When can it be used:
+//   - Call prior to persisting a new entity record to the database.
 func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) {
 	sanitized := make(map[string]any)
 
@@ -250,6 +292,15 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 }
 
 // SanitizePartialInput coerces and sanitizes ONLY the keys present in data payload for update operations.
+//
+// Purpose:
+//   Applies type coercion and non-null checks only to fields included in a partial update / patch request.
+//
+// Where it is used:
+//   - Called by CRUD service Update operations.
+//
+// When can it be used:
+//   - Call prior to executing partial record updates (PATCH/PUT) on existing database records.
 func SanitizePartialInput(m *model.Model, data map[string]any) (map[string]any, error) {
 	if m == nil || data == nil {
 		return data, nil

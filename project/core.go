@@ -1,3 +1,9 @@
+// Package project manages multi-tenant or scoped project workspaces, adapter bindings, and metadata lifecycle.
+//
+// File: core.go
+// Usage:
+//   Defines Project and AdapterConfig domain structures and entrypoints (New, NewWithModels, NewProject)
+//   for bootstrapping dedicated engine instances wired to specific database adapters.
 package project
 
 import (
@@ -53,6 +59,15 @@ type ProjectConfig struct {
 }
 
 // New creates an Engine directly from a database adapter with zero configuration needed.
+//
+// Purpose:
+//   Quick-starts an engine workspace wired to a database adapter with default settings.
+//
+// Where it is used:
+//   - Used in standalone scripts, lightweight microservices, and integration tests.
+//
+// When can it be used:
+//   - Call when instantiating an engine without explicit multi-project configuration.
 func New(adp adapter.Adapter) *Engine {
 	if adp == nil {
 		panic("adapter cannot be nil")
@@ -70,6 +85,15 @@ func New(adp adapter.Adapter) *Engine {
 }
 
 // NewWithModels creates an Engine loaded with initial ModelConfigs and DataModels.
+//
+// Purpose:
+//   Bootstraps an engine workspace and pre-loads model configurations and field definitions.
+//
+// Where it is used:
+//   - Used when launching services from declarative configuration or seed files.
+//
+// When can it be used:
+//   - Call when initializing an engine with known static or pre-defined models.
 func NewWithModels(adp adapter.Adapter, configs []*model.ModelConfig, dataModels []*model.DataModel) (*Engine, error) {
 	engine := New(adp)
 	if err := engine.LoadModels(context.Background(), configs, dataModels); err != nil {
@@ -80,6 +104,15 @@ func NewWithModels(adp adapter.Adapter, configs []*model.ModelConfig, dataModels
 
 // NewProject creates a new Project, resolves the adapter connection from ENV if configured,
 // and initializes the project's dedicated Engine.
+//
+// Purpose:
+//   Constructs a scoped Project entity, resolving environment variables and attaching an Engine instance.
+//
+// Where it is used:
+//   - Called by project management APIs and multi-tenant project initializers.
+//
+// When can it be used:
+//   - Call when provisioning a new project workspace.
 func NewProject(cfg ProjectConfig, adp adapter.Adapter) (*Project, error) {
 	if adp == nil {
 		return nil, errors.New("adapter cannot be nil")

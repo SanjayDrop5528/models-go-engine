@@ -1,3 +1,9 @@
+// Package adapter defines interfaces, registries, and capability matrices for database adapters.
+//
+// File: capabilities.go
+// Usage:
+//   Declares Capabilities feature matrix (transactions, DDL migration, procedures, functions, aggregation pipelines)
+//   and provides GetCapabilities to query an adapter's supported features.
 package adapter
 
 // StorageCategory identifies the architectural classification of the database.
@@ -48,6 +54,15 @@ type CapableAdapter interface {
 }
 
 // GetCapabilities returns the capabilities of the adapter, falling back to conservative defaults if not implemented.
+//
+// Purpose:
+//   Queries an adapter's CapableAdapter implementation or supplies defaults based on adapter engine category.
+//
+// Where it is used:
+//   - Used by DatasetService, validator engines, API metadata endpoints, and test suites.
+//
+// When can it be used:
+//   - Call whenever determining if an adapter supports features like stored procedures, transactions, or DDL migrations.
 func GetCapabilities(a Adapter) Capabilities {
 	if ca, ok := a.(CapableAdapter); ok {
 		return ca.Capabilities()

@@ -1,3 +1,8 @@
+// Package execution provides normalized execution request and result structures for dispatching database operations.
+//
+// File: execution.go
+// Usage:
+//   Defines standardized ExecutionRequest and ExecutionResult payloads passed between engine services and storage adapters.
 package execution
 
 import (

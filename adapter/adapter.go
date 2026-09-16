@@ -1,15 +1,24 @@
+// Package adapter defines the database-agnostic interface abstractions for database
+// connections, transactions, schema operations, metadata import, and CRUD execution.
+//
+// File: adapter.go
+// Usage:
+//   This file provides the core Adapter and Transaction contracts implemented by database
+//   drivers (PostgreSQL, MySQL, MongoDB, and In-Memory). It also defines the Adapter Registry
+//   which catalogs active driver instances and allows unified multi-database access.
 package adapter
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/SanjayDrop5528/models-go-engine/execution"
 	"github.com/SanjayDrop5528/models-go-engine/model"
 	"github.com/SanjayDrop5528/models-go-engine/plan"
 	"github.com/SanjayDrop5528/models-go-engine/query"
 	"github.com/SanjayDrop5528/models-go-engine/schema"
-	"sync"
 )
 
 // ErrOperationNotSupported is returned when an adapter does not support a requested operation type.
@@ -78,6 +87,15 @@ type Registry struct {
 }
 
 // NewRegistry creates a new adapter registry.
+//
+// Purpose:
+//   Initializes an empty thread-safe Registry for database adapters.
+//
+// Where it is used:
+//   - Instantiated during application bootstrap to manage multi-database connections.
+//
+// When can it be used:
+//   - Whenever the application coordinates access across multiple storage drivers.
 func NewRegistry() *Registry {
 	return &Registry{
 		adapters: make(map[string]Adapter),
@@ -85,6 +103,15 @@ func NewRegistry() *Registry {
 }
 
 // Register adds an adapter under a name.
+//
+// Purpose:
+//   Registers a database adapter instance under a unique driver or tenant key.
+//
+// Where it is used:
+//   - Called after establishing database connections in service or server initialization.
+//
+// When can it be used:
+//   - When making a database adapter globally discoverable by name.
 func (r *Registry) Register(name string, a Adapter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -92,6 +119,15 @@ func (r *Registry) Register(name string, a Adapter) {
 }
 
 // Get retrieves an adapter by name.
+//
+// Purpose:
+//   Looks up a registered database adapter, returning an error if not found.
+//
+// Where it is used:
+//   - Called by service routers, execution engines, and dataset services to obtain driver instances.
+//
+// When can it be used:
+//   - When dispatching a query or dataset execution to a specific driver.
 func (r *Registry) Get(name string) (Adapter, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

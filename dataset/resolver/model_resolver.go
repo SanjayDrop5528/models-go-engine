@@ -1,3 +1,12 @@
+// Package resolver defines the contracts and implementations for dynamic model,
+// field, and database function lookup across all Dataset Studio operations.
+//
+// File: model_resolver.go
+// Usage:
+//   This file implements the DynamicModelResolver, which bridges the engine's core
+//   model registry (ModelRegistry) with Dataset Studio's validation and planning pipelines.
+//   It allows models and table definitions to be dynamically registered or looked up,
+//   exposing primary keys, data types, nullability, and unique constraints.
 package resolver
 
 import (
@@ -18,6 +27,15 @@ type DynamicModelResolver struct {
 }
 
 // NewModelResolver creates a new model and field resolver.
+//
+// Purpose:
+//   Initializes a thread-safe DynamicModelResolver backed optionally by a central ModelRegistry.
+//
+// Where it is used:
+//   - Instantiated in server setups, dataset service initialization, and integration tests.
+//
+// When can it be used:
+//   - Can be used whenever dataset operations require table/model metadata validation.
 func NewModelResolver(reg *registry.ModelRegistry) *DynamicModelResolver {
 	return &DynamicModelResolver{
 		registry: reg,
@@ -26,6 +44,15 @@ func NewModelResolver(reg *registry.ModelRegistry) *DynamicModelResolver {
 }
 
 // RegisterModel registers a local model definition for schema validation.
+//
+// Purpose:
+//   Stores a table/model specification in memory keyed by table name, schema.table, and reference name.
+//
+// Where it is used:
+//   - Called during service bootstrapping, mock setup, or when schemas are discovered dynamically.
+//
+// When can it be used:
+//   - Can be used to inject test fixtures or pre-register runtime tables into the resolver.
 func (r *DynamicModelResolver) RegisterModel(m *ModelDefinition) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -41,6 +68,16 @@ func (r *DynamicModelResolver) RegisterModel(m *ModelDefinition) {
 }
 
 // ResolveModel looks up model metadata from registry.
+//
+// Purpose:
+//   Finds a table or model definition by schema and collection name. If not present in local cache,
+//   it consults the underlying ModelRegistry; if still absent, it creates a permissive virtual model.
+//
+// Where it is used:
+//   - Called by DataSetValidator to check root and join collections.
+//
+// When can it be used:
+//   - Can be used whenever inspecting entity attributes or verifying schema existence.
 func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collection string) (*ModelDefinition, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -92,6 +129,16 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 }
 
 // ResolveField verifies if a field exists on the model.
+//
+// Purpose:
+//   Inspects the model's attribute dictionary for a column name. If found, returns the FieldDefinition;
+//   otherwise, returns a permissive virtual FieldDefinition with ANY data type.
+//
+// Where it is used:
+//   - Called by DataSetValidator when verifying fields referenced in joins, custom columns, and projections.
+//
+// When can it be used:
+//   - When verifying field types, nullability, or checking whether an attribute is a primary key.
 func (r *DynamicModelResolver) ResolveField(ctx context.Context, model *ModelDefinition, fieldName string) (*FieldDefinition, error) {
 	if model == nil {
 		return nil, domain.NewError(domain.ErrModelNotFound, "cannot resolve field on nil model")

@@ -1,3 +1,10 @@
+// Package query provides fluent SQL query builders, connection handling, statement
+// compilation, and lifecycle hook definitions for the RDBMS abstraction layer.
+//
+// File: hooks.go
+// Usage:
+//   Defines BeforeSelectHook and AfterSelectHook interfaces allowing models or plugins
+//   to intercept query execution before dispatch and after row scanning.
 package query
 
 import "context"

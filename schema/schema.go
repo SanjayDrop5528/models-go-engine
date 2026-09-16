@@ -1,3 +1,8 @@
+// Package schema defines database-agnostic schema structures representing tables, columns, keys, indexes, and relations.
+//
+// File: schema.go
+// Usage:
+//   Provides normalized schema definitions and conversion utilities between higher-level models and live database physical schemas.
 package schema
 
 import (
@@ -56,6 +61,15 @@ type Schema struct {
 }
 
 // GetAttribute finds an attribute by name.
+//
+// Purpose:
+//   Looks up a column or field definition by name within the schema's attributes list.
+//
+// Where it is used:
+//   - Used during diff calculations, column alterations, and validator checks.
+//
+// When can it be used:
+//   - Call whenever inspecting whether a specific attribute exists and checking its datatype or constraints.
 func (s *Schema) GetAttribute(name string) *SchemaAttribute {
 	for i := range s.Attributes {
 		if s.Attributes[i].Name == name {
@@ -66,6 +80,15 @@ func (s *Schema) GetAttribute(name string) *SchemaAttribute {
 }
 
 // GetIndex finds an index by name.
+//
+// Purpose:
+//   Searches the schema's indexes slice for an index matching the given name.
+//
+// Where it is used:
+//   - Used during diff engine index comparison and DDL migration planning.
+//
+// When can it be used:
+//   - Call when verifying if a database index exists on a table or collection.
 func (s *Schema) GetIndex(name string) *SchemaIndex {
 	for i := range s.Indexes {
 		if s.Indexes[i].Name == name {
@@ -76,6 +99,15 @@ func (s *Schema) GetIndex(name string) *SchemaIndex {
 }
 
 // FromModel converts a Model metadata definition to a Schema representation.
+//
+// Purpose:
+//   Transforms high-level Model domain metadata into a normalized, database-independent Schema structure.
+//
+// Where it is used:
+//   - Called by SchemaService during diff calculation and migration planning.
+//
+// When can it be used:
+//   - Call when preparing a model definition to compare against a live introspected database schema.
 func FromModel(m *model.Model) *Schema {
 	if m == nil {
 		return nil

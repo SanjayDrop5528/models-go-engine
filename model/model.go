@@ -1,3 +1,12 @@
+// Package model defines entity data models, attributes, constraints, orbital references,
+// relation graphs, and schema metadata representations for the engine and database adapters.
+//
+// File: model.go
+// Usage:
+//   This file defines the primary Model and Attribute structures used throughout runtime
+//   CRUD operations, query compilation, validation, and schema management. It provides
+//   factories and converter methods to translate between metadata persistence entities
+//   (ModelConfig, DataModel) and runtime execution entities (Model, Attribute, ModelRef).
 package model
 
 import (
@@ -27,6 +36,16 @@ type ModelRef struct {
 }
 
 // NewModelRef creates a ModelRef with standard default values.
+//
+// Purpose:
+//   Constructs a lightweight ModelRef token used by database adapters to locate a target table or collection.
+//
+// Where it is used:
+//   - Used across all adapter CRUD calls (Create, FindOne, Find, Update, Delete).
+//   - Used in integration tests and example servers.
+//
+// When can it be used:
+//   - When addressing a table, view, or collection on a database adapter.
 func NewModelRef(id, name, storageName, primaryKey string) ModelRef {
 	if storageName == "" {
 		storageName = id
@@ -153,6 +172,15 @@ type Model struct {
 }
 
 // Ref returns a ModelRef for this model.
+//
+// Purpose:
+//   Extracts a ModelRef descriptor from the model, populating ID, Name, StorageName, Database, and PrimaryKey.
+//
+// Where it is used:
+//   - Used when dispatching adapter operations for this model.
+//
+// When can it be used:
+//   - When an adapter method requires a model reference token.
 func (m *Model) Ref() ModelRef {
 	storage := m.StorageName
 	if storage == "" {
@@ -186,6 +214,15 @@ func (m *Model) Ref() ModelRef {
 }
 
 // GetAttribute finds an attribute by name, ref_name, column_name, or json_field (case-insensitive search).
+//
+// Purpose:
+//   Performs a flexible, case-insensitive attribute search across multiple identifier aliases.
+//
+// Where it is used:
+//   - Called by ValidateData, ValidatePartialData, query builders, and relation generators.
+//
+// When can it be used:
+//   - When looking up an attribute by any of its configured names.
 func (m *Model) GetAttribute(name string) *Attribute {
 	for i := range m.Attributes {
 		if strings.EqualFold(m.Attributes[i].Name, name) ||
@@ -199,6 +236,15 @@ func (m *Model) GetAttribute(name string) *Attribute {
 }
 
 // IsPrimaryKey returns true if the attribute is part of the model's primary key.
+//
+// Purpose:
+//   Determines whether a given field name belongs to the primary key definition or has IsPrimaryKey set.
+//
+// Where it is used:
+//   - Called during validation and SQL query construction for WHERE clauses.
+//
+// When can it be used:
+//   - When checking if a column is a primary key.
 func (m *Model) IsPrimaryKey(name string) bool {
 	if m.PrimaryKey != nil {
 		for _, col := range m.PrimaryKey.Columns {
@@ -216,6 +262,15 @@ func (m *Model) IsPrimaryKey(name string) bool {
 }
 
 // GetPrimaryKeyAttributes returns all attributes marked as primary key.
+//
+// Purpose:
+//   Collects all primary key attributes (single column or composite).
+//
+// Where it is used:
+//   - Used by DDL generators, constraint validators, and schema inspectors.
+//
+// When can it be used:
+//   - When constructing primary key constraints or extracting record identity.
 func (m *Model) GetPrimaryKeyAttributes() []Attribute {
 	var pks []Attribute
 	for _, attr := range m.Attributes {
@@ -313,6 +368,16 @@ type DataModel struct {
 }
 
 // ToAttribute converts a DataModel field to an execution Attribute.
+//
+// Purpose:
+//   Translates a persistent DataModel catalog record into an active runtime Attribute,
+//   configuring validation rulesets, data types, orbital references, precision, and scale.
+//
+// Where it is used:
+//   - Used by BuildModel and schema synchronization routines.
+//
+// When can it be used:
+//   - When materializing column metadata into an in-memory execution attribute.
 func (dm *DataModel) ToAttribute() Attribute {
 	name := dm.ColumnName
 	if name == "" {
@@ -383,6 +448,16 @@ func (dm *DataModel) ToAttribute() Attribute {
 }
 
 // BuildModel converts a ModelConfig and a list of DataModel fields into an active execution Model.
+//
+// Purpose:
+//   Constructs an executable Model instance combining high-level entity configuration,
+//   active field attributes, primary keys, and orbital relationship edges.
+//
+// Where it is used:
+//   - Called by model services and metadata loaders to assemble complete entities.
+//
+// When can it be used:
+//   - When instantiating an active runtime model from database catalog definitions.
 func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageType StorageType) *Model {
 	if cfg == nil {
 		return nil
@@ -455,6 +530,16 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 }
 
 // GenerateRelationsFromOrbitalReferences converts DataModel orbital reference metadata into executable model.Relation entries.
+//
+// Purpose:
+//   Inspects fields with IsOrbitalReference = true and synthesizes foreign-key Relation entries
+//   linking source columns to target model primary keys or target attributes.
+//
+// Where it is used:
+//   - Called by BuildModel when converting database field definitions into complete models.
+//
+// When can it be used:
+//   - When deriving foreign key or cross-collection relational join edges from metadata.
 func GenerateRelationsFromOrbitalReferences(fields []*DataModel, resolveTargetPK func(targetModel string) string) []Relation {
 	var relations []Relation
 	relationNames := make(map[string]int)

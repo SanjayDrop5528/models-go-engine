@@ -1,3 +1,9 @@
+// Package diff defines schema migration operations, risk safety levels, and hints for schema delta calculation.
+//
+// File: operations.go
+// Usage:
+//   Defines atomic schema operation types (e.g. CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE),
+//   safety classifications (SAFE, POTENTIALLY_UNSAFE, DESTRUCTIVE), and user-provided migration hints.
 package diff
 
 // OperationType specifies the granular atomic schema mutation.

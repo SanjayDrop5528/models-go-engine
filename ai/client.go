@@ -1,3 +1,10 @@
+// Package ai provides client bindings and natural language translation services
+// connecting the models-go-engine with LLM completion backends to synthesize schemas and dataset definitions.
+//
+// File: client.go
+// Usage:
+//   Defines the Client interface, chat completion payload models, and default HTTP
+//   implementation communicating with the KriyaTec AI completions API endpoint.
 package ai
 
 import (
@@ -66,6 +73,16 @@ type HTTPClient struct {
 }
 
 // NewHTTPClient creates an HTTPClient with configurable or environment-based settings.
+//
+// Purpose:
+//   Instantiates an AI HTTP client configured with endpoint URL, default model name,
+//   and timeout settings for calling remote LLM services.
+//
+// Where it is used:
+//   - In models-go-engine/ai/service.go and cmd/server initialization to talk to the AI backend.
+//
+// When can it be used:
+//   - When bootstrapping an AIService or running standalone natural language completions.
 func NewHTTPClient(apiURL, model string) *HTTPClient {
 	if apiURL == "" {
 		if envURL := os.Getenv("AI_API_URL"); envURL != "" {
@@ -91,6 +108,15 @@ func NewHTTPClient(apiURL, model string) *HTTPClient {
 }
 
 // Chat sends a completion request to the KriyaTec AI endpoint.
+//
+// Purpose:
+//   Serializes a chat request, submits an HTTP POST to the AI API endpoint, and decodes the LLM response.
+//
+// Where it is used:
+//   - Called by AIService.GenerateDataSet to retrieve query plans and natural language explanations.
+//
+// When can it be used:
+//   - Whenever an application needs to send conversational prompts to the AI completion service.
 func (c *HTTPClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
 	if req.Model == "" {
 		req.Model = c.model

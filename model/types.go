@@ -1,5 +1,11 @@
+// Package model defines the core domain models, attribute metadata, schema structures, and data types.
+//
+// File: types.go
+// Usage:
+//   Enumerates standardized DataType, StorageType, ModelStatus, and IndexType definitions,
+//   and provides NormalizeDataType to map dialect-specific SQL/NoSQL type names into canonical types.
 package model
- 
+
 import "strings"
 
 // DataType represents standard database-independent data types.
@@ -27,6 +33,15 @@ const (
 )
 
 // NormalizeDataType normalizes arbitrary casing and common aliases into canonical DataType.
+//
+// Purpose:
+//   Resolves dialect-specific types (e.g. "VARCHAR", "INT4", "BIGINT", "JSONB") into uniform engine DataTypes.
+//
+// Where it is used:
+//   - Used during database introspection, model parsing, schema validation, and SQL generation.
+//
+// When can it be used:
+//   - Call whenever mapping raw SQL column type strings or user inputs to internal model DataTypes.
 func NormalizeDataType(t string) DataType {
 	switch strings.ToUpper(strings.TrimSpace(t)) {
 	case "STRING", "VARCHAR", "CHAR":

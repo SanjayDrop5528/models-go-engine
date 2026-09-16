@@ -1,3 +1,10 @@
+// Package query provides fluent SQL query builders, connection handling, statement
+// compilation, and lifecycle hook definitions for the RDBMS abstraction layer.
+//
+// File: select.go
+// Usage:
+//   Comprehensive SELECT query builder implementing fluent SQL clauses (JOIN, WHERE, GROUP BY,
+//   HAVING, WINDOW, ORDER BY, LIMIT, OFFSET, UNION, FOR UPDATE) and row scanning execution.
 package query
 
 import (
@@ -40,6 +47,15 @@ type SelectQuery struct {
 var _ Query = (*SelectQuery)(nil)
 
 // NewSelectQuery returns a SelectQuery attached to the provided DB.
+//
+// Purpose:
+//   Initializes a new fluent SelectQuery attached to the provided DB handle.
+//
+// Where it is used:
+//   - In rdbms.NewSelectQuery, rdbms.NewSelectFromQuery, and DB.NewSelect.
+//
+// When can it be used:
+//   - Whenever constructing a SQL SELECT query programmatically.
 func NewSelectQuery(db *DB) *SelectQuery {
 	return &SelectQuery{
 		whereBaseQuery: whereBaseQuery{
@@ -52,24 +68,60 @@ func NewSelectQuery(db *DB) *SelectQuery {
 }
 
 // Conn sets the database connection for this query.
+//
+// Purpose:
+//   Assigns an explicit database connection or transaction handle (IConn) to execute against.
+//
+// Where it is used:
+//   - In transactional query workflows.
+//
+// When can it be used:
+//   - When overriding the default DB connection with a transaction.
 func (q *SelectQuery) Conn(db IConn) *SelectQuery {
 	q.setConn(db)
 	return q
 }
 
 // Model sets the model to select into and generates SELECT and FROM clauses.
+//
+// Purpose:
+//   Binds a schema TableModel or target struct to automatically generate SELECT columns and FROM table references.
+//
+// Where it is used:
+//   - In adapter query runners and ORM selection flows.
+//
+// When can it be used:
+//   - When querying structured model entities.
 func (q *SelectQuery) Model(model any) *SelectQuery {
 	q.setModel(model)
 	return q
 }
 
 // Err sets an error on the query, causing subsequent operations to fail.
+//
+// Purpose:
+//   Records a validation or construction error, short-circuiting query execution.
+//
+// Where it is used:
+//   - In fluent builder error propagation.
+//
+// When can it be used:
+//   - When an invalid option or query parameter is encountered during assembly.
 func (q *SelectQuery) Err(err error) *SelectQuery {
 	q.setErr(err)
 	return q
 }
 
 // Apply calls each function in fns, passing the SelectQuery as an argument.
+//
+// Purpose:
+//   Allows modular scope application and query mutators to be applied cleanly.
+//
+// Where it is used:
+//   - In reusable query filters and pagination middleware.
+//
+// When can it be used:
+//   - When composing reusable query transformation logic.
 func (q *SelectQuery) Apply(fns ...func(*SelectQuery) *SelectQuery) *SelectQuery {
 	for _, fn := range fns {
 		if fn != nil {
@@ -80,12 +132,31 @@ func (q *SelectQuery) Apply(fns ...func(*SelectQuery) *SelectQuery) *SelectQuery
 }
 
 // LoadWithChildren configures whether child relations are loaded during queries.
+//
+// Purpose:
+//   Toggles eager loading of nested/child relationships and their projected columns.
+//
+// Where it is used:
+//   - In RelationOpts and SelectQuery execution.
+//
+// When can it be used:
+//   - When selectively disabling eager loading of relations to optimize performance.
 func (q *SelectQuery) LoadWithChildren(load bool) *SelectQuery {
 	q.loadWithChildren = load
 	return q
 }
 
 // ApplyUnifiedQuery configures this SelectQuery using a unified query.Query specification.
+//
+// Purpose:
+//   Maps all facets of the unified query.Query AST (tables, fields, filters, joins, groups,
+//   aggregations, order, pagination) onto this SelectQuery builder.
+//
+// Where it is used:
+//   - In rdbms.NewSelectFromQuery and relational adapter Query methods.
+//
+// When can it be used:
+//   - When executing an engine-level unified Query through relational SQL dialects.
 func (q *SelectQuery) ApplyUnifiedQuery(uq coreQuery.Query) *SelectQuery {
 	for _, t := range uq.Tables {
 		q.Table(t)

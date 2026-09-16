@@ -1,3 +1,11 @@
+// Package query provides a unified, cross-database query specification and builder DSL.
+//
+// File: query.go
+// Usage:
+//   This file defines the canonical Query struct, Filter operators, Sort orders, Joins,
+//   and Pagination parameters used uniformly across PostgreSQL, MySQL, MongoDB, and In-Memory
+//   adapters. It provides a fluent API for building complex filtering, projection, grouping,
+//   and relational queries without writing vendor-specific SQL or aggregation pipelines.
 package query
 
 import (
@@ -161,12 +169,31 @@ type Query struct {
 	CommentText      string           `json:"comment,omitempty"`
 }
 
-// New returns a fresh, fluent Query instance.
+// New returns a fresh, fluent Query instance with standard defaults.
+//
+// Purpose:
+//   Convenience constructor for NewQuery.
+//
+// Where it is used:
+//   - Used in test files, example servers, and application repositories.
+//
+// When can it be used:
+//   - Whenever initializing a query builder.
 func New() Query {
 	return NewQuery()
 }
 
 // NewQuery returns a default Query instance.
+//
+// Purpose:
+//   Initializes a Query object with default logical conjunction (OpAnd), LoadWithChildren enabled,
+//   and standard pagination limits (limit: 50, offset: 0).
+//
+// Where it is used:
+//   - Universal entry point for building queries passed to adapter.Find, FindOne, and dataset compilation.
+//
+// When can it be used:
+//   - Any time records need to be retrieved or filtered from a database adapter.
 func NewQuery() Query {
 	return Query{
 		LogicalOp:        OpAnd,

@@ -1,3 +1,12 @@
+// Package validator provides deep structural, semantic, and security validation
+// for Dataset Studio definitions prior to planning and code generation.
+//
+// File: validator.go
+// Usage:
+//   This file implements the comprehensive DataSetValidator. It validates that dataset metadata,
+//   collection names, relational join paths, custom column formulas, operand counts, GROUP BY
+//   field constraints, and filter parameter declarations are valid, secure, and compatible
+//   with the target database dialect before any AST planning or SQL/MongoDB compilation occurs.
 package validator
 
 import (
@@ -20,6 +29,16 @@ type DataSetValidator struct {
 }
 
 // NewDataSetValidator creates a new validator instance.
+//
+// Purpose:
+//   Constructs a DataSetValidator wired to resolvers for models, fields, and functions.
+//
+// Where it is used:
+//   - Instantiated in DataSetService.NewDataSetService.
+//   - Used directly in validation unit tests.
+//
+// When can it be used:
+//   - Can be used before any dataset is saved, previewed, or executed.
 func NewDataSetValidator(mr resolver.ModelResolver, fr resolver.FieldResolver, fnr resolver.FunctionResolver) *DataSetValidator {
 	return &DataSetValidator{
 		modelResolver:    mr,
@@ -29,6 +48,19 @@ func NewDataSetValidator(mr resolver.ModelResolver, fr resolver.FieldResolver, f
 }
 
 // Validate executes all validation passes on the dataset.
+//
+// Purpose:
+//   Executes all structural, semantic, relational, and aggregation integrity checks on a DataSet.
+//   Ensures valid identifiers, resolvable tables, ordered joins, valid operand counts, GROUP BY consistency,
+//   and unique non-empty parameter names.
+//
+// Where it is used:
+//   - Invoked as the first step in DataSetService.Preview.
+//   - Invoked as the first step in DataSetService.Save.
+//   - Invoked as the first step in DataSetService.Execute.
+//
+// When can it be used:
+//   - Whenever a raw DataSet JSON payload is received from the UI or API and needs verification.
 func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) error {
 	if ds == nil {
 		return domain.NewError(domain.ErrDataSetNotFound, "dataset definition cannot be nil")

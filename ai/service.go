@@ -1,3 +1,10 @@
+// Package ai provides client bindings and natural language translation services
+// connecting the models-go-engine with LLM completion backends to synthesize schemas and dataset definitions.
+//
+// File: service.go
+// Usage:
+//   Orchestrates schema discovery, multi-turn conversational prompt compilation,
+//   AI completions, and conversion of LLM query plans into executable Dataset models.
 package ai
 
 import (
@@ -77,6 +84,16 @@ type AIService struct {
 }
 
 // NewAIService creates a new AIService.
+//
+// Purpose:
+//   Initializes the AI generation service with an AI Client, ModelRegistry for schema metadata,
+//   and DataSetService for query compilation.
+//
+// Where it is used:
+//   - In models-go-example/api/router.go and server bootstrap to wire the natural language query assistant.
+//
+// When can it be used:
+//   - When setting up AI query synthesis and interactive chat endpoints.
 func NewAIService(client Client, reg *registry.ModelRegistry, dsSvc *datasetsvc.DataSetService) *AIService {
 	if client == nil {
 		client = NewHTTPClient("", "")
@@ -89,6 +106,15 @@ func NewAIService(client Client, reg *registry.ModelRegistry, dsSvc *datasetsvc.
 }
 
 // GetActiveConversationID returns the active conversation ID tracked by the engine.
+//
+// Purpose:
+//   Retrieves the currently retained conversation session ID under thread-safe read lock.
+//
+// Where it is used:
+//   - In AI service handler to chain sequential multi-turn user requests.
+//
+// When can it be used:
+//   - Whenever checking the active conversational thread status.
 func (s *AIService) GetActiveConversationID() string {
 	s.activeConvMu.RLock()
 	defer s.activeConvMu.RUnlock()
@@ -96,6 +122,15 @@ func (s *AIService) GetActiveConversationID() string {
 }
 
 // SetActiveConversationID stores the active conversation ID in the engine.
+//
+// Purpose:
+//   Sets or updates the current conversation ID for stateful chat sessions.
+//
+// Where it is used:
+//   - In AI generation endpoint when starting or continuing a chat thread.
+//
+// When can it be used:
+//   - When associating incoming user requests with an ongoing AI thread.
 func (s *AIService) SetActiveConversationID(id string) {
 	s.activeConvMu.Lock()
 	defer s.activeConvMu.Unlock()
@@ -103,6 +138,15 @@ func (s *AIService) SetActiveConversationID(id string) {
 }
 
 // ResetConversation clears the conversation ID memory in the engine.
+//
+// Purpose:
+//   Flushes active conversation state to start a clean conversational context.
+//
+// Where it is used:
+//   - Called when a user clicks "New Chat" or resets session context.
+//
+// When can it be used:
+//   - Whenever starting a fresh chat turn without previous conversational history.
 func (s *AIService) ResetConversation() {
 	s.activeConvMu.Lock()
 	defer s.activeConvMu.Unlock()
@@ -110,6 +154,16 @@ func (s *AIService) ResetConversation() {
 }
 
 // GenerateDataSet converts a natural language prompt into an executable DataSet, preserving conversation memory.
+//
+// Purpose:
+//   Discovers relevant schema tables, constructs system prompts with schema metadata,
+//   invokes the AI backend, extracts query plans, and converts them to executable DataSets.
+//
+// Where it is used:
+//   - In api/router.go under /api/ai/generate to satisfy natural language query queries.
+//
+// When can it be used:
+//   - When transforming conversational natural language into structured database query configurations.
 func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (*GenerateResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return nil, fmt.Errorf("prompt cannot be empty")
@@ -284,6 +338,16 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 }
 
 // PlanToDataSet transforms an AIQueryPlan into an executable domain.DataSet.
+//
+// Purpose:
+//   Maps high-level AST constructs (selects, joins, filters, grouping, aggregations, params)
+//   from the LLM into a complete domain.DataSet with resolved schema types, column aliases, and join mappings.
+//
+// Where it is used:
+//   - In AIService.GenerateDataSet to convert LLM output into an engine-managed DataSet.
+//
+// When can it be used:
+//   - Whenever an AIQueryPlan needs to be converted into a queryable domain.DataSet.
 func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.DataSet, error) {
 	if plan == nil {
 		return nil, fmt.Errorf("query plan is nil")
@@ -578,6 +642,16 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 
 // DiscoverRelatedTables (Layer 1): Sends all meta table names to the AI to identify relevant tables,
 // and traverses relational links (FKs, Orbital References, abbreviations) to gather all connected meta-tables.
+//
+// Purpose:
+//   Discovers tables and relationship paths relevant to user prompt keywords,
+//   leveraging FK links, orbital references, and semantic keyword scoring.
+//
+// Where it is used:
+//   - In AIService.GenerateDataSet to construct enriched prompt contexts for the LLM.
+//
+// When can it be used:
+//   - When analyzing natural language prompts against registered schemas to find target entities.
 func (s *AIService) DiscoverRelatedTables(ctx context.Context, prompt string, currentDS *domain.DataSet) []*DiscoveredTableMeta {
 	if s.registry == nil {
 		return nil
@@ -932,6 +1006,16 @@ Return strictly a JSON object:
 
 // BuildEnrichedSchemaContext (Layer 2): Takes discovered candidate tables and formats their complete attributes,
 // types, keys, and explicit join relationships for the AI prompt.
+//
+// Purpose:
+//   Serializes discovered table definitions, column types, primary/foreign keys, and relational
+//   links into an informative prompt context block for the LLM.
+//
+// Where it is used:
+//   - In AIService.GenerateDataSet to provide schema ground-truth to the AI model.
+//
+// When can it be used:
+//   - When assembling context for prompt engineering in database query synthesis.
 func (s *AIService) BuildEnrichedSchemaContext(discovered []*DiscoveredTableMeta) (string, []string) {
 	if len(discovered) == 0 {
 		return "No relevant database tables identified.", nil
@@ -997,6 +1081,17 @@ var commonStopWords = map[string]bool{
 	"having": true, "order": true, "please": true, "query": true, "data": true,
 }
 
+// extractPromptKeywords parses a natural language prompt into significant keywords.
+//
+// Purpose:
+//   Tokenizes user prompts, strips non-alphanumeric punctuation and standard stop words,
+//   returning unique candidate keyword tokens for table matching.
+//
+// Where it is used:
+//   - In AIService.DiscoverRelatedTables for scoring table relevance.
+//
+// When can it be used:
+//   - When analyzing natural language prompts for entity matching.
 func extractPromptKeywords(prompt string) []string {
 	f := func(c rune) bool {
 		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
@@ -1014,6 +1109,17 @@ func extractPromptKeywords(prompt string) []string {
 	return keywords
 }
 
+// singularize converts plural English nouns to their singular form.
+//
+// Purpose:
+//   Applies standard English singularization heuristics ("ies" -> "y", "es" -> "", "s" -> "")
+//   to match plural query tokens against singular table/model names.
+//
+// Where it is used:
+//   - In AIService.DiscoverRelatedTables and resolveJoinPath when cross-matching entity stems.
+//
+// When can it be used:
+//   - Whenever stem matching table names against user query words.
 func singularize(w string) string {
 	w = strings.ToLower(strings.TrimSpace(w))
 	if strings.HasSuffix(w, "ies") && len(w) > 3 {
@@ -1028,6 +1134,17 @@ func singularize(w string) string {
 	return w
 }
 
+// pluralize converts singular English nouns to their plural form.
+//
+// Purpose:
+//   Applies pluralization rules ("y" -> "ies", otherwise appends "s") to match singular tokens
+//   to plural table identifiers.
+//
+// Where it is used:
+//   - In AIService.DiscoverRelatedTables and resolveJoinPath when checking plural table mappings.
+//
+// When can it be used:
+//   - Whenever resolving relationship naming conventions between models.
 func pluralize(w string) string {
 	w = strings.ToLower(strings.TrimSpace(w))
 	if strings.HasSuffix(w, "y") && len(w) > 2 {
@@ -1039,6 +1156,16 @@ func pluralize(w string) string {
 	return w + "s"
 }
 
+// buildSystemPrompt constructs the LLM system instruction including database schema and formatting rules.
+//
+// Purpose:
+//   Prepares the comprehensive instruction set and JSON output format schema for the AI completion model.
+//
+// Where it is used:
+//   - In AIService.GenerateDataSet when constructing the ChatRequest payload.
+//
+// When can it be used:
+//   - Whenever invoking the AI model to translate prompts into query plans.
 func (s *AIService) buildSystemPrompt(schemaContext, driver string) string {
 	return fmt.Sprintf(`You are an expert SQL, Database and Data Engine architect specializing in turning Natural Language questions into structured Query Plans.
 The target query database engine is: %s.
@@ -1098,6 +1225,16 @@ RULES:
 8. Return ONLY the raw JSON object.`, driver, schemaContext, driver)
 }
 
+// cleanJSONBlock strips markdown code fence formatting from LLM response text.
+//
+// Purpose:
+//   Cleans surrounding ```json and ``` markdown fences to leave valid parseable JSON.
+//
+// Where it is used:
+//   - In extractAIQueryPlan prior to JSON unmarshaling.
+//
+// When can it be used:
+//   - Whenever parsing LLM output that may have been enclosed in markdown blocks.
 func cleanJSONBlock(content string) string {
 	clean := strings.TrimSpace(content)
 	if idx := strings.Index(clean, "```json"); idx != -1 {
@@ -1114,6 +1251,16 @@ func cleanJSONBlock(content string) string {
 	return strings.TrimSpace(clean)
 }
 
+// extractAIQueryPlan decodes the JSON payload returned by the AI into an AIQueryPlan struct.
+//
+// Purpose:
+//   Strips markdown wraps, unmarshals the response text into AIQueryPlan, and returns validation errors if malformed.
+//
+// Where it is used:
+//   - In AIService.GenerateDataSet when processing model response choices.
+//
+// When can it be used:
+//   - Whenever converting raw AI JSON output into an internal AIQueryPlan.
 func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
 	clean := cleanJSONBlock(content)
 	var plan AIQueryPlan
@@ -1124,6 +1271,16 @@ func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
 }
 
 // normalizeFilterValue checks if the filter value is an interval expression and normalizes it to C[...] macro syntax.
+//
+// Purpose:
+//   Converts raw interval string representations (e.g. now() - interval '7 days') into standardized
+//   dynamic offset macros like C[-7d] supported across all adapter query engines.
+//
+// Where it is used:
+//   - In PlanToDataSet when processing filter values from AI output.
+//
+// When can it be used:
+//   - When ingesting AI-suggested date interval filters.
 func normalizeFilterValue(val any) any {
 	if s, ok := val.(string); ok {
 		sTrim := strings.TrimSpace(s)
@@ -1156,6 +1313,16 @@ func normalizeFilterValue(val any) any {
 }
 
 // getFieldsForTable returns all DataModel fields for a given table name or model ID, resolving aliases and configs.
+//
+// Purpose:
+//   Searches the ModelRegistry for a table or model ID, resolving schemas and aliases to retrieve
+//   all declared columns and references.
+//
+// Where it is used:
+//   - In DiscoverRelatedTables and resolveJoinPath.
+//
+// When can it be used:
+//   - When inspecting columns, types, or foreign keys of a registered model.
 func (s *AIService) getFieldsForTable(tbl string) []*model.DataModel {
 	if s.registry == nil {
 		return nil
@@ -1188,6 +1355,16 @@ func (s *AIService) getFieldsForTable(tbl string) []*model.DataModel {
 // resolveJoinPath (Relationship Graph):
 // Determines the join keys between fromTable and toTable using the metadata registry's foreign keys,
 // orbital references, and naming conventions.
+//
+// Purpose:
+//   Inspects model relationships in both directions to discover the corresponding join keys
+//   (e.g., store_id -> id or employee_id -> id) for automatic join construction.
+//
+// Where it is used:
+//   - In PlanToDataSet when LLM joins omit explicit foreign key join attributes.
+//
+// When can it be used:
+//   - Whenever connecting two relational tables that lack explicit ON clause mappings.
 func (s *AIService) resolveJoinPath(fromTable, toTable string) (string, string) {
 	if s.registry == nil {
 		return "id", fmt.Sprintf("%s_id", singularize(fromTable))

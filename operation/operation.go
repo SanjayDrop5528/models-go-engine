@@ -1,3 +1,9 @@
+// Package operation defines executable operation specifications, parameters, and operation categories across engines.
+//
+// File: operation.go
+// Usage:
+//   Defines OperationType (CREATE, GET, FUNCTION, PROCEDURE, TRANSACTION, etc.),
+//   OperationParameter, and OperationConfig metadata structures for registering and executing database operations.
 package operation
 
 import (

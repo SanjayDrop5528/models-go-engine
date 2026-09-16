@@ -1,3 +1,10 @@
+// Package query provides fluent SQL query builders, connection handling, statement
+// compilation, and lifecycle hook definitions for the RDBMS abstraction layer.
+//
+// File: base.go
+// Usage:
+//   Defines base query structs, DB wrapper, CTE (WithQuery), index hints, order/limit/offset
+//   tracking, and WHERE clause builders shared across RDBMS query compilers.
 package query
 
 import (
@@ -53,6 +60,16 @@ type DB struct {
 	db      *sql.DB
 }
 
+// NewDB creates a new DB wrapper instance.
+//
+// Purpose:
+//   Initializes a DB query execution wrapper combining sql.DB and dialect formatting.
+//
+// Where it is used:
+//   - In rdbms.NewDB and relational adapter constructors.
+//
+// When can it be used:
+//   - When wrapping database connections for dialect-driven query execution.
 func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 	if d == nil {
 		d = dialect.NewPostgreSQL()
@@ -64,18 +81,58 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 	}
 }
 
+// Dialect returns the associated dialect.
+//
+// Purpose:
+//   Returns the active SQL dialect.
+//
+// Where it is used:
+//   - In query compilation to inspect formatting rules.
+//
+// When can it be used:
+//   - Whenever inspecting target SQL dialect capabilities.
 func (db *DB) Dialect() dialect.Dialect {
 	return db.dialect
 }
 
+// QueryGen returns the query generator.
+//
+// Purpose:
+//   Provides the schema.QueryGen serializer for the database.
+//
+// Where it is used:
+//   - In SelectQuery when formatting query fragments.
+//
+// When can it be used:
+//   - When serializing SQL query fragments.
 func (db *DB) QueryGen() schema.QueryGen {
 	return db.gen
 }
 
+// DB returns the underlying *sql.DB handle.
+//
+// Purpose:
+//   Exposes the raw database/sql connection pool handle.
+//
+// Where it is used:
+//   - In connection execution routines.
+//
+// When can it be used:
+//   - When direct access to sql.DB connection methods is needed.
 func (db *DB) DB() *sql.DB {
 	return db.db
 }
 
+// NewSelect initializes a new SelectQuery on this DB.
+//
+// Purpose:
+//   Constructs a fresh SelectQuery builder bound to this database handle.
+//
+// Where it is used:
+//   - In query callers constructing select operations.
+//
+// When can it be used:
+//   - When building a SELECT statement fluently.
 func (db *DB) NewSelect() *SelectQuery {
 	return NewSelectQuery(db)
 }
@@ -95,14 +152,44 @@ type defaultQueryGen struct {
 	dialect dialect.Dialect
 }
 
+// Dialect returns the generator's dialect.
+//
+// Purpose:
+//   Returns the bound SQL dialect for identifier and parameter formatting.
+//
+// Where it is used:
+//   - In schema.QueryWithArgs formatting.
+//
+// When can it be used:
+//   - Whenever querying the dialect instance.
 func (g *defaultQueryGen) Dialect() dialect.Dialect {
 	return g.dialect
 }
 
+// IsNop returns whether the generator is a no-op formatter.
+//
+// Purpose:
+//   Reports false since defaultQueryGen performs active query formatting.
+//
+// Where it is used:
+//   - In schema.QueryGen callers checking for formatting bypass.
+//
+// When can it be used:
+//   - When checking generator active state.
 func (g *defaultQueryGen) IsNop() bool {
 	return false
 }
 
+// AppendQuery formats a query string replacing ? placeholders with dialect parameters.
+//
+// Purpose:
+//   Replaces standard ? placeholders with dialect-specific syntax ($1 or ?) and inlines values where appropriate.
+//
+// Where it is used:
+//   - In query builders serializing parameterized SQL fragments.
+//
+// When can it be used:
+//   - When serializing queries with arguments into a byte buffer.
 func (g *defaultQueryGen) AppendQuery(b []byte, query string, args ...any) ([]byte, error) {
 	if len(args) == 0 {
 		return append(b, query...), nil
@@ -129,6 +216,16 @@ func (g *defaultQueryGen) AppendQuery(b []byte, query string, args ...any) ([]by
 	return append(b, out...), nil
 }
 
+// appendValue formats and appends an argument literal into the buffer according to type.
+//
+// Purpose:
+//   Converts an argument value (nil, string, int, float, bool) into SQL literal syntax.
+//
+// Where it is used:
+//   - In defaultQueryGen.AppendQuery when inlining argument values.
+//
+// When can it be used:
+//   - When serializing literal parameter values.
 func (g *defaultQueryGen) appendValue(b []byte, val any) []byte {
 	switch v := val.(type) {
 	case nil:
@@ -156,6 +253,16 @@ type WithQuery struct {
 	query     Query
 }
 
+// NewWithQuery creates a new CTE WithQuery instance.
+//
+// Purpose:
+//   Initializes a Common Table Expression with a name and underlying query.
+//
+// Where it is used:
+//   - In SelectQuery.With.
+//
+// When can it be used:
+//   - When declaring CTEs for WITH clauses.
 func NewWithQuery(name string, query Query) *WithQuery {
 	return &WithQuery{
 		name:  name,
@@ -163,11 +270,31 @@ func NewWithQuery(name string, query Query) *WithQuery {
 	}
 }
 
+// Recursive marks the CTE as recursive.
+//
+// Purpose:
+//   Flags the CTE for WITH RECURSIVE rendering.
+//
+// Where it is used:
+//   - In hierarchical or recursive graph queries.
+//
+// When can it be used:
+//   - When executing recursive SQL queries.
 func (w *WithQuery) Recursive() *WithQuery {
 	w.recursive = true
 	return w
 }
 
+// AppendQuery renders the CTE expression into the SQL buffer.
+//
+// Purpose:
+//   Renders "name AS (SELECT ...)" into the SQL buffer.
+//
+// Where it is used:
+//   - In SelectQuery.AppendQuery when serializing WITH clauses.
+//
+// When can it be used:
+//   - When formatting CTE headers.
 func (w *WithQuery) AppendQuery(gen schema.QueryGen, b []byte) ([]byte, error) {
 	if gen != nil {
 		b = gen.Dialect().AppendIdent(b, w.name)

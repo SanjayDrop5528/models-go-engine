@@ -1,3 +1,9 @@
+// Package service orchestrates schema migrations, previews, differences, and synchronization with target database adapters.
+//
+// File: schema_service.go
+// Usage:
+//   Provides SchemaService for comparing model definitions with live database schemas,
+//   computing diffs, generating preview scripts, applying safe migrations, and reverse-syncing schema metadata.
 package service
 
 import (
@@ -37,6 +43,15 @@ type SchemaService struct {
 }
 
 // NewSchemaService creates a new SchemaService.
+//
+// Purpose:
+//   Instantiates the schema migration coordinator with access to model registry and database adapters.
+//
+// Where it is used:
+//   - Initialized in API routers, server bootstrap, and integration test suites.
+//
+// When can it be used:
+//   - Call when setting up application services requiring schema diffing and migration operations.
 func NewSchemaService(reg *registry.ModelRegistry, adapters *adapter.Registry) *SchemaService {
 	return &SchemaService{
 		registry:   reg,
@@ -46,6 +61,15 @@ func NewSchemaService(reg *registry.ModelRegistry, adapters *adapter.Registry) *
 }
 
 // GetCurrentSchema fetches the live database schema from the target database adapter.
+//
+// Purpose:
+//   Introspects the target database storage entity (table/collection) to retrieve live schema state.
+//
+// Where it is used:
+//   - Called by schema inspector endpoints and diagnostic tools.
+//
+// When can it be used:
+//   - Call when checking current live columns, types, indexes, and primary keys for a model.
 func (s *SchemaService) GetCurrentSchema(ctx context.Context, modelID string) (*schema.Schema, error) {
 	m, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -61,6 +85,15 @@ func (s *SchemaService) GetCurrentSchema(ctx context.Context, modelID string) (*
 }
 
 // GetDiff computes the difference between current live database schema and desired model schema.
+//
+// Purpose:
+//   Compares current live database structure against desired model definition using the diff engine.
+//
+// Where it is used:
+//   - Called during schema migration planning, model editing, and preview endpoints.
+//
+// When can it be used:
+//   - Call to detect added, altered, or dropped columns/indexes before applying changes.
 func (s *SchemaService) GetDiff(ctx context.Context, modelID string, hints diff.DiffHints) (*diff.SchemaDiff, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -82,6 +115,15 @@ func (s *SchemaService) GetDiff(ctx context.Context, modelID string, hints diff.
 }
 
 // Preview computes the diff and generates native preview statements from the adapter.
+//
+// Purpose:
+//   Computes schema diff, builds a migration plan, and asks the database adapter to generate native SQL or commands.
+//
+// Where it is used:
+//   - Called by migration preview endpoints and CLI preview commands.
+//
+// When can it be used:
+//   - Call to review exact SQL DDL or MongoDB commands prior to applying schema modifications.
 func (s *SchemaService) Preview(ctx context.Context, modelID string, hints diff.DiffHints) (*plan.SchemaPreview, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -103,15 +145,16 @@ func (s *SchemaService) Preview(ctx context.Context, modelID string, hints diff.
 	return adp.PreviewSchemaChange(ctx, schemaPlan)
 }
 
-// Apply executes the complete safe migration flow:
-// 1. Mark status APPLYING
-// 2. Re-introspect live DB schema
-// 3. Re-calculate diff
-// 4. Validate safety rules & destructive flags
-// 5. Build minimal plan
-// 6. Adapter applies changes
-// 7. Re-introspect & verify
-// 8. Promote model to ACTIVE in registry
+// Apply executes the complete safe migration flow.
+//
+// Purpose:
+//   Executes end-to-end safe migration: introspects, diffs, validates safety flags, runs adapter DDL, verifies, and updates registry.
+//
+// Where it is used:
+//   - Called by schema migration endpoints, CLI migration commands, and automated deployment pipelines.
+//
+// When can it be used:
+//   - Call when applying validated model schema changes to a live database.
 func (s *SchemaService) Apply(ctx context.Context, modelID string, req ApplyRequest) (*ApplyResult, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -195,6 +238,15 @@ func (s *SchemaService) Apply(ctx context.Context, modelID string, req ApplyRequ
 }
 
 // Sync introspects live database and populates or aligns model definition.
+//
+// Purpose:
+//   Performs reverse schema introspection to synchronize model attribute metadata with the actual live database structure.
+//
+// Where it is used:
+//   - Called by reverse engineering endpoints, schema sync CLI commands, and database import workflows.
+//
+// When can it be used:
+//   - Call when importing existing database tables or collections into the data model registry.
 func (s *SchemaService) Sync(ctx context.Context, modelID string) (*model.Model, error) {
 	m, err := s.registry.GetDraft(modelID)
 	if err != nil {

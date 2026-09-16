@@ -1,3 +1,13 @@
+// Package domain provides data transfer objects, domain models, and core types
+// for Dataset Studio query definitions, custom columns, joins, aggregations,
+// filter parameters, and execution modes.
+//
+// File: function.go
+// Usage:
+//   This file defines the domain models and metadata structures for registered dataset functions
+//   across all dialect compilers (PostgreSQL, MySQL, MongoDB, and In-Memory). It models function
+//   categories (Numeric, String, Date/Time, Aggregate, Conditional Aggregate, etc.), operand counts,
+//   and dialect-specific expressions used by Dataset Studio when building custom calculated columns.
 package domain
 
 import (

@@ -1,3 +1,11 @@
+// Package ai provides client bindings and natural language translation services
+// connecting the models-go-engine with LLM completion backends to synthesize schemas and dataset definitions.
+//
+// File: plan.go
+// Usage:
+//   Defines the intermediate AST structures (AIQueryPlan, AISelect, AIJoin, AIFilter,
+//   AIAggregate, AIGroupBy, AIParam) produced by LLMs when translating natural language
+//   prompts into executable database queries.
 package ai
 
 // AIQueryPlan represents the structured query plan produced by the LLM.

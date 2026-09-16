@@ -1,3 +1,13 @@
+// Package resolver defines the contracts and implementations for dynamic model,
+// field, and database function lookup across all Dataset Studio operations.
+//
+// File: function_resolver.go
+// Usage:
+//
+//	This file implements the InMemFunctionRegistry, which provides a thread-safe,
+//	database-backed or in-memory function registry for Dataset Studio. It seeds and catalogs
+//	all standard SQL/Mongo expressions for Numeric, String, Date/Time, Aggregate, and
+//	Conditional Aggregate functions, providing operand count limits and vendor expressions.
 package resolver
 
 import (
@@ -17,6 +27,18 @@ type InMemFunctionRegistry struct {
 }
 
 // NewFunctionRegistry creates and seeds a function registry with all standard categories.
+//
+// Purpose:
+//
+//	Initializes an InMemFunctionRegistry and seeds it with default mathematical, string,
+//	date/time, aggregate, and conditional aggregate function specifications.
+//
+// Where it is used:
+//   - Instantiated by DataSetService.NewDataSetService if no custom registry is supplied.
+//   - Used extensively across dataset unit and integration tests.
+//
+// When can it be used:
+//   - Whenever dataset functions need to be resolved, validated, or listed.
 func NewFunctionRegistry() *InMemFunctionRegistry {
 	r := &InMemFunctionRegistry{
 		functions: make(map[string]*domain.FunctionDefinition),
@@ -26,6 +48,18 @@ func NewFunctionRegistry() *InMemFunctionRegistry {
 }
 
 // ResolveFunction finds a function by its name or reference name (case-insensitive).
+//
+// Purpose:
+//
+//	Looks up a registered function definition, checking that it exists and is marked ACTIVE.
+//
+// Where it is used:
+//   - Called by DataSetValidator to check custom aggregate / formula functions and operand counts.
+//   - Called by DataSetPlanner to determine if custom columns require GROUP BY aggregation.
+//   - Called by adapter compilers to fetch dialect-specific SQL/Mongo expressions.
+//
+// When can it be used:
+//   - Whenever verifying or compiling a custom calculation column.
 func (r *InMemFunctionRegistry) ResolveFunction(ctx context.Context, name string) (*domain.FunctionDefinition, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -42,6 +76,17 @@ func (r *InMemFunctionRegistry) ResolveFunction(ctx context.Context, name string
 }
 
 // RegisterFunction stores or updates a function in the registry.
+//
+// Purpose:
+//
+//	Registers a new custom or user-defined database function into the active registry.
+//
+// Where it is used:
+//   - Called during application startup to inject custom stored functions or extensions.
+//   - Can be called via management APIs when new functions are created in metadata tables.
+//
+// When can it be used:
+//   - When extending the dataset engine with organization-specific SQL calculations.
 func (r *InMemFunctionRegistry) RegisterFunction(ctx context.Context, fn *domain.FunctionDefinition) error {
 	if fn == nil || fn.Name == "" {
 		return domain.NewError(domain.ErrFunctionNotFound, "invalid function definition: name is required")
@@ -65,6 +110,16 @@ func (r *InMemFunctionRegistry) RegisterFunction(ctx context.Context, fn *domain
 }
 
 // ListFunctions returns all functions in a category, or all functions if category is empty.
+//
+// Purpose:
+//
+//	Retrieves a deduplicated list of available functions matching an optional category filter.
+//
+// Where it is used:
+//   - Called by API endpoints to populate UI dropdowns and function palettes in Dataset Studio.
+//
+// When can it be used:
+//   - When exploring available functions by category (e.g. "Numeric", "Aggregate", "Date/Time").
 func (r *InMemFunctionRegistry) ListFunctions(ctx context.Context, category domain.FunctionCategory) ([]*domain.FunctionDefinition, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -83,6 +138,17 @@ func (r *InMemFunctionRegistry) ListFunctions(ctx context.Context, category doma
 	return list, nil
 }
 
+// seedDefaultFunctions populates standard built-in functions for all supported databases.
+//
+// Purpose:
+//
+//	Provides pre-configured expressions for Postgres, MySQL, and MongoDB across all standard functions.
+//
+// Where it is used:
+//   - Called internally during NewFunctionRegistry initialization.
+//
+// When can it be used:
+//   - Invoked automatically during bootstrap.
 func (r *InMemFunctionRegistry) seedDefaultFunctions() {
 	now := time.Now()
 

@@ -1,3 +1,11 @@
+// Package planner converts validated domain datasets into query abstract syntax trees (QueryAST).
+//
+// File: ast.go
+// Usage:
+//   This file defines the abstract syntax tree (AST) data models for dataset queries.
+//   It captures the root table, normalized relational joins, projected columns, custom/virtual
+//   calculated fields, aggregate expressions, filter conditions, group by dimensions, and
+//   runtime parameters in a vendor-neutral intermediate representation.
 package planner
 
 import (

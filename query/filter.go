@@ -1,3 +1,9 @@
+// Package query defines structured query, filtering, sorting, projection, and pagination types for database execution.
+//
+// File: filter.go
+// Usage:
+//   Defines pagination and filter criteria payloads (compatible with AG-Grid / enterprise UI grids),
+//   and parses PaginationRequest into standardized engine Query objects.
 package query
 
 import (
@@ -49,11 +55,29 @@ type PaginationRequest struct {
 }
 
 // WantsTotal returns true unless includeTotal is explicitly set to false.
+//
+// Purpose:
+//   Determines whether the caller requires a total count query alongside paginated results.
+//
+// Where it is used:
+//   - Used by ParsePaginationRequest and query execution pipelines.
+//
+// When can it be used:
+//   - Call to check if total row count calculation should be executed for a paginated request.
 func (r PaginationRequest) WantsTotal() bool {
 	return r.IncludeTotal == nil || *r.IncludeTotal
 }
 
 // ParsePaginationRequest converts a PaginationRequest struct into a core Query object.
+//
+// Purpose:
+//   Translates enterprise UI grid filter payloads into internal database-agnostic Query filters, sorts, and limits.
+//
+// Where it is used:
+//   - Called by HTTP controllers handling POST /api/data/:model/query or search endpoints.
+//
+// When can it be used:
+//   - Call when receiving incoming grid filter/pagination JSON to produce an executable Query.
 func ParsePaginationRequest(req PaginationRequest) Query {
 	q := NewQuery()
 
@@ -110,6 +134,16 @@ func ParsePaginationRequest(req PaginationRequest) Query {
 	return q
 }
 
+// parseConditionGroup recursively translates a ConditionGroup into engine Filters.
+//
+// Purpose:
+//   Maps grid operator keywords (EQUALS, CONTAINS, LESSTHAN, INRANGE, BLANK, etc.) into engine Filter operators.
+//
+// Where it is used:
+//   - Called internally by ParsePaginationRequest for each condition group.
+//
+// When can it be used:
+//   - Internal helper for parsing recursive filter conditions.
 func parseConditionGroup(q *Query, cond ConditionGroup) {
 	// Handle nested conditions recursively
 	if len(cond.Conditions) > 0 {

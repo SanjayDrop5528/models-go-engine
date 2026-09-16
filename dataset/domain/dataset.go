@@ -1,3 +1,13 @@
+// Package domain provides data transfer objects, domain models, and core types
+// for Dataset Studio query definitions, custom columns, joins, aggregations,
+// filter parameters, and execution modes.
+//
+// Usage:
+// This package models the abstract syntax representation of datasets before compilation.
+// A DataSet struct captures the root collection/table, joins, custom mathematical or
+// string calculations, grouping rules, and dynamic filter parameters. It is consumed by
+// DatasetPlanner and adapter compilers (Postgres, MySQL, MongoDB, In-Memory) to produce
+// production-ready executable pipelines or database routines (Stored Procedures / Functions).
 package domain
 
 import (

@@ -1,3 +1,13 @@
+// Package service implements dataset lifecycle orchestration including validation, AST planning,
+// multi-database query compilation, previewing, saving, and runtime execution with parameter binding.
+//
+// File: dataset_service.go
+// Usage:
+//   This file defines the primary application-layer service (DataSetService) for all dynamic dataset operations.
+//   It connects the user-facing HTTP endpoints or programmatic clients with the underlying AST planner,
+//   domain validator, dialect compilers (PostgreSQL, MySQL, MongoDB), and physical database adapters.
+//   It coordinates design-time features (preview without saving, DDL generation for procedures/functions)
+//   and runtime features (executing saved datasets with payload/token parameter precedence).
 package service
 
 import (
@@ -40,7 +50,19 @@ type DataSetService struct {
 	compilers        map[string]compiler.DataSetCompiler
 }
 
-// NewDataSetService creates a new DataSetService.
+// NewDataSetService creates a new DataSetService instance.
+//
+// Purpose:
+//   Initializes the DataSetService with its required metadata repository, validators,
+//   AST planners, resolvers, and target database adapter.
+//
+// Where it is used:
+//   - Initialized in the engine setup layer (models-go-engine/project).
+//   - Initialized in API server bootstrapping (models-go-example/examples/*/server.go).
+//   - Initialized in integration and unit tests.
+//
+// When can it be used:
+//   - At application startup when assembling the engine and configuring dataset capabilities.
 func NewDataSetService(
 	repo repository.DataSetRepository,
 	mr resolver.ModelResolver,
@@ -63,19 +85,52 @@ func NewDataSetService(
 }
 
 // RegisterCompiler registers a custom compiler for a specific driver.
+//
+// Purpose:
+//   Adds or overrides a database-specific compiler implementation (e.g., "postgres", "mysql", "mongodb").
+//
+// Where it is used:
+//   - Called during adapter registration or project startup to hook in database-specific compilers.
+//   - Called in test setups to provide mock compilers.
+//
+// When can it be used:
+//   - Before invoking Preview, Save, or Execute, to ensure compilation support for target database drivers.
 func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompiler) *DataSetService {
 	s.compilers[strings.ToLower(driver)] = c
 	return s
 }
 
 // SetAdapter sets or updates the underlying execution adapter.
+//
+// Purpose:
+//   Attaches a physical database adapter (PostgreSQL, MySQL, MongoDB, Memory) to the dataset service
+//   for running preview queries, applying DDL routines, and executing queries.
+//
+// Where it is used:
+//   - Called by Engine/Project when an adapter is initialized or swapped.
+//   - Called in test harnesses to attach real or mock adapters.
+//
+// When can it be used:
+//   - Anytime the dataset service needs to be bound to an active database connection.
 func (s *DataSetService) SetAdapter(adp adapter.Adapter) *DataSetService {
 	s.adapter = adp
 	return s
 }
 
-
 // Preview compiles and executes the dataset without saving it to database metadata.
+//
+// Purpose:
+//   Validates the incoming dataset definition, plans an AST, compiles the executable query
+//   and reference pipeline for the specified driver, runs a live preview query through the adapter,
+//   and returns sample rows and compiled DDL without persisting to catalog storage.
+//
+// Where it is used:
+//   - Called by the HTTP handler `POST /api/datasets/preview`.
+//   - Used by the Angular UI Dataset Studio during interactive query design.
+//
+// When can it be used:
+//   - During dataset authoring when users configure joins, custom calculations, aggregations,
+//     and filter parameters and want immediate visual feedback without saving.
 func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*PreviewResponse, error) {
 	// 1. Validate
 	if err := s.validator.Validate(ctx, ds); err != nil {
@@ -146,6 +201,18 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 }
 
 // Save validates, compiles pipelines, executes DDL (procedures/functions), and persists dataset metadata.
+//
+// Purpose:
+//   Validates the dataset definition, compiles the pipeline for the target dialect, applies any
+//   necessary DDL statements on the database (e.g. `CREATE OR REPLACE PROCEDURE` or `FUNCTION`),
+//   and saves the dataset definition to the system metadata catalog (`metadata_catalog.dataset`).
+//
+// Where it is used:
+//   - Called by the HTTP handler `POST /api/datasets`.
+//   - Used by the Angular UI Dataset Studio when clicking "Save Dataset".
+//
+// When can it be used:
+//   - When finalizing and publishing a dataset for application consumption or report generation.
 func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.DataSet, error) {
 	// 1. Validate
 	if err := s.validator.Validate(ctx, ds); err != nil {
@@ -195,6 +262,16 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 }
 
 // Execute resolves dataset by reference name, binds parameters safely, and runs the query.
+//
+// Purpose:
+//   Standard entry point to execute a saved dataset by its unique reference name with runtime arguments.
+//   Delegates to ExecuteWithUserToken with a nil userToken.
+//
+// Where it is used:
+//   - Called by programmatic Go callers and simple execution APIs without authentication context.
+//
+// When can it be used:
+//   - When executing datasets that do not depend on session user tokens (KTON) or when default tokens suffice.
 func (s *DataSetService) Execute(ctx context.Context, referenceName string, runtimeParams map[string]any) ([]map[string]any, error) {
 	return s.ExecuteWithUserToken(ctx, referenceName, runtimeParams, nil)
 }
@@ -202,6 +279,24 @@ func (s *DataSetService) Execute(ctx context.Context, referenceName string, runt
 // ExecuteWithUserToken resolves dataset by reference name, binds parameters safely
 // (supporting KTON user tokens, dynamic CD date expressions, and type coercions), and runs
 // the dataset via Procedure, Function, or Direct Query.
+//
+// Purpose:
+//   Executes a dataset using full parameter precedence:
+//     1. Checks if each parameter is provided in `runtimeParams` (payload). If yes, uses it.
+//     2. If not provided or empty, falls back to `defaultValue`.
+//     3. Resolves dynamic token macros (`KTON|<key>`) from `userToken`.
+//     4. Resolves dynamic date macros (`CD|<offset>|<mode>`) using user's timezone.
+//     5. Dispatches execution according to `SaveMode`:
+//          - PROCEDURE: executes `CALL sp_<name>(...)`.
+//          - FUNCTION: executes `SELECT fn_<name>(...)` or `SELECT * FROM fn_<name>(...)`.
+//          - QUERY: performs placeholder substitution via CreateFilterParams and runs raw query.
+//
+// Where it is used:
+//   - Called by the HTTP handler `POST /api/datasets/{referenceName}/execute`.
+//   - Used by application services executing multi-tenant or role-scoped queries.
+//
+// When can it be used:
+//   - At runtime whenever data needs to be retrieved from a saved dataset with runtime arguments and session tokens.
 func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName string, runtimeParams map[string]any, userToken any) ([]map[string]any, error) {
 	ds, err := s.repo.FindByReferenceName(ctx, referenceName)
 	if err != nil {
@@ -319,6 +414,16 @@ func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName
 	return []map[string]any{}, nil
 }
 
+// coerceDataType parses and converts an arbitrary parameter value into its target Go data type.
+//
+// Purpose:
+//   Ensures parameter values match the declared data type before binding into queries or procedures.
+//
+// Where it is used:
+//   - Called internally by ExecuteWithUserToken for each bounded parameter.
+//
+// When can it be used:
+//   - When raw string or interface values from JSON payloads need to be typed (int, float, bool, date).
 func coerceDataType(val any, targetType string) (any, error) {
 	if val == nil {
 		return nil, nil
@@ -345,6 +450,16 @@ func coerceDataType(val any, targetType string) (any, error) {
 	}
 }
 
+// compile delegates dataset compilation to the adapter's native compiler or a registered dialect compiler.
+//
+// Purpose:
+//   Converts an abstract syntax tree (QueryAST) into executable queries and reference pipelines.
+//
+// Where it is used:
+//   - Called internally by Preview and Save.
+//
+// When can it be used:
+//   - When generating database-specific SQL or MongoDB aggregation pipelines from an AST.
 func (s *DataSetService) compile(ctx context.Context, ast *planner.QueryAST, ds *domain.DataSet) (*compiler.CompiledPipeline, error) {
 	// 1. Check if adapter provides native dataset compilation
 	if dsAdapter, ok := s.adapter.(adapter.DataSetAdapter); ok {

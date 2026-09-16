@@ -1,3 +1,12 @@
+// Package domain defines the core dataset models, schemas, and parameter parsing logic.
+//
+// File: filter_params.go
+// Usage:
+//   This file provides centralized parameter parsing, placeholder replacement, and dynamic
+//   token/date expression resolution for datasets across all database adapters (PostgreSQL,
+//   MySQL, MongoDB, and in-memory). It ensures that parameter values supplied in runtime payloads
+//   take precedence over default values, and that dynamic user tokens (KTON|key) and date macros
+//   (CD|+offset|mode) are uniformly resolved across all query execution and compilation modes.
 package domain
 
 import (
@@ -10,6 +19,18 @@ import (
 )
 
 // StructToMap converts any struct, map, or pointer into a map[string]any.
+//
+// Purpose:
+//   Normalizes diverse input representations (Go structs, JSON objects, maps) into a
+//   standard string-keyed map for safe lookup and parameter extraction.
+//
+// Where it is used:
+//   - Called by CreateFilterParams and ConvertValueToDataType to inspect userToken objects.
+//   - Called by DataSetService and API handlers when processing authentication/session tokens.
+//
+// When can it be used:
+//   - Can be used whenever an arbitrary object needs to be accessed dynamically by string key,
+//     such as extracting session variables ("org_id", "timezone", "user_id").
 func StructToMap(obj any) (map[string]any, error) {
 	if obj == nil {
 		return nil, nil
@@ -34,11 +55,22 @@ func StructToMap(obj any) (map[string]any, error) {
 }
 
 // CreateFilterParams resolves and replaces filter parameter placeholders in a pipeline/query string.
-// It is common for all adapters (PostgreSQL, MySQL, MongoDB, Memory).
-// Placeholders supported:
-//   - `{"paramName":"...","paramDataType":"..."}`
-//   - `{"ParamsName":"...","parmsDataType":"..."}`
-//   - Escaped variations: `{\"paramName\":\"...\",\"paramDataType\":\"...\"}`
+//
+// Purpose:
+//   Replaces parameter definition placeholders (`{"paramName":"...","paramDataType":"..."}`) within
+//   raw pipeline or SQL query templates with actual concrete values. If a runtime value (Paramvalue)
+//   is provided, it is used; otherwise, it falls back to the defined DefaultValue.
+//
+// Where it is used:
+//   - Used by DataSetService.Execute / ExecuteWithUserToken for direct query execution (SaveModeQuery).
+//   - Used by MongoDB dataset compiler and adapter execution when compiling native aggregation pipelines.
+//   - Used by preview handlers to substitute test parameter values into reference queries.
+//
+// When can it be used:
+//   - When executing a dataset query directly without database stored routines.
+//   - When compiling a parameterized reference pipeline into an executable pipeline.
+//   - Whenever dynamic runtime values, user token claims (KTON), or current date macros (CD) need
+//     to be stamped into a query string.
 func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken any) string {
 	filterPipeline := pipeline
 	var user map[string]any
@@ -47,14 +79,7 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 	}
 
 	for _, filter := range filterParams {
-		patterns := []string{
-			fmt.Sprintf(`{"paramName":"%s","paramDataType":"%s"}`, filter.ParamName, filter.ParamDataType),
-			fmt.Sprintf(`{"paramName":"%s", "paramDataType":"%s"}`, filter.ParamName, filter.ParamDataType),
-			fmt.Sprintf(`{"ParamsName":"%s","parmsDataType":"%s"}`, filter.ParamName, filter.ParamDataType),
-			fmt.Sprintf(`{"ParamsName":"%s", "parmsDataType":"%s"}`, filter.ParamName, filter.ParamDataType),
-			fmt.Sprintf(`{\"paramName\":\"%s\",\"paramDataType\":\"%s\"}`, filter.ParamName, filter.ParamDataType),
-			fmt.Sprintf(`{\"ParamsName\":\"%s\",\"parmsDataType\":\"%s\"}`, filter.ParamName, filter.ParamDataType),
-		}
+		findString := fmt.Sprintf(`{"paramName":"%s","paramDataType":"%s"}`, filter.ParamName, filter.ParamDataType)
 
 		targetVal := filter.Paramvalue
 		if targetVal == nil || targetVal == "" {
@@ -80,9 +105,7 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 				}
 			}
 
-			for _, pattern := range patterns {
-				filterPipeline = strings.ReplaceAll(filterPipeline, pattern, replaceVal)
-			}
+			filterPipeline = strings.ReplaceAll(filterPipeline, findString, replaceVal)
 		}
 	}
 
@@ -91,6 +114,24 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 
 // ConvertValueToDataType converts a value according to its data type, resolving
 // dynamic user token fields (KTON|<key>) and current date expressions (CD|<offset>|<mode>).
+//
+// Purpose:
+//   Formats a given Go value or macro expression into a string suitable for query injection,
+//   performing dynamic token extraction and timezone-aware date calculations where necessary.
+//
+// Where it is used:
+//   - Called by CreateFilterParams for each matched parameter.
+//   - Called by DataSetService.ExecuteWithUserToken to resolve dynamic expressions before type coercion.
+//
+// When can it be used:
+//   - When resolving string macros:
+//       "KTON|org_id"    -> Resolves to userToken["org_id"]
+//       "CD"             -> Resolves to current timestamp in user timezone
+//       "CD|+1"          -> Resolves to tomorrow (+1 day)
+//       "CD|-1"          -> Resolves to yesterday (-1 day)
+//       "CD|+0|ST"       -> Resolves to Start of Day (00:00:00) in user timezone
+//       "CD|+0|ED"       -> Resolves to End of Day (23:59:59) in user timezone
+//   - When converting numeric, boolean, or temporal primitive types into string representations.
 func ConvertValueToDataType(datatype string, defaultValue any, user any) string {
 	var replaceValue string
 

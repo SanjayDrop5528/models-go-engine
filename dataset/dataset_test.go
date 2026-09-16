@@ -534,7 +534,7 @@ func TestCommon_CreateFilterParams(t *testing.T) {
 		{"$match": {"salary": {"$gte": {"paramName":"min_salary","paramDataType":"int"}}}},
 		{"$match": {"active": {"paramName":"is_active","paramDataType":"bool"}}},
 		{"$match": {"organization": {"paramName":"user_org","paramDataType":"string"}}},
-		{"$match": {"created_at": {"$gte": {"ParamsName":"start_date","parmsDataType":"time.Time"}}}},
+		{"$match": {"created_at": {"$gte": {"paramName":"start_date","paramDataType":"time.Time"}}}},
 		{"$match": {"expired_at": {"$lte": {"paramName":"end_date","paramDataType":"date"}}}},
 		{"$match": {"bonus": {"paramName":"bonus_rate","paramDataType":"decimal"}}}
 	]`

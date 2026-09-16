@@ -305,10 +305,18 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 
 		// Check if value is a parameter reference
 		if valMap, ok := v.(map[string]any); ok {
-			if pName, exists := valMap["ParamsName"].(string); exists {
+			pName := ""
+			if pn, exists := valMap["paramName"].(string); exists {
+				pName = pn
+			} else if pn, exists := valMap["ParamsName"].(string); exists {
+				pName = pn
+			}
+			if pName != "" {
 				cond.IsParamRef = true
 				cond.ParamName = pName
-				if pType, typeExists := valMap["parmsDataType"].(string); typeExists {
+				if pType, typeExists := valMap["paramDataType"].(string); typeExists {
+					cond.ParamDataType = pType
+				} else if pType, typeExists := valMap["parmsDataType"].(string); typeExists {
 					cond.ParamDataType = pType
 				}
 			}

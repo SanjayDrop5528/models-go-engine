@@ -104,7 +104,11 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		execReq := execution.ExecutionRequest{
 			Operation: operation.OpQuery,
 			Target:    compiled.ExecutableQuery,
-			Arguments: map[string]any{"preview": true},
+			Arguments: map[string]any{
+				"preview":    true,
+				"collection": ds.BaseCollection.Collection,
+				"schema":     ds.BaseCollection.Schema,
+			},
 		}
 		res, err := s.adapter.Execute(ctx, execReq)
 		if err == nil && res != nil {

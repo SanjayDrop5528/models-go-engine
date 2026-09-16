@@ -24,6 +24,7 @@ type GenerateRequest struct {
 	ConversationID string          `json:"conversation_id,omitempty"`
 	Driver         string          `json:"driver,omitempty"`
 	CurrentDataSet *domain.DataSet `json:"current_dataset,omitempty"`
+	ExistingQuery  string          `json:"existing_query,omitempty"`
 }
 
 // GenerateResponse represents the result of the AI generation turn.
@@ -123,8 +124,22 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 		}
 	}
 
+	// Resolve existing compiled query if present
+	existingQuery := strings.TrimSpace(req.ExistingQuery)
+	if existingQuery == "" && req.CurrentDataSet != nil {
+		if req.CurrentDataSet.ReferencePipeline != "" {
+			existingQuery = strings.TrimSpace(req.CurrentDataSet.ReferencePipeline)
+		} else if req.CurrentDataSet.Pipeline != "" {
+			existingQuery = strings.TrimSpace(req.CurrentDataSet.Pipeline)
+		}
+	}
+
 	// 1. Layer 1: Discover all relevant meta-tables matching the user intent and their relationships
-	discovered := s.DiscoverRelatedTables(ctx, req.Prompt, req.CurrentDataSet)
+	searchPrompt := req.Prompt
+	if existingQuery != "" {
+		searchPrompt = req.Prompt + " " + existingQuery
+	}
+	discovered := s.DiscoverRelatedTables(ctx, searchPrompt, req.CurrentDataSet)
 
 	// 2. Layer 2: Formulate enriched schema context containing those tables, all their attributes, and relationships
 	schemaContext, discoveredTableNames := s.BuildEnrichedSchemaContext(discovered)
@@ -132,7 +147,7 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 	// 3. Build system instructions with enriched Layer 2 context
 	systemPrompt := s.buildSystemPrompt(schemaContext, driver)
 
-	// 3. Resolve conversation ID from request, current dataset, or engine memory
+	// 4. Resolve conversation ID from request, current dataset, or engine memory
 	convID := strings.TrimSpace(req.ConversationID)
 	if convID == "" && req.CurrentDataSet != nil {
 		convID = strings.TrimSpace(req.CurrentDataSet.ConversationID)
@@ -141,10 +156,28 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 		convID = s.GetActiveConversationID()
 	}
 
+	// 5. Build user prompt: if an existing query or dataset exists, pass both the SQL and structure so AI refines and adds to it
 	userPrompt := req.Prompt
-	if req.CurrentDataSet != nil && req.CurrentDataSet.BaseCollection.Collection != "" {
-		dsJSON, _ := json.MarshalIndent(req.CurrentDataSet, "", "  ")
-		userPrompt = fmt.Sprintf("Current DataSet State:\n%s\n\nUser Refinement Request:\n%s", string(dsJSON), req.Prompt)
+	hasExisting := existingQuery != "" || (req.CurrentDataSet != nil && req.CurrentDataSet.BaseCollection.Collection != "")
+	if hasExisting {
+		var promptBuilder strings.Builder
+		promptBuilder.WriteString("==================== EXISTING QUERY & DATASET STATE ====================\n")
+		promptBuilder.WriteString("The user already has an existing query / dataset that has been built and wants to REFINE or EXTEND it.\n")
+		promptBuilder.WriteString("CRITICAL REFINEMENT INSTRUCTIONS:\n")
+		promptBuilder.WriteString("1. PRESERVE all existing tables, selected columns, joins, group by dimensions, and filters from the existing query/dataset unless the user explicitly requested to remove or replace them.\n")
+		promptBuilder.WriteString("2. Add newly requested columns, joins, filters, or calculations on top of the existing query.\n\n")
+
+		if existingQuery != "" {
+			promptBuilder.WriteString(fmt.Sprintf("EXISTING COMPILED SQL / PIPELINE:\n```sql\n%s\n```\n\n", existingQuery))
+		}
+
+		if req.CurrentDataSet != nil && req.CurrentDataSet.BaseCollection.Collection != "" {
+			dsJSON, _ := json.MarshalIndent(req.CurrentDataSet, "", "  ")
+			promptBuilder.WriteString(fmt.Sprintf("CURRENT DATASET CONFIGURATION (JSON):\n%s\n\n", string(dsJSON)))
+		}
+		promptBuilder.WriteString("========================================================================\n\n")
+		promptBuilder.WriteString(fmt.Sprintf("USER REFINEMENT / MODIFICATION REQUEST:\n%s", req.Prompt))
+		userPrompt = promptBuilder.String()
 	}
 
 	chatReq := &ChatRequest{
@@ -197,6 +230,22 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 	ds, err := s.PlanToDataSet(plan, driver)
 	if err != nil {
 		return nil, fmt.Errorf("failed converting AI plan to DataSet: %w", err)
+	}
+
+	// Preserve existing dataset identity if refining an existing dataset
+	if req.CurrentDataSet != nil && req.CurrentDataSet.BaseCollection.Collection != "" {
+		if req.CurrentDataSet.ID != "" {
+			ds.ID = req.CurrentDataSet.ID
+		}
+		if req.CurrentDataSet.Name != "" {
+			ds.Name = req.CurrentDataSet.Name
+		}
+		if req.CurrentDataSet.ReferenceName != "" {
+			ds.ReferenceName = req.CurrentDataSet.ReferenceName
+		}
+		if req.CurrentDataSet.SaveMode != "" && plan.SaveMode == "" {
+			ds.SaveMode = req.CurrentDataSet.SaveMode
+		}
 	}
 
 	// Persist conversation ID directly in the DataSet model itself
@@ -615,12 +664,30 @@ Return strictly a JSON object:
 		}
 	}
 
-	// Current dataset base table receives strong anchor weight
-	if currentDS != nil && currentDS.BaseCollection.Collection != "" {
-		cCol := strings.ToLower(currentDS.BaseCollection.Collection)
-		if cfg, ok := cfgByTable[cCol]; ok {
-			selectedSet[strings.ToLower(cfg.Table)] = cfg
-			scores[strings.ToLower(cfg.Table)] = 150
+	// Current dataset base table and joined tables receive strong anchor weights
+	if currentDS != nil {
+		if currentDS.BaseCollection.Collection != "" {
+			cCol := strings.ToLower(currentDS.BaseCollection.Collection)
+			if cfg, ok := cfgByTable[cCol]; ok {
+				selectedSet[strings.ToLower(cfg.Table)] = cfg
+				scores[strings.ToLower(cfg.Table)] = 150
+			}
+		}
+		for _, j := range currentDS.JoinCollections {
+			if j.ToCollection != "" {
+				jCol := strings.ToLower(j.ToCollection)
+				if cfg, ok := cfgByTable[jCol]; ok {
+					selectedSet[strings.ToLower(cfg.Table)] = cfg
+					scores[strings.ToLower(cfg.Table)] = 140
+				}
+			}
+			if j.FromCollection != "" {
+				jCol := strings.ToLower(j.FromCollection)
+				if cfg, ok := cfgByTable[jCol]; ok {
+					selectedSet[strings.ToLower(cfg.Table)] = cfg
+					scores[strings.ToLower(cfg.Table)] = 140
+				}
+			}
 		}
 	}
 

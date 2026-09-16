@@ -362,6 +362,12 @@ func (q *baseQuery) setModel(m any) {
 	if tm, ok := m.(schema.TableModel); ok {
 		q.tableModel = tm
 		q.table = tm.Table()
+	} else if conv, ok := m.(interface{ ToTableModel() schema.TableModel }); ok {
+		tm := conv.ToTableModel()
+		if tm != nil {
+			q.tableModel = tm
+			q.table = tm.Table()
+		}
 	}
 }
 

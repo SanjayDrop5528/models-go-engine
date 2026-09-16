@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // ModelRef uniquely identifies a model reference for adapter CRUD and execution calls.
@@ -43,11 +44,13 @@ func NewModelRef(id, name, storageName, primaryKey string) ModelRef {
 
 // OrbitalRefSpec defines complete reference parameters for foreign and orbital references.
 type OrbitalRefSpec struct {
-	Schema    string `json:"schema,omitempty"`
-	Model     string `json:"model"`
-	Attribute string `json:"attribute"`
-	OnDelete  string `json:"on_delete,omitempty"`
-	OnUpdate  string `json:"on_update,omitempty"`
+	Schema       string `json:"schema,omitempty"`
+	Model        string `json:"model"`
+	Attribute    string `json:"attribute"`
+	RelationName string `json:"relation_name,omitempty"`
+	Alias        string `json:"alias,omitempty"`
+	OnDelete     string `json:"on_delete,omitempty"`
+	OnUpdate     string `json:"on_update,omitempty"`
 }
 
 // ItemRule defines validation rules for array item elements.
@@ -400,7 +403,6 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 
 	attrs := make([]Attribute, 0, len(fields))
 	var pkCols []string
-	var relations []Relation
 	for _, f := range fields {
 		if f != nil && (f.Status == "" || f.Status == DataModelStatusActive) {
 			attrs = append(attrs, f.ToAttribute())
@@ -411,56 +413,10 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 				}
 				pkCols = append(pkCols, pkName)
 			}
-
-			if f.IsOrbitalReference && f.OrbitalReferenceModelID != nil && *f.OrbitalReferenceModelID != "" {
-				col := f.ColumnName
-				if col == "" {
-					col = f.JSONField
-				}
-				targetTable := *f.OrbitalReferenceModelID
-				targetCol := "id"
-				if f.OrbitalReferenceFieldID != nil && *f.OrbitalReferenceFieldID != "" {
-					targetCol = *f.OrbitalReferenceFieldID
-				}
-				relations = append(relations, Relation{
-					Name:        fmt.Sprintf("fk_%s_%s", cfg.ID, col),
-					Type:        RelManyToOne,
-					TargetModel: targetTable,
-					TargetKey:   targetCol,
-					ForeignKey:  col,
-					OnDelete:    "CASCADE",
-					OnUpdate:    "CASCADE",
-				})
-			} else if f.Reference != nil && f.Reference.Model != "" {
-				col := f.ColumnName
-				if col == "" {
-					col = f.JSONField
-				}
-				targetTable := f.Reference.Model
-				targetCol := f.Reference.Attribute
-				if targetCol == "" {
-					targetCol = "id"
-				}
-				onDel := f.Reference.OnDelete
-				if onDel == "" {
-					onDel = "CASCADE"
-				}
-				onUpd := f.Reference.OnUpdate
-				if onUpd == "" {
-					onUpd = "CASCADE"
-				}
-				relations = append(relations, Relation{
-					Name:        fmt.Sprintf("fk_%s_%s", cfg.ID, col),
-					Type:        RelManyToOne,
-					TargetModel: targetTable,
-					TargetKey:   targetCol,
-					ForeignKey:  col,
-					OnDelete:    onDel,
-					OnUpdate:    onUpd,
-				})
-			}
 		}
 	}
+
+	relations := GenerateRelationsFromOrbitalReferences(fields, nil)
 
 	modelStatus := StatusDraft
 	switch cfg.Status {
@@ -498,3 +454,169 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 	}
 }
 
+// GenerateRelationsFromOrbitalReferences converts DataModel orbital reference metadata into executable model.Relation entries.
+func GenerateRelationsFromOrbitalReferences(fields []*DataModel, resolveTargetPK func(targetModel string) string) []Relation {
+	var relations []Relation
+	relationNames := make(map[string]int)
+
+	for _, f := range fields {
+		if f == nil || (f.Status != "" && f.Status != DataModelStatusActive) {
+			continue
+		}
+		// Never generate a relation when is_orbital_reference is false
+		if !f.IsOrbitalReference {
+			continue
+		}
+
+		targetModel := ""
+		if f.OrbitalReferenceModelID != nil && strings.TrimSpace(*f.OrbitalReferenceModelID) != "" {
+			targetModel = strings.TrimSpace(*f.OrbitalReferenceModelID)
+		} else if f.Reference != nil && strings.TrimSpace(f.Reference.Model) != "" {
+			targetModel = strings.TrimSpace(f.Reference.Model)
+			if strings.TrimSpace(f.Reference.Schema) != "" && !strings.Contains(targetModel, ".") {
+				targetModel = fmt.Sprintf("%s.%s", strings.TrimSpace(f.Reference.Schema), targetModel)
+			}
+		}
+
+		// Never generate a relation when target model cannot be resolved
+		if targetModel == "" {
+			continue
+		}
+
+		col := f.ColumnName
+		if col == "" {
+			col = f.JSONField
+		}
+
+		targetCol := ""
+		if f.OrbitalReferenceFieldID != nil && strings.TrimSpace(*f.OrbitalReferenceFieldID) != "" {
+			targetCol = strings.TrimSpace(*f.OrbitalReferenceFieldID)
+		} else if f.Reference != nil && strings.TrimSpace(f.Reference.Attribute) != "" {
+			targetCol = strings.TrimSpace(f.Reference.Attribute)
+		}
+
+		if targetCol == "" {
+			if resolveTargetPK != nil {
+				targetCol = resolveTargetPK(targetModel)
+			}
+			if targetCol == "" {
+				targetCol = "id"
+			}
+		}
+
+		// Determine relation name: support custom aliases if provided in Reference or RefName, else generate from target model
+		baseRelName := ""
+		if f.Reference != nil && strings.TrimSpace(f.Reference.RelationName) != "" {
+			baseRelName = strings.TrimSpace(f.Reference.RelationName)
+		} else if f.Reference != nil && strings.TrimSpace(f.Reference.Alias) != "" {
+			baseRelName = strings.TrimSpace(f.Reference.Alias)
+		} else if strings.TrimSpace(f.RefName) != "" {
+			baseRelName = strings.TrimSpace(f.RefName)
+		}
+
+		if baseRelName == "" {
+			baseRelName = toRelationName(targetModel)
+		} else {
+			baseRelName = toRelationName(baseRelName)
+		}
+
+		relName := uniqueRelationName(baseRelName, relationNames)
+
+		onDelete := "CASCADE"
+		onUpdate := "CASCADE"
+		if f.Reference != nil {
+			if f.Reference.OnDelete != "" {
+				onDelete = f.Reference.OnDelete
+			}
+			if f.Reference.OnUpdate != "" {
+				onUpdate = f.Reference.OnUpdate
+			}
+		}
+
+		relations = append(relations, Relation{
+			Name:        relName,
+			Type:        RelManyToOne,
+			TargetModel: targetModel,
+			TargetKey:   targetCol,
+			ForeignKey:  col,
+			OnDelete:    onDelete,
+			OnUpdate:    onUpdate,
+		})
+	}
+
+	return relations
+}
+
+func toRelationName(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "Relation"
+	}
+	if idx := strings.LastIndex(raw, "."); idx >= 0 {
+		raw = raw[idx+1:]
+	}
+	raw = strings.TrimSuffix(raw, "_id")
+	raw = strings.TrimSuffix(raw, "Id")
+	if strings.HasSuffix(strings.ToLower(raw), "ies") && len(raw) > 3 {
+		raw = raw[:len(raw)-3] + "y"
+	} else if strings.HasSuffix(strings.ToLower(raw), "s") && len(raw) > 1 {
+		raw = raw[:len(raw)-1]
+	}
+
+	words := splitIdentifierWords(raw)
+	if len(words) == 0 {
+		return "Relation"
+	}
+
+	var b strings.Builder
+	for _, w := range words {
+		if w == "" {
+			continue
+		}
+		runes := []rune(w)
+		runes[0] = unicode.ToUpper(runes[0])
+		b.WriteString(string(runes))
+	}
+	if b.Len() == 0 {
+		return "Relation"
+	}
+	return b.String()
+}
+
+func splitIdentifierWords(s string) []string {
+	var words []string
+	var current []rune
+	for i, r := range s {
+		if r == '_' || r == '-' || r == ' ' {
+			if len(current) > 0 {
+				words = append(words, string(current))
+				current = nil
+			}
+			continue
+		}
+		if unicode.IsUpper(r) && len(current) > 0 {
+			prev := current[len(current)-1]
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || (i+1 < len(s) && unicode.IsLower(rune(s[i+1]))) {
+				words = append(words, string(current))
+				current = nil
+			}
+		}
+		current = append(current, r)
+	}
+	if len(current) > 0 {
+		words = append(words, string(current))
+	}
+	return words
+}
+
+func uniqueRelationName(base string, seen map[string]int) string {
+	if base == "" {
+		base = "Relation"
+	}
+	count := seen[base]
+	seen[base] = count + 1
+	if count == 0 {
+		return base
+	}
+	return fmt.Sprintf("%s%d", base, count+1)
+}

@@ -93,11 +93,10 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 	}
 
-	// Check if any custom column contains aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.)
+	// Check if any custom column contains aggregate functions (SUM, AVG, COUNT, MIN, MAX, COUNT_IF, SUM_IF, etc.)
 	hasAggregate := false
 	for _, cc := range ds.CustomColumns {
-		fnName := strings.ToUpper(cc.CustomAggregateFnName)
-		if fnName == "SUM" || fnName == "AVG" || fnName == "COUNT" || fnName == "COUNT_DISTINCT" || fnName == "MIN" || fnName == "MAX" || fnName == "COUNT_ALL" {
+		if isAggregateFunctionName(cc.CustomAggregateFnName) {
 			hasAggregate = true
 			break
 		}
@@ -106,10 +105,6 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 				hasAggregate = true
 				break
 			}
-		}
-		if isAggregateFunctionName(cc.CustomAggregateFnName) {
-			hasAggregate = true
-			break
 		}
 	}
 
@@ -160,6 +155,18 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 	} else if !hasAggregate {
 		for _, sel := range ds.SelectedList {
+			// Check if sel.Field matches a custom column; custom columns are handled separately in ast.CustomColumns
+			isCustom := false
+			for _, cc := range ds.CustomColumns {
+				if strings.EqualFold(cc.CustomColumnName, sel.Field) || strings.EqualFold(cc.CustomLabelName, sel.Field) {
+					isCustom = true
+					break
+				}
+			}
+			if isCustom {
+				continue
+			}
+
 			tbl := ds.BaseCollection.Collection
 			fld := sel.Field
 			if idx := strings.Index(sel.Field, "."); idx >= 0 {
@@ -271,7 +278,7 @@ func resolveTableAlias(table string, aliases map[string]string) string {
 
 func isAggregateFunctionName(name string) bool {
 	switch strings.ToUpper(strings.TrimSpace(name)) {
-	case "SUM", "AVG", "COUNT", "COUNT_DISTINCT", "MIN", "MAX", "COUNT_ALL", "COUNT(*)":
+	case "SUM", "AVG", "COUNT", "COUNT_DISTINCT", "MIN", "MAX", "COUNT_ALL", "COUNT(*)", "COUNT_IF", "SUM_IF":
 		return true
 	default:
 		return false

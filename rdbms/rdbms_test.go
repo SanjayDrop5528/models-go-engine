@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SanjayDrop5528/models-go-engine/model"
 	coreQuery "github.com/SanjayDrop5528/models-go-engine/query"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/dialect"
@@ -378,4 +379,57 @@ func TestNewSelectFromQuery(t *testing.T) {
 		t.Fatalf("unexpected order/limit/offset: %s", sqlStr)
 	}
 }
+
+func TestNewTableModelFromModel_RelationQuery(t *testing.T) {
+	db := rdbms.NewDB(nil, dialect.NewPostgreSQL())
+
+	targetModel := "organisations"
+	targetField := "id"
+	empModel := model.BuildModel(&model.ModelConfig{
+		ID:     "employee",
+		Name:   "Employee",
+		Table:  "employees",
+		Status: model.ModelConfigStatusActive,
+	}, []*model.DataModel{
+		{
+			ID:           "id",
+			ColumnName:   "id",
+			IsPrimaryKey: true,
+			Status:       model.DataModelStatusActive,
+		},
+		{
+			ID:         "first_name",
+			ColumnName: "first_name",
+			Status:     model.DataModelStatusActive,
+		},
+		{
+			ID:                         "organisation_id",
+			ColumnName:                 "organisation_id",
+			IsOrbitalReference:         true,
+			OrbitalReferenceModelID:    &targetModel,
+			OrbitalReferenceFieldID:    &targetField,
+			OrbitalReferenceValidation: model.OrbitalValidationExists,
+			Status:                     model.DataModelStatusActive,
+		},
+	}, "testdb", model.StorageRelational)
+
+	tm := rdbms.NewTableModelFromModel(empModel)
+	if tm == nil {
+		t.Fatal("expected table model")
+	}
+	if tm.Join("Organisation") == nil {
+		t.Fatal("expected join for Organisation")
+	}
+
+	q := db.NewSelect().Model(tm).Relation("Organisation")
+	sqlStr := q.String()
+
+	if !strings.Contains(sqlStr, `FROM "employees" AS "employee"`) {
+		t.Fatalf("expected FROM employees AS employee, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, `LEFT JOIN "organisations" ON "organisations"."id" = organisation_id`) {
+		t.Fatalf("expected join on organisation_id, got: %s", sqlStr)
+	}
+}
+
 

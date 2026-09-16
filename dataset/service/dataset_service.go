@@ -25,6 +25,7 @@ type PreviewResponse struct {
 	Pipeline          string                 `json:"pipeline"`
 	ReferencePipeline string                 `json:"reference_pipeline"`
 	Parameters        []domain.FilterParam   `json:"parameters"`
+	DDLStatement      string                 `json:"ddl_statement,omitempty"`
 }
 
 // DataSetService orchestrates design-time Preview & Save, and runtime Execution.
@@ -132,6 +133,7 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		Pipeline:          compiled.ExecutableQuery,
 		ReferencePipeline: compiled.ReferencePipeline,
 		Parameters:        compiled.Parameters,
+		DDLStatement:      compiled.DDLStatement,
 	}, nil
 }
 

@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -75,6 +76,9 @@ type RelationOpts struct {
 	Apply            func(Query) Query `json:"-"`
 	LoadWithChildren bool              `json:"load_with_children"`
 	Conditions       []string          `json:"conditions,omitempty"`
+	Fields           []string          `json:"fields,omitempty"`
+	On               []string          `json:"on,omitempty"`
+	Order            []Sort            `json:"order,omitempty"`
 }
 
 // RelationSpec stores relation configurations on the query.
@@ -83,6 +87,10 @@ type RelationSpec struct {
 	Apply            func(Query) Query `json:"-"`
 	LoadWithChildren bool              `json:"load_with_children"`
 	Conditions       []string          `json:"conditions,omitempty"`
+	Fields           []string          `json:"fields,omitempty"`
+	On               []string          `json:"on,omitempty"`
+	Order            []Sort            `json:"order,omitempty"`
+	SubRelations     []RelationSpec    `json:"sub_relations,omitempty"`
 }
 
 // UnionSpec stores set operations on the query.
@@ -371,28 +379,66 @@ func (q Query) JoinOnOr(cond string, args ...any) Query {
 
 // Relation registers a relation to join or populate eagerly.
 func (q Query) Relation(name string, apply ...func(Query) Query) Query {
-	var app func(Query) Query
-	if len(apply) > 0 {
-		app = apply[0]
+	spec := RelationSpec{
+		Name:             name,
+		LoadWithChildren: q.LoadWithChildren,
+	}
+	if len(apply) > 0 && apply[0] != nil {
+		spec.Apply = apply[0]
+		sub := apply[0](New())
+		spec.LoadWithChildren = sub.LoadWithChildren
+		spec.Fields = sub.Fields
+		spec.Order = sub.Sorts
+		spec.SubRelations = sub.RelationSpecs
+		for _, f := range sub.Filters {
+			opStr := "="
+			switch f.Op {
+			case OpEq:
+				opStr = "="
+			case OpNeq:
+				opStr = "<>"
+			case OpGt:
+				opStr = ">"
+			case OpGte:
+				opStr = ">="
+			case OpLt:
+				opStr = "<"
+			case OpLte:
+				opStr = "<="
+			}
+			spec.Conditions = append(spec.Conditions, fmt.Sprintf("%s %s '%v'", f.Field, opStr, f.Value))
+		}
 	}
 	q.Relations = append(q.Relations, name)
-	q.RelationSpecs = append(q.RelationSpecs, RelationSpec{
-		Name:             name,
-		Apply:            app,
-		LoadWithChildren: q.LoadWithChildren,
-	})
+	q.RelationSpecs = append(q.RelationSpecs, spec)
 	return q
 }
 
 // RelationWithOpts configures a relation with explicit options.
 func (q Query) RelationWithOpts(name string, opts RelationOpts) Query {
-	q.Relations = append(q.Relations, name)
-	q.RelationSpecs = append(q.RelationSpecs, RelationSpec{
+	spec := RelationSpec{
 		Name:             name,
 		Apply:            opts.Apply,
 		LoadWithChildren: opts.LoadWithChildren,
 		Conditions:       opts.Conditions,
-	})
+		Fields:           opts.Fields,
+		On:               opts.On,
+		Order:            opts.Order,
+	}
+	if opts.Apply != nil {
+		sub := opts.Apply(New())
+		if len(sub.Fields) > 0 && len(spec.Fields) == 0 {
+			spec.Fields = sub.Fields
+		}
+		if len(sub.Sorts) > 0 && len(spec.Order) == 0 {
+			spec.Order = sub.Sorts
+		}
+		if len(sub.RelationSpecs) > 0 {
+			spec.SubRelations = sub.RelationSpecs
+		}
+	}
+	q.Relations = append(q.Relations, name)
+	q.RelationSpecs = append(q.RelationSpecs, spec)
 	return q
 }
 

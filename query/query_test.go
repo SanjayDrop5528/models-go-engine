@@ -92,3 +92,50 @@ func TestUnifiedQueryBuilder(t *testing.T) {
 		t.Fatalf("unexpected comment: %s", q.CommentText)
 	}
 }
+
+func TestRelationWithOptsAndApply(t *testing.T) {
+	q := query.New().
+		Table("employees").
+		Relation("Department", func(sub query.Query) query.Query {
+			return sub.
+				Column("id", "name").
+				WhereFilter("is_active", query.OpEq, true).
+				OrderBy("name", query.SortAsc).
+				Relation("Organization")
+		}).
+		RelationWithOpts("Address", query.RelationOpts{
+			Fields:     []string{"city", "country"},
+			Conditions: []string{"is_primary = true"},
+			On:         []string{"Address.status = 'active'"},
+		})
+
+	if len(q.Relations) != 2 {
+		t.Fatalf("expected 2 relations, got %d", len(q.Relations))
+	}
+
+	deptSpec := q.RelationSpecs[0]
+	if deptSpec.Name != "Department" {
+		t.Fatalf("expected Department relation spec, got: %s", deptSpec.Name)
+	}
+	if len(deptSpec.Fields) != 2 || deptSpec.Fields[0] != "id" || deptSpec.Fields[1] != "name" {
+		t.Fatalf("unexpected deptSpec.Fields: %v", deptSpec.Fields)
+	}
+	if len(deptSpec.Conditions) != 1 || deptSpec.Conditions[0] != "is_active = 'true'" {
+		t.Fatalf("unexpected deptSpec.Conditions: %v", deptSpec.Conditions)
+	}
+	if len(deptSpec.SubRelations) != 1 || deptSpec.SubRelations[0].Name != "Organization" {
+		t.Fatalf("unexpected deptSpec.SubRelations: %v", deptSpec.SubRelations)
+	}
+
+	addrSpec := q.RelationSpecs[1]
+	if addrSpec.Name != "Address" {
+		t.Fatalf("expected Address spec, got %s", addrSpec.Name)
+	}
+	if len(addrSpec.Fields) != 2 || addrSpec.Fields[0] != "city" {
+		t.Fatalf("unexpected addrSpec.Fields: %v", addrSpec.Fields)
+	}
+	if len(addrSpec.On) != 1 || addrSpec.On[0] != "Address.status = 'active'" {
+		t.Fatalf("unexpected addrSpec.On: %v", addrSpec.On)
+	}
+}
+

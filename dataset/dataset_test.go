@@ -6,12 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SanjayDrop5528/models-go-engine/adapter"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/compiler"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/domain"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/planner"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/repository"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/service"
+	"github.com/SanjayDrop5528/models-go-engine/execution"
 )
 
 func setupTestService() *service.DataSetService {
@@ -481,3 +483,291 @@ func TestDataSet_Validation_InvalidOperandCount(t *testing.T) {
 		t.Fatalf("expected INVALID_OPERAND_COUNT error code, got: %v", err)
 	}
 }
+
+func TestCommon_CreateFilterParams(t *testing.T) {
+	filterParams := []domain.FilterParam{
+		{
+			ParamName:     "dept_id",
+			ParamDataType: "string",
+			DefaultValue:  "dept_eng",
+		},
+		{
+			ParamName:     "min_salary",
+			ParamDataType: "int",
+			DefaultValue:  50000,
+		},
+		{
+			ParamName:     "is_active",
+			ParamDataType: "bool",
+			DefaultValue:  true,
+		},
+		{
+			ParamName:     "user_org",
+			ParamDataType: "string",
+			DefaultValue:  "KTON|org_id",
+		},
+		{
+			ParamName:     "start_date",
+			ParamDataType: "time.Time",
+			DefaultValue:  "CD|+0|ST",
+		},
+		{
+			ParamName:     "end_date",
+			ParamDataType: "date",
+			DefaultValue:  "CD|+0|ED",
+		},
+		{
+			ParamName:     "bonus_rate",
+			ParamDataType: "decimal",
+			DefaultValue:  0.15,
+			Paramvalue:    0.20, // Runtime override
+		},
+	}
+
+	userToken := map[string]any{
+		"org_id":   "org_corp_999",
+		"timezone": "America/New_York",
+	}
+
+	rawPipeline := `[
+		{"$match": {"department": {"paramName":"dept_id","paramDataType":"string"}}},
+		{"$match": {"salary": {"$gte": {"paramName":"min_salary","paramDataType":"int"}}}},
+		{"$match": {"active": {"paramName":"is_active","paramDataType":"bool"}}},
+		{"$match": {"organization": {"paramName":"user_org","paramDataType":"string"}}},
+		{"$match": {"created_at": {"$gte": {"ParamsName":"start_date","parmsDataType":"time.Time"}}}},
+		{"$match": {"expired_at": {"$lte": {"paramName":"end_date","paramDataType":"date"}}}},
+		{"$match": {"bonus": {"paramName":"bonus_rate","paramDataType":"decimal"}}}
+	]`
+
+	resolved := domain.CreateFilterParams(filterParams, rawPipeline, userToken)
+
+	// Check string value is quoted
+	if !strings.Contains(resolved, `"department": "dept_eng"`) {
+		t.Errorf("expected department dept_eng, got:\n%s", resolved)
+	}
+	// Check int value is unquoted
+	if !strings.Contains(resolved, `"salary": {"$gte": 50000}`) {
+		t.Errorf("expected salary 50000, got:\n%s", resolved)
+	}
+	// Check bool value is unquoted
+	if !strings.Contains(resolved, `"active": true`) {
+		t.Errorf("expected active true, got:\n%s", resolved)
+	}
+	// Check KTON token resolution
+	if !strings.Contains(resolved, `"organization": "org_corp_999"`) {
+		t.Errorf("expected organization org_corp_999, got:\n%s", resolved)
+	}
+	// Check CD Start of Day resolution with timezone (00:00:00)
+	if !strings.Contains(resolved, `T00:00:00`) {
+		t.Errorf("expected start_date to have T00:00:00, got:\n%s", resolved)
+	}
+	// Check CD End of Day resolution with timezone (23:59:59)
+	if !strings.Contains(resolved, `T23:59:59`) {
+		t.Errorf("expected end_date to have T23:59:59, got:\n%s", resolved)
+	}
+	// Check runtime Paramvalue override (0.20 instead of 0.15)
+	if !strings.Contains(resolved, `"bonus": 0.2`) {
+		t.Errorf("expected bonus 0.2, got:\n%s", resolved)
+	}
+}
+
+type mockExecutionAdapter struct {
+	adapter.Adapter
+	lastReq execution.ExecutionRequest
+}
+
+func (m *mockExecutionAdapter) Execute(ctx context.Context, req execution.ExecutionRequest) (*execution.ExecutionResult, error) {
+	m.lastReq = req
+	return &execution.ExecutionResult{
+		Data:   []map[string]any{{"mock_id": 1}},
+		Status: "SUCCESS",
+	}, nil
+}
+
+func TestDataSetService_Execute_SaveModes(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	mockAdp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.SetAdapter(mockAdp)
+
+	// 1. Test Procedure SaveMode
+	dsProc := &domain.DataSet{
+		ID:            "ds_proc",
+		Name:          "Procedure Dataset",
+		ReferenceName: "proc_dataset",
+		SaveMode:      domain.SaveModeProcedure,
+		FilterParams: []domain.FilterParam{
+			{ParamName: "dept", ParamDataType: "string", DefaultValue: "engineering"},
+		},
+	}
+	if err := repo.Save(ctx, dsProc); err != nil {
+		t.Fatalf("failed saving proc dataset: %v", err)
+	}
+
+	_, err := svc.Execute(ctx, "proc_dataset", map[string]any{"dept": "sales"})
+	if err != nil {
+		t.Fatalf("failed executing procedure dataset: %v", err)
+	}
+	if mockAdp.lastReq.Operation != "PROCEDURE" {
+		t.Errorf("expected operation PROCEDURE, got: %s", mockAdp.lastReq.Operation)
+	}
+	if mockAdp.lastReq.Target != "sp_proc_dataset" {
+		t.Errorf("expected target sp_proc_dataset, got: %s", mockAdp.lastReq.Target)
+	}
+	if mockAdp.lastReq.Arguments["dept"] != "sales" {
+		t.Errorf("expected arg dept=sales, got: %v", mockAdp.lastReq.Arguments["dept"])
+	}
+
+	// 2. Test Function SaveMode
+	dsFn := &domain.DataSet{
+		ID:            "ds_fn",
+		Name:          "Function Dataset",
+		ReferenceName: "fn_dataset",
+		SaveMode:      domain.SaveModeFunction,
+		FilterParams: []domain.FilterParam{
+			{ParamName: "limit", ParamDataType: "int", DefaultValue: 10},
+		},
+	}
+	if err := repo.Save(ctx, dsFn); err != nil {
+		t.Fatalf("failed saving fn dataset: %v", err)
+	}
+
+	_, err = svc.Execute(ctx, "fn_dataset", map[string]any{"limit": 25})
+	if err != nil {
+		t.Fatalf("failed executing function dataset: %v", err)
+	}
+	if mockAdp.lastReq.Operation != "FUNCTION" {
+		t.Errorf("expected operation FUNCTION, got: %s", mockAdp.lastReq.Operation)
+	}
+	if mockAdp.lastReq.Target != "fn_fn_dataset" {
+		t.Errorf("expected target fn_fn_dataset, got: %s", mockAdp.lastReq.Target)
+	}
+
+	// 3. Test Direct Query SaveMode with CreateFilterParams substitution
+	dsQuery := &domain.DataSet{
+		ID:                "ds_query",
+		Name:              "Query Dataset",
+		ReferenceName:     "query_dataset",
+		SaveMode:          domain.SaveModeQuery,
+		Pipeline:          `SELECT * FROM users WHERE status = 'active'`,
+		ReferencePipeline: `SELECT * FROM users WHERE status = {"paramName":"status","paramDataType":"string"}`,
+		FilterParams: []domain.FilterParam{
+			{ParamName: "status", ParamDataType: "string", DefaultValue: "active"},
+		},
+	}
+	if err := repo.Save(ctx, dsQuery); err != nil {
+		t.Fatalf("failed saving query dataset: %v", err)
+	}
+
+	_, err = svc.Execute(ctx, "query_dataset", map[string]any{"status": "pending"})
+	if err != nil {
+		t.Fatalf("failed executing query dataset: %v", err)
+	}
+	if mockAdp.lastReq.Operation != "QUERY" {
+		t.Errorf("expected operation QUERY, got: %s", mockAdp.lastReq.Operation)
+	}
+	if !strings.Contains(mockAdp.lastReq.Target, `"pending"`) {
+		t.Errorf("expected target to have substituted pending, got: %s", mockAdp.lastReq.Target)
+	}
+}
+
+func TestDataSet_PayloadVsDefaultValue_Precedence(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	mockAdp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.SetAdapter(mockAdp)
+
+	ds := &domain.DataSet{
+		ID:                "ds_precedence",
+		Name:              "Precedence Dataset",
+		ReferenceName:     "precedence_ds",
+		SaveMode:          domain.SaveModeQuery,
+		Pipeline:          `SELECT * FROM items`,
+		ReferencePipeline: `SELECT * FROM items WHERE col1 = {"paramName":"param1","paramDataType":"string"} AND col2 = {"paramName":"param2","paramDataType":"string"} AND col3 = {"paramName":"param3","paramDataType":"string"} AND col4 = {"paramName":"param4","paramDataType":"string"}`,
+		FilterParams: []domain.FilterParam{
+			{
+				ParamName:     "param1",
+				ParamDataType: "string",
+				DefaultValue:  "default_val_1",
+			},
+			{
+				ParamName:     "param2",
+				ParamDataType: "string",
+				DefaultValue:  "default_val_2",
+			},
+			{
+				ParamName:     "param3",
+				ParamDataType: "string",
+				DefaultValue:  "default_val_3",
+			},
+			{
+				ParamName:     "param4",
+				ParamDataType: "string",
+				DefaultValue:  "KTON|org_id",
+			},
+		},
+	}
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatalf("failed saving dataset: %v", err)
+	}
+
+	// Payload provides param1 (should use payload value)
+	// Payload does not provide param2 (should use default value)
+	// Payload provides empty string for param3 (should fallback to default value)
+	// Payload does not provide param4 (should resolve KTON|org_id from userToken)
+	payload := map[string]any{
+		"param1": "payload_custom_1",
+		"param3": "", // empty, should fallback
+	}
+	userToken := map[string]any{
+		"org_id": "org_secret_777",
+	}
+
+	_, err := svc.ExecuteWithUserToken(ctx, "precedence_ds", payload, userToken)
+	if err != nil {
+		t.Fatalf("failed executing dataset: %v", err)
+	}
+
+	query := mockAdp.lastReq.Target
+
+	// param1 must use payload value
+	if !strings.Contains(query, `"payload_custom_1"`) {
+		t.Errorf("expected param1 to use payload value 'payload_custom_1', got:\n%s", query)
+	}
+	// param2 must use default value
+	if !strings.Contains(query, `"default_val_2"`) {
+		t.Errorf("expected param2 to use default value 'default_val_2', got:\n%s", query)
+	}
+	// param3 must fallback to default value
+	if !strings.Contains(query, `"default_val_3"`) {
+		t.Errorf("expected param3 to fallback to default value 'default_val_3', got:\n%s", query)
+	}
+	// param4 must resolve from userToken
+	if !strings.Contains(query, `"org_secret_777"`) {
+		t.Errorf("expected param4 to resolve KTON token 'org_secret_777', got:\n%s", query)
+	}
+
+	// Now verify that if payload DOES provide param4, it overrides the KTON token default
+	payloadWithParam4 := map[string]any{
+		"param1": "custom_1",
+		"param4": "override_org_888",
+	}
+	_, err = svc.ExecuteWithUserToken(ctx, "precedence_ds", payloadWithParam4, userToken)
+	if err != nil {
+		t.Fatalf("failed executing dataset with param4 override: %v", err)
+	}
+	query2 := mockAdp.lastReq.Target
+	if !strings.Contains(query2, `"override_org_888"`) {
+		t.Errorf("expected param4 to be overridden by payload 'override_org_888', got:\n%s", query2)
+	}
+}
+
+

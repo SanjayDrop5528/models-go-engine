@@ -118,5 +118,7 @@ type FilterParam struct {
 	ParamName     string      `json:"paramName"`
 	ParamDataType string      `json:"paramDataType"` // "string", "int", "decimal", "boolean", "date", "timestamp"
 	DefaultValue  interface{} `json:"defaultValue,omitempty"`
+	Paramvalue    interface{} `json:"paramValue,omitempty"` // Runtime value or value override
 	Required      bool        `json:"required"`
 }
+

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -66,6 +67,13 @@ func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompi
 	s.compilers[strings.ToLower(driver)] = c
 	return s
 }
+
+// SetAdapter sets or updates the underlying execution adapter.
+func (s *DataSetService) SetAdapter(adp adapter.Adapter) *DataSetService {
+	s.adapter = adp
+	return s
+}
+
 
 // Preview compiles and executes the dataset without saving it to database metadata.
 func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*PreviewResponse, error) {
@@ -188,47 +196,106 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 
 // Execute resolves dataset by reference name, binds parameters safely, and runs the query.
 func (s *DataSetService) Execute(ctx context.Context, referenceName string, runtimeParams map[string]any) ([]map[string]any, error) {
+	return s.ExecuteWithUserToken(ctx, referenceName, runtimeParams, nil)
+}
+
+// ExecuteWithUserToken resolves dataset by reference name, binds parameters safely
+// (supporting KTON user tokens, dynamic CD date expressions, and type coercions), and runs
+// the dataset via Procedure, Function, or Direct Query.
+func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName string, runtimeParams map[string]any, userToken any) ([]map[string]any, error) {
 	ds, err := s.repo.FindByReferenceName(ctx, referenceName)
 	if err != nil {
 		return nil, err
 	}
 
-	// 1. Validate & Coerce Parameters
+	// 1. Validate & Coerce Parameters: check payload first, else fallback to default value
 	boundArgs := make(map[string]any)
-	for _, p := range ds.FilterParams {
-		val, provided := runtimeParams[p.ParamName]
-		if !provided || val == nil {
-			if p.Required && p.DefaultValue == nil {
-				return nil, domain.NewErrorf(domain.ErrMissingRequiredParameter, "required parameter '%s' was not provided", p.ParamName)
+	effectiveParams := make([]domain.FilterParam, len(ds.FilterParams))
+	for i, p := range ds.FilterParams {
+		var val any
+		foundInPayload := false
+
+		// Check if value came from payload (case-insensitive)
+		for k, v := range runtimeParams {
+			if strings.EqualFold(k, p.ParamName) && v != nil && v != "" {
+				val = v
+				foundInPayload = true
+				break
 			}
-			val = p.DefaultValue
 		}
 
+		// If not in payload, fallback to default value
+		if !foundInPayload || val == nil {
+			if p.Paramvalue != nil && p.Paramvalue != "" {
+				val = p.Paramvalue
+			} else {
+				val = p.DefaultValue
+			}
+		}
+
+		if val == nil && p.Required {
+			return nil, domain.NewErrorf(domain.ErrMissingRequiredParameter, "required parameter '%s' was not provided", p.ParamName)
+		}
+
+		effectiveParams[i] = p
 		if val != nil {
+			// Resolve dynamic expressions (KTON|key, CD|+0|ST, etc.)
+			if strVal, ok := val.(string); ok {
+				var user map[string]any
+				if userToken != nil {
+					user, _ = domain.StructToMap(userToken)
+				}
+				resolved := domain.ConvertValueToDataType("string", strVal, user)
+				if resolved != "unsupported_data_type" && resolved != "" {
+					val = resolved
+				}
+			}
+
 			coerced, err := coerceDataType(val, p.ParamDataType)
 			if err != nil {
 				return nil, domain.WrapError(domain.ErrInvalidParameterType, fmt.Sprintf("parameter '%s' coercion failed", p.ParamName), err)
 			}
 			boundArgs[p.ParamName] = coerced
+			effectiveParams[i].Paramvalue = coerced
 		}
 	}
 
-	// 2. Select Pipeline (ReferencePipeline if parameters present, else Pipeline)
-	queryToRun := ds.Pipeline
-	if len(runtimeParams) > 0 && ds.ReferencePipeline != "" {
-		queryToRun = ds.ReferencePipeline
-	}
-
-	// 3. Execute via Adapter
+	// 2. Select execution strategy based on SaveMode
 	if s.adapter == nil {
 		return []map[string]any{}, nil
 	}
 
-	execReq := execution.ExecutionRequest{
-		Operation: operation.OpQuery,
-		Target:    queryToRun,
-		Arguments: boundArgs,
+	cleanName := strings.ReplaceAll(ds.ReferenceName, "-", "_")
+	var execReq execution.ExecutionRequest
+
+	switch ds.SaveMode {
+	case domain.SaveModeProcedure:
+		execReq = execution.ExecutionRequest{
+			Operation: operation.OpProcedure,
+			Target:    fmt.Sprintf("sp_%s", cleanName),
+			Arguments: boundArgs,
+		}
+	case domain.SaveModeFunction:
+		execReq = execution.ExecutionRequest{
+			Operation: operation.OpFunction,
+			Target:    fmt.Sprintf("fn_%s", cleanName),
+			Arguments: boundArgs,
+		}
+	default: // SaveModeQuery
+		queryToRun := ds.Pipeline
+		if ds.ReferencePipeline != "" {
+			queryToRun = domain.CreateFilterParams(effectiveParams, ds.ReferencePipeline, userToken)
+		}
+		if queryToRun == "" {
+			queryToRun = ds.Pipeline
+		}
+		execReq = execution.ExecutionRequest{
+			Operation: operation.OpQuery,
+			Target:    queryToRun,
+			Arguments: boundArgs,
+		}
 	}
+
 	res, err := s.adapter.Execute(ctx, execReq)
 	if err != nil {
 		return nil, domain.WrapError(domain.ErrPipelineExecutionFailed, "dataset execution failed", err)
@@ -241,6 +308,11 @@ func (s *DataSetService) Execute(ctx context.Context, referenceName string, runt
 			}
 		} else if rows, ok := res.Data.([]map[string]any); ok {
 			return rows, nil
+		} else if rawStr, ok := res.Data.(string); ok {
+			var parsedRows []map[string]any
+			if err := json.Unmarshal([]byte(rawStr), &parsedRows); err == nil {
+				return parsedRows, nil
+			}
 		}
 	}
 

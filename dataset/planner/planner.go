@@ -33,6 +33,13 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		Parameters: ds.FilterParams,
 	}
 
+	tableAliases := map[string]string{
+		strings.ToLower(ds.BaseCollection.Collection): ds.BaseCollection.Collection,
+	}
+	if ds.BaseCollection.Schema != "" {
+		tableAliases[strings.ToLower(ds.BaseCollection.Schema+"."+ds.BaseCollection.Collection)] = ds.BaseCollection.Collection
+	}
+
 	// 1. Map Joins
 	for _, j := range ds.JoinCollections {
 		jType := j.JoinType
@@ -47,6 +54,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		if fromTbl == "" {
 			fromTbl = ds.BaseCollection.Collection
 		}
+		fromTbl = resolveTableAlias(fromTbl, tableAliases)
 
 		ast.Joins = append(ast.Joins, ASTJoin{
 			Schema:        j.Schema,
@@ -60,6 +68,10 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			ConvertString: j.ConvertToString,
 			CastMode:      j.CastMode,
 		})
+		tableAliases[strings.ToLower(j.ToCollection)] = alias
+		if j.Schema != "" {
+			tableAliases[strings.ToLower(j.Schema+"."+j.ToCollection)] = alias
+		}
 	}
 
 	// 2. Map Group By first to establish grouping criteria
@@ -68,6 +80,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		if tbl == "" {
 			tbl = ds.BaseCollection.Collection
 		}
+		tbl = resolveTableAlias(tbl, tableAliases)
 		fld := g.FieldName
 		if fld == "" {
 			fld = g.Name
@@ -88,7 +101,13 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			hasAggregate = true
 			break
 		}
-		if fn, err := p.functionResolver.ResolveFunction(ctx, cc.CustomAggregateFnName); err == nil && fn.IsAggregate {
+		if p.functionResolver != nil {
+			if fn, err := p.functionResolver.ResolveFunction(ctx, cc.CustomAggregateFnName); err == nil && fn.IsAggregate {
+				hasAggregate = true
+				break
+			}
+		}
+		if isAggregateFunctionName(cc.CustomAggregateFnName) {
 			hasAggregate = true
 			break
 		}
@@ -109,6 +128,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 				tbl = sel.Field[:idx]
 				fld = sel.Field[idx+1:]
 			}
+			tbl = resolveTableAlias(tbl, tableAliases)
 			fullKey := strings.ToLower(tbl + "." + fld)
 			shortKey := strings.ToLower(fld)
 			if groupedMap[fullKey] || groupedMap[shortKey] {
@@ -146,6 +166,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 				tbl = sel.Field[:idx]
 				fld = sel.Field[idx+1:]
 			}
+			tbl = resolveTableAlias(tbl, tableAliases)
 			ast.Projections = append(ast.Projections, ASTProjection{
 				SourceTable: tbl,
 				SourceField: fld,
@@ -158,17 +179,22 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 	// 4. Map Custom Columns & Functions
 	for _, cc := range ds.CustomColumns {
 		astCol := ASTCustomColumn{
-			Alias:      cc.CustomColumnName,
-			Label:      cc.CustomLabelName,
-			Expression: cc.Expression,
-			DataType:   cc.Type,
+			Alias:        cc.CustomColumnName,
+			Label:        cc.CustomLabelName,
+			FunctionName: cc.CustomAggregateFnName,
+			Expression:   cc.Expression,
+			DataType:     cc.Type,
 		}
 
-		if cc.CustomAggregateFnName != "" {
+		if cc.CustomAggregateFnName != "" && p.functionResolver != nil {
 			if fn, err := p.functionResolver.ResolveFunction(ctx, cc.CustomAggregateFnName); err == nil {
 				astCol.Function = fn
 				astCol.IsAggregate = fn.IsAggregate
+			} else if isAggregateFunctionName(cc.CustomAggregateFnName) {
+				astCol.IsAggregate = true
 			}
+		} else if isAggregateFunctionName(cc.CustomAggregateFnName) {
+			astCol.IsAggregate = true
 		}
 
 		for _, f := range cc.Fields {
@@ -206,6 +232,9 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			if tbl == "" && !isLit && !isCustomRef {
 				tbl = ds.BaseCollection.Collection
 			}
+			if tbl != "" {
+				tbl = resolveTableAlias(tbl, tableAliases)
+			}
 			astCol.Operands = append(astCol.Operands, ASTOperand{
 				SourceTable: tbl,
 				SourceField: fldName,
@@ -219,13 +248,37 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 
 	// 5. Map Where Filters
 	if len(ds.Filter) > 0 {
-		ast.WhereFilters = p.parseFilterMap(ds.Filter, ds.BaseCollection.Collection)
+		ast.WhereFilters = p.parseFilterMap(ds.Filter, ds.BaseCollection.Collection, tableAliases)
 	}
 
 	return ast, nil
 }
 
-func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable string) []ASTCondition {
+func resolveTableAlias(table string, aliases map[string]string) string {
+	if table == "" {
+		return table
+	}
+	if alias, ok := aliases[strings.ToLower(table)]; ok {
+		return alias
+	}
+	if idx := strings.LastIndex(table, "."); idx >= 0 {
+		if alias, ok := aliases[strings.ToLower(table[idx+1:])]; ok {
+			return alias
+		}
+	}
+	return table
+}
+
+func isAggregateFunctionName(name string) bool {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "SUM", "AVG", "COUNT", "COUNT_DISTINCT", "MIN", "MAX", "COUNT_ALL", "COUNT(*)":
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable string, tableAliases map[string]string) []ASTCondition {
 	var conditions []ASTCondition
 	for k, v := range filter {
 		tbl := defaultTable
@@ -234,6 +287,7 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 			tbl = k[:idx]
 			col = k[idx+1:]
 		}
+		tbl = resolveTableAlias(tbl, tableAliases)
 
 		cond := ASTCondition{
 			Table:    tbl,

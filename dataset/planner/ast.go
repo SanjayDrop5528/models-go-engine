@@ -52,13 +52,14 @@ type ASTProjection struct {
 
 // ASTCustomColumn represents a calculated or aggregate expression.
 type ASTCustomColumn struct {
-	Alias       string
-	Label       string
-	Function    *domain.FunctionDefinition
-	Expression  string
-	Operands    []ASTOperand
-	IsAggregate bool
-	DataType    string
+	Alias        string
+	Label        string
+	FunctionName string
+	Function     *domain.FunctionDefinition
+	Expression   string
+	Operands     []ASTOperand
+	IsAggregate  bool
+	DataType     string
 }
 
 // ASTOperand represents an argument passed to a function or calculation.

@@ -489,6 +489,14 @@ func TestValidateModelConfig(t *testing.T) {
 			errContains: "model_config name cannot be empty",
 		},
 		{
+			name: "valid qualified schema.table model_config",
+			cfg: &model.ModelConfig{
+				Name:   "public.employee",
+				Status: model.ModelConfigStatusActive,
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid identifier name",
 			cfg: &model.ModelConfig{
 				Name: "123-Invalid!",

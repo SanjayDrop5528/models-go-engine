@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	uuidRegex       = regexp.MustCompile(`^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$`)
-	emailRegex      = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	validIdentifier       = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	validConfigIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$`)
+	uuidRegex             = regexp.MustCompile(`^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$`)
+	emailRegex            = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
 
 // ValidationError represents a structured validation failure.
@@ -160,7 +161,7 @@ func ValidateModel(m *model.Model) error {
 	if strings.TrimSpace(m.Name) == "" {
 		return errors.New("model name cannot be empty")
 	}
-	if !validIdentifier.MatchString(m.Name) {
+	if !validConfigIdentifier.MatchString(m.Name) {
 		return fmt.Errorf("model name '%s' must be a valid identifier (alphanumeric and underscores)", m.Name)
 	}
 
@@ -721,7 +722,7 @@ func ValidateModelConfig(cfg *model.ModelConfig) error {
 	if strings.TrimSpace(cfg.Name) == "" {
 		return errors.New("model_config name cannot be empty")
 	}
-	if !validIdentifier.MatchString(cfg.Name) {
+	if !validConfigIdentifier.MatchString(cfg.Name) {
 		return fmt.Errorf("model_config name '%s' must be a valid identifier", cfg.Name)
 	}
 	switch cfg.Status {

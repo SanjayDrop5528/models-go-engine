@@ -579,7 +579,7 @@ func (r *ModelRegistry) resolveID(idOrName string) string {
 		}
 	}
 	for id, cfg := range r.modelConfigs {
-		if strings.EqualFold(id, idOrName) || strings.EqualFold(cfg.Name, idOrName) || strings.EqualFold(cfg.RefName, idOrName) {
+		if strings.EqualFold(id, idOrName) || strings.EqualFold(cfg.Name, idOrName) || strings.EqualFold(cfg.RefName, idOrName) || strings.EqualFold(cfg.Table, idOrName) || (cfg.Schema != "" && strings.EqualFold(fmt.Sprintf("%s.%s", cfg.Schema, cfg.Table), idOrName)) {
 			return id
 		}
 	}

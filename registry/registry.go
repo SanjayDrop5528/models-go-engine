@@ -249,6 +249,23 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 	if cp.CreatedAt.IsZero() {
 		cp.CreatedAt = cp.UpdatedAt
 	}
+	targetCol := cp.ColumnName
+	if targetCol == "" {
+		targetCol = cp.JSONField
+	}
+	if targetCol != "" {
+		for _, existing := range r.dataModels[cp.ModelID] {
+			if existing.ID != cp.ID {
+				existingCol := existing.ColumnName
+				if existingCol == "" {
+					existingCol = existing.JSONField
+				}
+				if strings.EqualFold(existingCol, targetCol) {
+					return nil, fmt.Errorf("column name '%s' already exists in model '%s'. Duplicate column names are not allowed", targetCol, cp.ModelID)
+				}
+			}
+		}
+	}
 
 	if _, ok := r.dataModels[cp.ModelID]; !ok {
 		r.dataModels[cp.ModelID] = make(map[string]*model.DataModel)

@@ -67,7 +67,11 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 	}
 
 	if ds.ID == "" {
-		ds.ID = "ds_" + strings.ToLower(ds.ReferenceName)
+		if existing, err := r.FindByReferenceName(ctx, ds.ReferenceName); err == nil && existing != nil && existing.ID != "" {
+			ds.ID = existing.ID
+		} else {
+			ds.ID = "ds_" + strings.ToLower(ds.ReferenceName)
+		}
 	}
 	if ds.Status == "" {
 		ds.Status = "ACTIVE"
@@ -208,11 +212,17 @@ func (r *AdapterDataSetRepository) List(ctx context.Context, status string) ([]*
 //
 // When can it be used:
 //   - When removing an unwanted or deprecated dataset.
-func (r *AdapterDataSetRepository) Delete(ctx context.Context, id string) error {
-	if r.adp != nil {
-		_ = r.adp.Delete(ctx, r.dsRef, id)
+func (r *AdapterDataSetRepository) Delete(ctx context.Context, idOrRef string) error {
+	targetID := idOrRef
+	if existing, err := r.FindByReferenceName(ctx, idOrRef); err == nil && existing != nil && existing.ID != "" {
+		targetID = existing.ID
 	}
-	return r.inMem.Delete(ctx, id)
+	if r.adp != nil {
+		_ = r.adp.Delete(ctx, r.dsRef, targetID)
+	}
+	_ = r.inMem.Delete(ctx, targetID)
+	_ = r.inMem.Delete(ctx, idOrRef)
+	return nil
 }
 
 // mapToDataSet deserializes a database record map into a domain.DataSet struct.
@@ -246,6 +256,10 @@ func mapToDataSet(rec map[string]any) *domain.DataSet {
 			_ = json.Unmarshal([]byte(v), target)
 		case []byte:
 			_ = json.Unmarshal(v, target)
+		default:
+			if b, err := json.Marshal(v); err == nil {
+				_ = json.Unmarshal(b, target)
+			}
 		}
 	}
 

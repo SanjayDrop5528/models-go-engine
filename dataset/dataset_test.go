@@ -2,6 +2,7 @@ package dataset_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -769,5 +770,286 @@ func TestDataSet_PayloadVsDefaultValue_Precedence(t *testing.T) {
 		t.Errorf("expected param4 to be overridden by payload 'override_org_888', got:\n%s", query2)
 	}
 }
+
+func TestDataSet_ExecuteWithOptions_Payload(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	mockAdp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.SetAdapter(mockAdp)
+
+	ds := &domain.DataSet{
+		ID:                "ds_exec_test",
+		Name:              "Exec Test DS",
+		ReferenceName:     "exec_test_ds",
+		Driver:            "postgres",
+		SaveMode:          domain.SaveModeQuery,
+		Pipeline:          `SELECT "id", "name", "status" FROM "users"`,
+		ReferencePipeline: `SELECT "id", "name", "status" FROM "users" WHERE "status" = {"paramName":"status","paramDataType":"string"}`,
+		FilterParams: []domain.FilterParam{
+			{ParamName: "status", ParamDataType: "string", DefaultValue: "active"},
+			{ParamName: "dept", ParamDataType: "string", DefaultValue: "engineering"},
+		},
+	}
+
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatalf("failed to save dataset: %v", err)
+	}
+
+	// 1. Execute with standardized payload including start, limit, filter, sort, filterParams
+	req := &domain.ExecuteRequest{
+		Start: 0,
+		Limit: 2,
+		Filter: map[string]any{
+			"status": "active",
+		},
+		Sort: map[string]any{
+			"id": "asc",
+		},
+		FilterParams: []any{
+			map[string]any{
+				"ParamName":     "status",
+				"ParamDatatype": "string",
+				"ParamValue":    "active",
+			},
+			map[string]any{
+				"ParamName":     "dept",
+				"ParamDatatype": "string",
+				"ParamValue":    "sales",
+			},
+		},
+	}
+
+	rows, err := svc.ExecuteWithOptions(ctx, "exec_test_ds", req)
+	if err != nil {
+		t.Fatalf("ExecuteWithOptions failed: %v", err)
+	}
+	if len(rows) > 2 {
+		t.Fatalf("expected at most 2 rows, got %d", len(rows))
+	}
+
+	targetSQL := mockAdp.lastReq.Target
+	if !strings.Contains(targetSQL, "LIMIT 2") {
+		t.Errorf("expected target SQL to contain 'LIMIT 2', got:\n%s", targetSQL)
+	}
+	if !strings.Contains(targetSQL, "\"_exec_sub\".\"status\" = 'active'") {
+		t.Errorf("expected target SQL to contain status filter, got:\n%s", targetSQL)
+	}
+	if !strings.Contains(targetSQL, "\"_exec_sub\".\"id\" ASC") {
+		t.Errorf("expected target SQL to contain sort clause, got:\n%s", targetSQL)
+	}
+}
+
+func TestDataSet_ExecuteRequest_AppendFilter_JSON(t *testing.T) {
+	// Case 1: explicit "first"
+	jsonStr1 := `{"start":0,"limit":10,"filter":{"a":"1"},"appendfilter":"first"}`
+	var req1 domain.ExecuteRequest
+	if err := json.Unmarshal([]byte(jsonStr1), &req1); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if req1.GetAppendFilter() != "first" {
+		t.Errorf("expected appendfilter 'first', got '%s'", req1.GetAppendFilter())
+	}
+
+	// Case 2: explicit "last"
+	jsonStr2 := `{"start":0,"limit":10,"filter":{"a":"1"},"appendfilter":"last"}`
+	var req2 domain.ExecuteRequest
+	if err := json.Unmarshal([]byte(jsonStr2), &req2); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if req2.GetAppendFilter() != "last" {
+		t.Errorf("expected appendfilter 'last', got '%s'", req2.GetAppendFilter())
+	}
+
+	// Case 3: omitted (default to "last")
+	jsonStr3 := `{"start":0,"limit":10,"filter":{"a":"1"}}`
+	var req3 domain.ExecuteRequest
+	if err := json.Unmarshal([]byte(jsonStr3), &req3); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if req3.GetAppendFilter() != "last" {
+		t.Errorf("expected default appendfilter 'last', got '%s'", req3.GetAppendFilter())
+	}
+
+	// Case 4: camelCase "appendFilter": "FIRST"
+	jsonStr4 := `{"start":0,"limit":10,"filter":{"a":"1"},"appendFilter":"FIRST"}`
+	var req4 domain.ExecuteRequest
+	if err := json.Unmarshal([]byte(jsonStr4), &req4); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if req4.GetAppendFilter() != "first" {
+		t.Errorf("expected case-insensitive 'first', got '%s'", req4.GetAppendFilter())
+	}
+
+	// Case 5: snake_case "append_filter": "first"
+	jsonStr5 := `{"start":0,"limit":10,"filter":{"a":"1"},"append_filter":"first"}`
+	var req5 domain.ExecuteRequest
+	if err := json.Unmarshal([]byte(jsonStr5), &req5); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if req5.GetAppendFilter() != "first" {
+		t.Errorf("expected snake_case 'first', got '%s'", req5.GetAppendFilter())
+	}
+}
+
+func TestDataSet_ExecuteWithOptions_AppendFilter_FirstAndLast(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	mockAdp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.SetAdapter(mockAdp)
+
+	ds := &domain.DataSet{
+		ID:            "ds_append_filter_test",
+		Name:          "Append Filter Test DS",
+		ReferenceName: "append_filter_test_ds",
+		Driver:        "postgres",
+		SaveMode:      domain.SaveModeQuery,
+		Pipeline:      `SELECT "id", "name", "role", "tenant_id" FROM "accounts"`,
+		Filter: map[string]any{
+			"tenant_id": "100",
+		},
+	}
+
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatalf("failed to save dataset: %v", err)
+	}
+
+	// 1. Execute with appendfilter = "first": dynamic "role" filter should be prepended before "tenant_id"
+	reqFirst := &domain.ExecuteRequest{
+		Filter: map[string]any{
+			"role": "admin",
+		},
+		AppendFilter: "first",
+	}
+	_, err := svc.ExecuteWithOptions(ctx, "append_filter_test_ds", reqFirst)
+	if err != nil {
+		t.Fatalf("ExecuteWithOptions first failed: %v", err)
+	}
+	sqlFirst := mockAdp.lastReq.Target
+	expectedFirst := "WHERE \"_exec_sub\".\"role\" = 'admin' AND \"_exec_sub\".\"tenant_id\" = '100'"
+	if !strings.Contains(sqlFirst, expectedFirst) {
+		t.Errorf("expected appendfilter 'first' SQL to contain:\n%s\ngot:\n%s", expectedFirst, sqlFirst)
+	}
+
+	// 2. Execute with appendfilter = "last": dynamic "role" filter should be appended after "tenant_id"
+	reqLast := &domain.ExecuteRequest{
+		Filter: map[string]any{
+			"role": "admin",
+		},
+		AppendFilter: "last",
+	}
+	_, err = svc.ExecuteWithOptions(ctx, "append_filter_test_ds", reqLast)
+	if err != nil {
+		t.Fatalf("ExecuteWithOptions last failed: %v", err)
+	}
+	sqlLast := mockAdp.lastReq.Target
+	expectedLast := "WHERE \"_exec_sub\".\"tenant_id\" = '100' AND \"_exec_sub\".\"role\" = 'admin'"
+	if !strings.Contains(sqlLast, expectedLast) {
+		t.Errorf("expected appendfilter 'last' SQL to contain:\n%s\ngot:\n%s", expectedLast, sqlLast)
+	}
+}
+
+func TestDataSet_ApplyFilterToSQL(t *testing.T) {
+	// 1. With existing WHERE: appendfilter = "first"
+	baseSQL1 := "SELECT * FROM users WHERE status = 'active'"
+	f1 := map[string]any{"dept": "engineering"}
+	out1 := service.ApplyFilterToSQL(baseSQL1, f1, "first")
+	expected1 := `WHERE ("dept" = 'engineering') AND (status = 'active')`
+	if !strings.Contains(out1, expected1) {
+		t.Errorf("expected '%s', got '%s'", expected1, out1)
+	}
+
+	// 2. With existing WHERE: appendfilter = "last"
+	out2 := service.ApplyFilterToSQL(baseSQL1, f1, "last")
+	expected2 := `WHERE (status = 'active') AND ("dept" = 'engineering')`
+	if !strings.Contains(out2, expected2) {
+		t.Errorf("expected '%s', got '%s'", expected2, out2)
+	}
+
+	// 3. Without existing WHERE, with ORDER BY
+	baseSQL2 := "SELECT id, name FROM users ORDER BY id ASC"
+	out3 := service.ApplyFilterToSQL(baseSQL2, f1, "last")
+	if !strings.Contains(out3, `WHERE "dept" = 'engineering'`) || !strings.Contains(out3, `ORDER BY id ASC`) {
+		t.Errorf("expected WHERE before ORDER BY, got '%s'", out3)
+	}
+}
+
+func TestDataSet_ExecuteWithOptions_MongoDB_AppendFilter(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	mockAdp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.SetAdapter(mockAdp)
+
+	ds := &domain.DataSet{
+		ID:            "ds_mongo_test",
+		Name:          "Mongo Test DS",
+		ReferenceName: "mongo_test_ds",
+		Driver:        "mongodb",
+		SaveMode:      domain.SaveModeQuery,
+		Pipeline:      `[{"$project":{"id":1,"name":1}}]`,
+	}
+
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatalf("failed to save dataset: %v", err)
+	}
+
+	// 1. appendfilter = "first" -> $match is at index 0
+	reqFirst := &domain.ExecuteRequest{
+		Filter: map[string]any{
+			"status": "active",
+		},
+		AppendFilter: "first",
+	}
+	_, err := svc.ExecuteWithOptions(ctx, "mongo_test_ds", reqFirst)
+	if err != nil {
+		t.Fatalf("ExecuteWithOptions failed: %v", err)
+	}
+	mongoFirst := mockAdp.lastReq.Target
+	var stagesFirst []map[string]any
+	if err := json.Unmarshal([]byte(mongoFirst), &stagesFirst); err != nil {
+		t.Fatalf("failed to parse mongo pipeline: %v", err)
+	}
+	if len(stagesFirst) != 2 {
+		t.Fatalf("expected 2 stages, got %d", len(stagesFirst))
+	}
+	if _, hasMatch := stagesFirst[0]["$match"]; !hasMatch {
+		t.Errorf("expected $match at index 0 for appendfilter=first, got: %v", stagesFirst[0])
+	}
+
+	// 2. appendfilter = "last" -> $match is at the end
+	reqLast := &domain.ExecuteRequest{
+		Filter: map[string]any{
+			"status": "active",
+		},
+		AppendFilter: "last",
+	}
+	_, err = svc.ExecuteWithOptions(ctx, "mongo_test_ds", reqLast)
+	if err != nil {
+		t.Fatalf("ExecuteWithOptions failed: %v", err)
+	}
+	mongoLast := mockAdp.lastReq.Target
+	var stagesLast []map[string]any
+	if err := json.Unmarshal([]byte(mongoLast), &stagesLast); err != nil {
+		t.Fatalf("failed to parse mongo pipeline: %v", err)
+	}
+	if len(stagesLast) != 2 {
+		t.Fatalf("expected 2 stages, got %d", len(stagesLast))
+	}
+	if _, hasMatch := stagesLast[1]["$match"]; !hasMatch {
+		t.Errorf("expected $match at index 1 for appendfilter=last, got: %v", stagesLast[1])
+	}
+}
+
 
 

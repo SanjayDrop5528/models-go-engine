@@ -154,13 +154,19 @@ func (r *InMemDataSetRepository) List(ctx context.Context, status string) ([]*do
 //
 // When can it be used:
 //   - When deleting an obsolete or draft dataset definition.
-func (r *InMemDataSetRepository) Delete(ctx context.Context, id string) error {
+func (r *InMemDataSetRepository) Delete(ctx context.Context, idOrRef string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if ds, exists := r.datasets[id]; exists {
+	if ds, exists := r.datasets[idOrRef]; exists {
 		delete(r.byRef, strings.ToLower(ds.ReferenceName))
+		delete(r.datasets, idOrRef)
+		return nil
+	}
+	if id, exists := r.byRef[strings.ToLower(idOrRef)]; exists {
+		delete(r.byRef, strings.ToLower(idOrRef))
 		delete(r.datasets, id)
+		return nil
 	}
 	return nil
 }

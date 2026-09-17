@@ -11,6 +11,9 @@
 package domain
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -130,5 +133,130 @@ type FilterParam struct {
 	DefaultValue  interface{} `json:"defaultValue,omitempty"`
 	Paramvalue    interface{} `json:"paramValue,omitempty"` // Runtime value or value override
 	Required      bool        `json:"required"`
+}
+
+// ExecuteRequest defines the standardized runtime execution request payload.
+//
+// Payload structure:
+//
+//	{
+//	    "start": 0,
+//	    "limit": 10,
+//	    "filter": { ... },
+//	    "sort": { ... },
+//	    "appendfilter": "last", // "first" or "last" (default: "last")
+//	    "filterParams": [
+//	        {
+//	            "ParamName": "status",
+//	            "ParamDatatype": "string",
+//	            "ParamValue": "active"
+//	        }
+//	    ]
+//	}
+type ExecuteRequest struct {
+	Start        int            `json:"start"`
+	Limit        int            `json:"limit"`
+	Filter       map[string]any `json:"filter"`
+	Sort         any            `json:"sort"`
+	FilterParams any            `json:"filterParams"`
+	AppendFilter string         `json:"appendfilter,omitempty"` // "first" or "last", default is "last"
+	UserToken    any            `json:"userToken,omitempty"`
+}
+
+// GetAppendFilter returns normalized "first" or "last" (defaulting to "last").
+func (r *ExecuteRequest) GetAppendFilter() string {
+	if r == nil {
+		return "last"
+	}
+	if strings.EqualFold(strings.TrimSpace(r.AppendFilter), "first") {
+		return "first"
+	}
+	return "last"
+}
+
+// UnmarshalJSON unmarshals ExecuteRequest supporting multiple casing variants for appendfilter:
+// "appendfilter", "appendFilter", "append_filter", "AppendFilter".
+// Any value other than "first" (case-insensitive) defaults to "last".
+func (r *ExecuteRequest) UnmarshalJSON(data []byte) error {
+	type Alias ExecuteRequest
+	aux := struct {
+		*Alias
+		AltAppendFilter1 string `json:"append_filter"`
+		AltAppendFilter2 string `json:"appendFilter"`
+		AltAppendFilter3 string `json:"AppendFilter"`
+		AltAppendFilter4 string `json:"appendfilter"`
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	val := aux.AltAppendFilter4
+	if val == "" {
+		val = aux.AltAppendFilter2
+	}
+	if val == "" {
+		val = aux.AltAppendFilter1
+	}
+	if val == "" {
+		val = aux.AltAppendFilter3
+	}
+
+	if strings.EqualFold(strings.TrimSpace(val), "first") {
+		r.AppendFilter = "first"
+	} else {
+		r.AppendFilter = "last"
+	}
+	return nil
+}
+
+// NormalizeRuntimeParams converts filterParams (whether []FilterParam, []map[string]any, or map[string]any)
+// into a standardized string-to-any map for parameter substitution and binding.
+func (r *ExecuteRequest) NormalizeRuntimeParams() map[string]any {
+	params := make(map[string]any)
+	if r == nil || r.FilterParams == nil {
+		return params
+	}
+
+	switch fp := r.FilterParams.(type) {
+	case map[string]any:
+		for k, v := range fp {
+			params[k] = v
+		}
+	case map[string]string:
+		for k, v := range fp {
+			params[k] = v
+		}
+	case []any:
+		for _, item := range fp {
+			if m, ok := item.(map[string]any); ok {
+				var name string
+				var val any
+				for k, v := range m {
+					lowerK := strings.ToLower(strings.ReplaceAll(k, "_", ""))
+					switch lowerK {
+					case "paramname", "name", "field":
+						name = fmt.Sprintf("%v", v)
+					case "paramvalue", "value", "val":
+						val = v
+					}
+				}
+				if name != "" {
+					params[name] = val
+				}
+			}
+		}
+	case []FilterParam:
+		for _, p := range fp {
+			if p.ParamName != "" {
+				if p.Paramvalue != nil {
+					params[p.ParamName] = p.Paramvalue
+				} else {
+					params[p.ParamName] = p.DefaultValue
+				}
+			}
+		}
+	}
+	return params
 }
 

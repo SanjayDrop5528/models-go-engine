@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -272,36 +273,36 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 //
 // When can it be used:
 //   - When executing datasets that do not depend on session user tokens (KTON) or when default tokens suffice.
+// Execute executes a saved dataset by reference name with runtime parameter bindings.
 func (s *DataSetService) Execute(ctx context.Context, referenceName string, runtimeParams map[string]any) ([]map[string]any, error) {
-	return s.ExecuteWithUserToken(ctx, referenceName, runtimeParams, nil)
+	return s.ExecuteWithOptions(ctx, referenceName, &domain.ExecuteRequest{
+		FilterParams: runtimeParams,
+	})
 }
 
 // ExecuteWithUserToken resolves dataset by reference name, binds parameters safely
 // (supporting KTON user tokens, dynamic CD date expressions, and type coercions), and runs
 // the dataset via Procedure, Function, or Direct Query.
-//
-// Purpose:
-//   Executes a dataset using full parameter precedence:
-//     1. Checks if each parameter is provided in `runtimeParams` (payload). If yes, uses it.
-//     2. If not provided or empty, falls back to `defaultValue`.
-//     3. Resolves dynamic token macros (`KTON|<key>`) from `userToken`.
-//     4. Resolves dynamic date macros (`CD|<offset>|<mode>`) using user's timezone.
-//     5. Dispatches execution according to `SaveMode`:
-//          - PROCEDURE: executes `CALL sp_<name>(...)`.
-//          - FUNCTION: executes `SELECT fn_<name>(...)` or `SELECT * FROM fn_<name>(...)`.
-//          - QUERY: performs placeholder substitution via CreateFilterParams and runs raw query.
-//
-// Where it is used:
-//   - Called by the HTTP handler `POST /api/datasets/{referenceName}/execute`.
-//   - Used by application services executing multi-tenant or role-scoped queries.
-//
-// When can it be used:
-//   - At runtime whenever data needs to be retrieved from a saved dataset with runtime arguments and session tokens.
 func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName string, runtimeParams map[string]any, userToken any) ([]map[string]any, error) {
+	return s.ExecuteWithOptions(ctx, referenceName, &domain.ExecuteRequest{
+		FilterParams: runtimeParams,
+		UserToken:    userToken,
+	})
+}
+
+// ExecuteWithOptions resolves dataset by reference name and executes it using the standardized
+// ExecuteRequest supporting dynamic runtime filters, multi-column sorting, pagination (start, limit),
+// and parameter substitution (filterParams).
+func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName string, req *domain.ExecuteRequest) ([]map[string]any, error) {
+	if req == nil {
+		req = &domain.ExecuteRequest{}
+	}
 	ds, err := s.repo.FindByReferenceName(ctx, referenceName)
 	if err != nil {
 		return nil, err
 	}
+
+	runtimeParams := req.NormalizeRuntimeParams()
 
 	// 1. Validate & Coerce Parameters: check payload first, else fallback to default value
 	boundArgs := make(map[string]any)
@@ -337,8 +338,8 @@ func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName
 			// Resolve dynamic expressions (KTON|key, CD|+0|ST, etc.)
 			if strVal, ok := val.(string); ok {
 				var user map[string]any
-				if userToken != nil {
-					user, _ = domain.StructToMap(userToken)
+				if req.UserToken != nil {
+					user, _ = domain.StructToMap(req.UserToken)
 				}
 				resolved := domain.ConvertValueToDataType("string", strVal, user)
 				if resolved != "unsupported_data_type" && resolved != "" {
@@ -361,57 +362,536 @@ func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName
 	}
 
 	cleanName := strings.ReplaceAll(ds.ReferenceName, "-", "_")
-	var execReq execution.ExecutionRequest
 
+	// Determine base executable query with runtime parameters substituted
+	baseQuery := ds.Pipeline
+	if ds.ReferencePipeline != "" {
+		baseQuery = domain.CreateFilterParams(effectiveParams, ds.ReferencePipeline, req.UserToken)
+	}
+	if baseQuery == "" {
+		baseQuery = ds.Pipeline
+	}
+
+	// Build wrapped query with runtime filter, sort, and pagination if applicable
+	finalQuery := buildWrappedQuery(baseQuery, ds, req)
+
+	var execReq execution.ExecutionRequest
 	switch ds.SaveMode {
 	case domain.SaveModeProcedure:
+		procTarget := fmt.Sprintf("sp_%s", cleanName)
+		if ds.BaseCollection.Schema != "" && ds.BaseCollection.Schema != "public" {
+			procTarget = fmt.Sprintf("%s.sp_%s", ds.BaseCollection.Schema, cleanName)
+		}
 		execReq = execution.ExecutionRequest{
 			Operation: operation.OpProcedure,
-			Target:    fmt.Sprintf("sp_%s", cleanName),
+			Target:    procTarget,
 			Arguments: boundArgs,
 		}
 	case domain.SaveModeFunction:
+		fnTarget := fmt.Sprintf("fn_%s", cleanName)
+		if ds.BaseCollection.Schema != "" && ds.BaseCollection.Schema != "public" {
+			fnTarget = fmt.Sprintf("%s.fn_%s", ds.BaseCollection.Schema, cleanName)
+		}
 		execReq = execution.ExecutionRequest{
 			Operation: operation.OpFunction,
-			Target:    fmt.Sprintf("fn_%s", cleanName),
+			Target:    fnTarget,
 			Arguments: boundArgs,
 		}
 	default: // SaveModeQuery
-		queryToRun := ds.Pipeline
-		if ds.ReferencePipeline != "" {
-			queryToRun = domain.CreateFilterParams(effectiveParams, ds.ReferencePipeline, userToken)
-		}
-		if queryToRun == "" {
-			queryToRun = ds.Pipeline
-		}
 		execReq = execution.ExecutionRequest{
 			Operation: operation.OpQuery,
-			Target:    queryToRun,
+			Target:    finalQuery,
 			Arguments: boundArgs,
 		}
 	}
 
 	res, err := s.adapter.Execute(ctx, execReq)
 	if err != nil {
-		return nil, domain.WrapError(domain.ErrPipelineExecutionFailed, "dataset execution failed", err)
+		if execReq.Operation != operation.OpQuery && finalQuery != "" {
+			// Fallback: execute final query directly if stored procedure/function is missing
+			qRes, qErr := s.adapter.Execute(ctx, execution.ExecutionRequest{
+				Operation: operation.OpQuery,
+				Target:    finalQuery,
+				Arguments: boundArgs,
+			})
+			if qErr != nil {
+				return nil, domain.WrapError(domain.ErrPipelineExecutionFailed, "dataset execution failed", qErr)
+			}
+			res = qRes
+		} else {
+			return nil, domain.WrapError(domain.ErrPipelineExecutionFailed, "dataset execution failed", err)
+		}
 	}
 
+	var rows []map[string]any
 	if res != nil {
 		if resMap, ok := res.Data.(map[string]any); ok {
-			if rows, ok := resMap["rows"].([]map[string]any); ok {
-				return rows, nil
+			if r, ok := resMap["rows"].([]map[string]any); ok && len(r) > 0 {
+				rows = r
 			}
-		} else if rows, ok := res.Data.([]map[string]any); ok {
-			return rows, nil
+		} else if r, ok := res.Data.([]map[string]any); ok && len(r) > 0 {
+			rows = r
 		} else if rawStr, ok := res.Data.(string); ok {
 			var parsedRows []map[string]any
-			if err := json.Unmarshal([]byte(rawStr), &parsedRows); err == nil {
-				return parsedRows, nil
+			if err := json.Unmarshal([]byte(rawStr), &parsedRows); err == nil && len(parsedRows) > 0 {
+				rows = parsedRows
 			}
 		}
 	}
 
-	return []map[string]any{}, nil
+	// For procedures or if direct execution returned no tabular rows, execute finalQuery
+	if len(rows) == 0 && finalQuery != "" {
+		qRes, qErr := s.adapter.Execute(ctx, execution.ExecutionRequest{
+			Operation: operation.OpQuery,
+			Target:    finalQuery,
+			Arguments: boundArgs,
+		})
+		if qErr == nil && qRes != nil {
+			if resMap, ok := qRes.Data.(map[string]any); ok {
+				if qRows, ok := resMap["rows"].([]map[string]any); ok {
+					rows = qRows
+				}
+			} else if qRows, ok := qRes.Data.([]map[string]any); ok {
+				rows = qRows
+			}
+		}
+	}
+
+	// In-memory safety pagination / slicing if query wasn't wrapped (e.g. non-SQL adapter)
+	if len(rows) > 0 && (req.Start > 0 || req.Limit > 0) {
+		if req.Limit > 0 && len(rows) > req.Limit {
+			start := req.Start
+			if start >= len(rows) {
+				return []map[string]any{}, nil
+			}
+			end := start + req.Limit
+			if end > len(rows) {
+				end = len(rows)
+			}
+			rows = rows[start:end]
+		}
+	}
+
+	if rows == nil {
+		rows = []map[string]any{}
+	}
+
+	return rows, nil
+}
+
+// buildWrappedQuery wraps or augments a base SQL or MongoDB query with runtime filtering,
+// dynamic sorting, pagination, and ordered filter appending ("first" or "last").
+func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.ExecuteRequest) string {
+	trimmed := strings.TrimSpace(baseQuery)
+	if trimmed == "" || req == nil {
+		return baseQuery
+	}
+
+	hasFilter := req.Filter != nil && len(req.Filter) > 0
+	hasSort := req.Sort != nil
+	hasPaging := req.Start > 0 || req.Limit > 0
+
+	if !hasFilter && !hasSort && !hasPaging && (ds == nil || len(ds.Filter) == 0) {
+		return baseQuery
+	}
+
+	// 1. MongoDB Aggregation Pipeline Support
+	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+		var stages []map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &stages); err == nil {
+			if hasFilter {
+				matchStage := map[string]any{
+					"$match": req.Filter,
+				}
+				if req.GetAppendFilter() == "first" {
+					stages = append([]map[string]any{matchStage}, stages...)
+				} else {
+					stages = append(stages, matchStage)
+				}
+			}
+			if req.Sort != nil {
+				stages = append(stages, map[string]any{"$sort": req.Sort})
+			}
+			if req.Start > 0 {
+				stages = append(stages, map[string]any{"$skip": req.Start})
+			}
+			if req.Limit > 0 {
+				stages = append(stages, map[string]any{"$limit": req.Limit})
+			}
+			if b, err := json.Marshal(stages); err == nil {
+				return string(b)
+			}
+		}
+		return baseQuery
+	}
+
+	// 2. SQL SELECT Queries Support
+	if strings.HasPrefix(strings.ToUpper(trimmed), "SELECT") {
+		cleanBase := strings.TrimSuffix(trimmed, ";")
+		var sb strings.Builder
+		sb.WriteString("SELECT * FROM (\n")
+		sb.WriteString(cleanBase)
+		sb.WriteString("\n) AS \"_exec_sub\"")
+
+		var reqConditions []string
+		if hasFilter {
+			var cols []string
+			for col := range req.Filter {
+				cols = append(cols, col)
+			}
+			sort.Strings(cols)
+			for _, col := range cols {
+				cond := formatSQLFilterCondition("_exec_sub", col, req.Filter[col])
+				if cond != "" {
+					reqConditions = append(reqConditions, cond)
+				}
+			}
+		}
+
+		var dsConditions []string
+		if ds != nil && len(ds.Filter) > 0 {
+			var cols []string
+			for col := range ds.Filter {
+				cols = append(cols, col)
+			}
+			sort.Strings(cols)
+			for _, col := range cols {
+				if req != nil && req.Filter != nil {
+					if _, exists := req.Filter[col]; exists {
+						continue
+					}
+				}
+				cond := formatSQLFilterCondition("_exec_sub", col, ds.Filter[col])
+				if cond != "" {
+					dsConditions = append(dsConditions, cond)
+				}
+			}
+		}
+
+		var allConditions []string
+		if req.GetAppendFilter() == "first" {
+			allConditions = append(allConditions, reqConditions...)
+			allConditions = append(allConditions, dsConditions...)
+		} else {
+			allConditions = append(allConditions, dsConditions...)
+			allConditions = append(allConditions, reqConditions...)
+		}
+
+		if len(allConditions) > 0 {
+			sb.WriteString("\nWHERE ")
+			sb.WriteString(strings.Join(allConditions, " AND "))
+		}
+
+		if hasSort {
+			sortClause := formatSQLSortClause("_exec_sub", req.Sort)
+			if sortClause != "" {
+				sb.WriteString("\nORDER BY ")
+				sb.WriteString(sortClause)
+			}
+		}
+
+		if req.Limit > 0 {
+			sb.WriteString(fmt.Sprintf("\nLIMIT %d", req.Limit))
+		}
+		if req.Start > 0 {
+			sb.WriteString(fmt.Sprintf(" OFFSET %d", req.Start))
+		}
+
+		sb.WriteString(";")
+		return sb.String()
+	}
+
+	return baseQuery
+}
+
+// ApplyFilterToSQL injects or appends dynamic filter conditions into a SQL WHERE clause directly.
+// If appendFilter is "first", new conditions are prepended to existing WHERE conditions:
+//
+//	WHERE (<new_conditions>) AND (<existing_where>)
+//
+// If appendFilter is "last" (or default), new conditions are appended to existing WHERE conditions:
+//
+//	WHERE (<existing_where>) AND (<new_conditions>)
+//
+// If no existing WHERE clause is present, it adds:
+//
+//	WHERE <new_conditions>
+func ApplyFilterToSQL(baseSQL string, filter map[string]any, appendFilter string) string {
+	if len(filter) == 0 {
+		return baseSQL
+	}
+	var cols []string
+	for col := range filter {
+		cols = append(cols, col)
+	}
+	sort.Strings(cols)
+
+	var conditions []string
+	for _, col := range cols {
+		cond := formatSQLFilterCondition("", col, filter[col])
+		if cond != "" {
+			conditions = append(conditions, cond)
+		}
+	}
+	if len(conditions) == 0 {
+		return baseSQL
+	}
+	newFilterStr := strings.Join(conditions, " AND ")
+
+	whereIdx := findTopLevelWhere(baseSQL)
+
+	if whereIdx != -1 {
+		preWhere := baseSQL[:whereIdx]
+		afterWhere := baseSQL[whereIdx+5:] // length of "WHERE"
+
+		endIdx := findClauseEnd(afterWhere)
+		existingWhere := strings.TrimSpace(afterWhere[:endIdx])
+		remainder := afterWhere[endIdx:]
+
+		var combinedWhere string
+		if strings.EqualFold(strings.TrimSpace(appendFilter), "first") {
+			combinedWhere = fmt.Sprintf("(%s) AND (%s)", newFilterStr, existingWhere)
+		} else {
+			combinedWhere = fmt.Sprintf("(%s) AND (%s)", existingWhere, newFilterStr)
+		}
+
+		return fmt.Sprintf("%sWHERE %s%s", preWhere, combinedWhere, remainder)
+	}
+
+	// No WHERE clause; insert before ORDER BY, GROUP BY, etc., or before trailing ';'
+	insertIdx := findClauseEnd(baseSQL)
+	pre := baseSQL[:insertIdx]
+	remainder := baseSQL[insertIdx:]
+	cleanPre := strings.TrimRight(pre, " \t\r\n;")
+	cleanRem := strings.TrimSpace(remainder)
+	if cleanRem != "" {
+		return fmt.Sprintf("%s\nWHERE %s\n%s", cleanPre, newFilterStr, cleanRem)
+	}
+	return fmt.Sprintf("%s\nWHERE %s;", cleanPre, newFilterStr)
+}
+
+// findTopLevelWhere finds the index of the top-level WHERE keyword not inside parentheses.
+func findTopLevelWhere(sql string) int {
+	parenDepth := 0
+	inQuote := false
+	var quoteChar rune
+	runes := []rune(sql)
+	n := len(runes)
+
+	for i := 0; i < n; i++ {
+		r := runes[i]
+		if inQuote {
+			if r == quoteChar {
+				inQuote = false
+			}
+			continue
+		}
+		if r == '\'' || r == '"' {
+			inQuote = true
+			quoteChar = r
+			continue
+		}
+		if r == '(' {
+			parenDepth++
+			continue
+		}
+		if r == ')' {
+			if parenDepth > 0 {
+				parenDepth--
+			}
+			continue
+		}
+		if parenDepth == 0 && (r == 'W' || r == 'w') && i+5 <= n {
+			candidate := strings.ToUpper(string(runes[i : i+5]))
+			if candidate == "WHERE" {
+				beforeOk := i == 0 || isSQLWordBoundary(runes[i-1])
+				afterOk := i+5 == n || isSQLWordBoundary(runes[i+5])
+				if beforeOk && afterOk {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
+// findClauseEnd finds where WHERE conditions end (start of GROUP BY, HAVING, WINDOW, ORDER BY, LIMIT, OFFSET, UNION).
+func findClauseEnd(sql string) int {
+	parenDepth := 0
+	inQuote := false
+	var quoteChar rune
+	runes := []rune(sql)
+	n := len(runes)
+
+	keywords := []string{"GROUP BY", "HAVING", "WINDOW", "ORDER BY", "LIMIT", "OFFSET", "FETCH", "UNION", "INTERSECT", "EXCEPT"}
+
+	for i := 0; i < n; i++ {
+		r := runes[i]
+		if inQuote {
+			if r == quoteChar {
+				inQuote = false
+			}
+			continue
+		}
+		if r == '\'' || r == '"' {
+			inQuote = true
+			quoteChar = r
+			continue
+		}
+		if r == '(' {
+			parenDepth++
+			continue
+		}
+		if r == ')' {
+			if parenDepth > 0 {
+				parenDepth--
+			}
+			continue
+		}
+		if parenDepth == 0 {
+			if r == ';' {
+				return i
+			}
+			for _, kw := range keywords {
+				kwLen := len(kw)
+				if i+kwLen <= n {
+					candidate := strings.ToUpper(string(runes[i : i+kwLen]))
+					if candidate == kw {
+						beforeOk := i == 0 || isSQLWordBoundary(runes[i-1])
+						afterOk := i+kwLen == n || isSQLWordBoundary(runes[i+kwLen])
+						if beforeOk && afterOk {
+							return i
+						}
+					}
+				}
+			}
+		}
+	}
+	return n
+}
+
+func isSQLWordBoundary(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '(' || r == ')' || r == ',' || r == ';'
+}
+
+// formatSQLFilterCondition translates a dynamic runtime filter key/value into an SQL condition.
+func formatSQLFilterCondition(alias, col string, val any) string {
+	safeCol := col
+	if strings.Contains(safeCol, ".") {
+		parts := strings.Split(safeCol, ".")
+		safeCol = parts[len(parts)-1]
+	}
+	var colExpr string
+	if alias != "" {
+		colExpr = fmt.Sprintf("\"%s\".\"%s\"", alias, strings.ReplaceAll(safeCol, "\"", ""))
+	} else {
+		colExpr = fmt.Sprintf("\"%s\"", strings.ReplaceAll(safeCol, "\"", ""))
+	}
+
+	if val == nil {
+		return fmt.Sprintf("%s IS NULL", colExpr)
+	}
+
+	switch v := val.(type) {
+	case string:
+		return fmt.Sprintf("%s = '%s'", colExpr, strings.ReplaceAll(v, "'", "''"))
+	case bool:
+		if v {
+			return fmt.Sprintf("%s = TRUE", colExpr)
+		}
+		return fmt.Sprintf("%s = FALSE", colExpr)
+	case int, int32, int64, float32, float64:
+		return fmt.Sprintf("%s = %v", colExpr, v)
+	case map[string]any:
+		var parts []string
+		for op, operand := range v {
+			switch strings.ToLower(op) {
+			case "$eq":
+				parts = append(parts, fmt.Sprintf("%s = '%v'", colExpr, operand))
+			case "$ne":
+				parts = append(parts, fmt.Sprintf("%s != '%v'", colExpr, operand))
+			case "$gt":
+				parts = append(parts, fmt.Sprintf("%s > '%v'", colExpr, operand))
+			case "$gte":
+				parts = append(parts, fmt.Sprintf("%s >= '%v'", colExpr, operand))
+			case "$lt":
+				parts = append(parts, fmt.Sprintf("%s < '%v'", colExpr, operand))
+			case "$lte":
+				parts = append(parts, fmt.Sprintf("%s <= '%v'", colExpr, operand))
+			case "$like", "$regex":
+				parts = append(parts, fmt.Sprintf("%s LIKE '%v'", colExpr, operand))
+			case "$in":
+				if arr, ok := operand.([]any); ok {
+					var inItems []string
+					for _, item := range arr {
+						inItems = append(inItems, fmt.Sprintf("'%v'", item))
+					}
+					parts = append(parts, fmt.Sprintf("%s IN (%s)", colExpr, strings.Join(inItems, ", ")))
+				}
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, " AND ")
+		}
+	}
+	return fmt.Sprintf("%s = '%v'", colExpr, val)
+}
+
+// formatSQLSortClause formats a dynamic sort request into an SQL ORDER BY clause.
+func formatSQLSortClause(alias string, sortVal any) string {
+	if sortVal == nil {
+		return ""
+	}
+	switch s := sortVal.(type) {
+	case string:
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return ""
+		}
+		parts := strings.Fields(s)
+		if len(parts) == 1 {
+			return fmt.Sprintf("\"%s\".\"%s\" ASC", alias, strings.ReplaceAll(parts[0], "\"", ""))
+		}
+		dir := "ASC"
+		if strings.EqualFold(parts[1], "DESC") {
+			dir = "DESC"
+		}
+		return fmt.Sprintf("\"%s\".\"%s\" %s", alias, strings.ReplaceAll(parts[0], "\"", ""), dir)
+	case map[string]any:
+		var parts []string
+		for field, dir := range s {
+			dStr := fmt.Sprintf("%v", dir)
+			order := "ASC"
+			if strings.EqualFold(dStr, "desc") || dStr == "-1" {
+				order = "DESC"
+			}
+			parts = append(parts, fmt.Sprintf("\"%s\".\"%s\" %s", alias, strings.ReplaceAll(field, "\"", ""), order))
+		}
+		return strings.Join(parts, ", ")
+	case []any:
+		var parts []string
+		for _, item := range s {
+			if m, ok := item.(map[string]any); ok {
+				f := fmt.Sprintf("%v", m["field"])
+				if f == "" {
+					f = fmt.Sprintf("%v", m["col"])
+				}
+				d := fmt.Sprintf("%v", m["dir"])
+				if d == "" {
+					d = fmt.Sprintf("%v", m["order"])
+				}
+				order := "ASC"
+				if strings.EqualFold(d, "desc") || d == "-1" {
+					order = "DESC"
+				}
+				if f != "" {
+					parts = append(parts, fmt.Sprintf("\"%s\".\"%s\" %s", alias, strings.ReplaceAll(f, "\"", ""), order))
+				}
+			}
+		}
+		return strings.Join(parts, ", ")
+	}
+	return ""
 }
 
 // coerceDataType parses and converts an arbitrary parameter value into its target Go data type.

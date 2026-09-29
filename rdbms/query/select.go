@@ -3,8 +3,9 @@
 //
 // File: select.go
 // Usage:
-//   Comprehensive SELECT query builder implementing fluent SQL clauses (JOIN, WHERE, GROUP BY,
-//   HAVING, WINDOW, ORDER BY, LIMIT, OFFSET, UNION, FOR UPDATE) and row scanning execution.
+//
+//	Comprehensive SELECT query builder implementing fluent SQL clauses (JOIN, WHERE, GROUP BY,
+//	HAVING, WINDOW, ORDER BY, LIMIT, OFFSET, UNION, FOR UPDATE) and row scanning execution.
 package query
 
 import (
@@ -15,11 +16,11 @@ import (
 	"fmt"
 	"sync"
 
+	coreQuery "github.com/SanjayDrop5528/models-go-engine/query"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/dialect"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/dialect/feature"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/internal"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/schema"
-	coreQuery "github.com/SanjayDrop5528/models-go-engine/query"
 )
 
 type union struct {
@@ -49,7 +50,8 @@ var _ Query = (*SelectQuery)(nil)
 // NewSelectQuery returns a SelectQuery attached to the provided DB.
 //
 // Purpose:
-//   Initializes a new fluent SelectQuery attached to the provided DB handle.
+//
+//	Initializes a new fluent SelectQuery attached to the provided DB handle.
 //
 // Where it is used:
 //   - In rdbms.NewSelectQuery, rdbms.NewSelectFromQuery, and DB.NewSelect.
@@ -70,7 +72,8 @@ func NewSelectQuery(db *DB) *SelectQuery {
 // Conn sets the database connection for this query.
 //
 // Purpose:
-//   Assigns an explicit database connection or transaction handle (IConn) to execute against.
+//
+//	Assigns an explicit database connection or transaction handle (IConn) to execute against.
 //
 // Where it is used:
 //   - In transactional query workflows.
@@ -85,7 +88,8 @@ func (q *SelectQuery) Conn(db IConn) *SelectQuery {
 // Model sets the model to select into and generates SELECT and FROM clauses.
 //
 // Purpose:
-//   Binds a schema TableModel or target struct to automatically generate SELECT columns and FROM table references.
+//
+//	Binds a schema TableModel or target struct to automatically generate SELECT columns and FROM table references.
 //
 // Where it is used:
 //   - In adapter query runners and ORM selection flows.
@@ -100,7 +104,8 @@ func (q *SelectQuery) Model(model any) *SelectQuery {
 // Err sets an error on the query, causing subsequent operations to fail.
 //
 // Purpose:
-//   Records a validation or construction error, short-circuiting query execution.
+//
+//	Records a validation or construction error, short-circuiting query execution.
 //
 // Where it is used:
 //   - In fluent builder error propagation.
@@ -115,7 +120,8 @@ func (q *SelectQuery) Err(err error) *SelectQuery {
 // Apply calls each function in fns, passing the SelectQuery as an argument.
 //
 // Purpose:
-//   Allows modular scope application and query mutators to be applied cleanly.
+//
+//	Allows modular scope application and query mutators to be applied cleanly.
 //
 // Where it is used:
 //   - In reusable query filters and pagination middleware.
@@ -134,7 +140,8 @@ func (q *SelectQuery) Apply(fns ...func(*SelectQuery) *SelectQuery) *SelectQuery
 // LoadWithChildren configures whether child relations are loaded during queries.
 //
 // Purpose:
-//   Toggles eager loading of nested/child relationships and their projected columns.
+//
+//	Toggles eager loading of nested/child relationships and their projected columns.
 //
 // Where it is used:
 //   - In RelationOpts and SelectQuery execution.
@@ -149,8 +156,9 @@ func (q *SelectQuery) LoadWithChildren(load bool) *SelectQuery {
 // ApplyUnifiedQuery configures this SelectQuery using a unified query.Query specification.
 //
 // Purpose:
-//   Maps all facets of the unified query.Query AST (tables, fields, filters, joins, groups,
-//   aggregations, order, pagination) onto this SelectQuery builder.
+//
+//	Maps all facets of the unified query.Query AST (tables, fields, filters, joins, groups,
+//	aggregations, order, pagination) onto this SelectQuery builder.
 //
 // Where it is used:
 //   - In rdbms.NewSelectFromQuery and relational adapter Query methods.
@@ -1388,6 +1396,9 @@ func (q *SelectQuery) scanResult(ctx context.Context, dest ...any) (sql.Result, 
 		return nil, err
 	}
 	defer rows.Close()
+	if err := scanRows(rows, dest...); err != nil {
+		return nil, err
+	}
 
 	if q.table != nil {
 		if err := q.afterSelectHook(ctx); err != nil {

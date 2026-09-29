@@ -139,3 +139,24 @@ func TestRelationWithOptsAndApply(t *testing.T) {
 	}
 }
 
+func TestDebugRelationSpecsRedactsNestedPredicates(t *testing.T) {
+	q := query.New()
+	specs := []query.RelationSpec{{
+		Name:       "Customer",
+		Conditions: []string{"tenant_id = 'secret'"},
+		SubRelations: []query.RelationSpec{{
+			Name: "Address",
+			On:   []string{"token = 'nested-secret'"},
+		}},
+	}}
+
+	redacted := q.DebugRelationSpecs(specs).([]query.RelationSpec)
+	if len(redacted[0].Conditions) != 0 || len(redacted[0].SubRelations[0].On) != 0 {
+		t.Fatalf("expected all predicate values to be redacted, got %+v", redacted)
+	}
+	q.DebugIncludeArgs = true
+	unredacted := q.DebugRelationSpecs(specs).([]query.RelationSpec)
+	if len(unredacted[0].Conditions) != 1 || len(unredacted[0].SubRelations[0].On) != 1 {
+		t.Fatalf("expected explicit debug argument opt-in to preserve predicates, got %+v", unredacted)
+	}
+}

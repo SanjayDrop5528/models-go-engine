@@ -2,8 +2,9 @@
 //
 // File: filter.go
 // Usage:
-//   Defines pagination and filter criteria payloads (compatible with AG-Grid / enterprise UI grids),
-//   and parses PaginationRequest into standardized engine Query objects.
+//
+//	Defines pagination and filter criteria payloads (compatible with AG-Grid / enterprise UI grids),
+//	and parses PaginationRequest into standardized engine Query objects.
 package query
 
 import (
@@ -45,19 +46,25 @@ type SortParam struct {
 
 // PaginationRequest defines the structured POST filter payload compatible with AG-Grid and enterprise filter APIs.
 type PaginationRequest struct {
-	Start        int               `json:"start,omitempty"`
-	End          int               `json:"end,omitempty"`
-	Filter       []FilterCondition `json:"filter,omitempty"`
-	FilterParam  []FilterParam     `json:"filterParam,omitempty"`
-	Sort         []SortParam       `json:"sort,omitempty"`
-	IncludeTotal *bool             `json:"includeTotal,omitempty"`
-	Fields       []string          `json:"fields,omitempty"`
+	Debug                bool              `json:"debug,omitempty"`
+	DebugIncludeArgs     bool              `json:"debug_include_args,omitempty"`
+	SlowQueryThresholdMS int               `json:"slow_query_threshold_ms,omitempty"`
+	Start                int               `json:"start,omitempty"`
+	End                  int               `json:"end,omitempty"`
+	Filter               []FilterCondition `json:"filter,omitempty"`
+	FilterParam          []FilterParam     `json:"filterParam,omitempty"`
+	Sort                 []SortParam       `json:"sort,omitempty"`
+	IncludeTotal         *bool             `json:"includeTotal,omitempty"`
+	Fields               []string          `json:"fields,omitempty"`
+	Relations            []string          `json:"relations,omitempty"`
+	RelationSpecs        []RelationSpec    `json:"relation_specs,omitempty"`
 }
 
 // WantsTotal returns true unless includeTotal is explicitly set to false.
 //
 // Purpose:
-//   Determines whether the caller requires a total count query alongside paginated results.
+//
+//	Determines whether the caller requires a total count query alongside paginated results.
 //
 // Where it is used:
 //   - Used by ParsePaginationRequest and query execution pipelines.
@@ -71,7 +78,8 @@ func (r PaginationRequest) WantsTotal() bool {
 // ParsePaginationRequest converts a PaginationRequest struct into a core Query object.
 //
 // Purpose:
-//   Translates enterprise UI grid filter payloads into internal database-agnostic Query filters, sorts, and limits.
+//
+//	Translates enterprise UI grid filter payloads into internal database-agnostic Query filters, sorts, and limits.
 //
 // Where it is used:
 //   - Called by HTTP controllers handling POST /api/data/:model/query or search endpoints.
@@ -80,11 +88,16 @@ func (r PaginationRequest) WantsTotal() bool {
 //   - Call when receiving incoming grid filter/pagination JSON to produce an executable Query.
 func ParsePaginationRequest(req PaginationRequest) Query {
 	q := NewQuery()
+	q.Debug = req.Debug
+	q.DebugIncludeArgs = req.DebugIncludeArgs
+	q.SlowQueryThresholdMS = req.SlowQueryThresholdMS
 
 	// 1. Fields / Projection
 	if len(req.Fields) > 0 {
 		q.Fields = req.Fields
 	}
+	q.Relations = append(q.Relations, req.Relations...)
+	q.RelationSpecs = append(q.RelationSpecs, req.RelationSpecs...)
 
 	// 2. Filters
 	for _, fc := range req.Filter {
@@ -137,7 +150,8 @@ func ParsePaginationRequest(req PaginationRequest) Query {
 // parseConditionGroup recursively translates a ConditionGroup into engine Filters.
 //
 // Purpose:
-//   Maps grid operator keywords (EQUALS, CONTAINS, LESSTHAN, INRANGE, BLANK, etc.) into engine Filter operators.
+//
+//	Maps grid operator keywords (EQUALS, CONTAINS, LESSTHAN, INRANGE, BLANK, etc.) into engine Filter operators.
 //
 // Where it is used:
 //   - Called internally by ParsePaginationRequest for each condition group.

@@ -3,8 +3,9 @@
 //
 // File: relation.go
 // Usage:
-//   Defines RelationJoin and its methods for formatting SQL JOIN clauses, appending
-//   table aliases, prefixing column names, and evaluating relation join conditions.
+//
+//	Defines RelationJoin and its methods for formatting SQL JOIN clauses, appending
+//	table aliases, prefixing column names, and evaluating relation join conditions.
 package schema
 
 import (
@@ -25,7 +26,8 @@ type RelationJoin struct {
 // NewRelationJoin creates a new RelationJoin wrapper for a relation and target table model.
 //
 // Purpose:
-//   Initializes a RelationJoin state container linking a relation definition to its TableModel.
+//
+//	Initializes a RelationJoin state container linking a relation definition to its TableModel.
 //
 // Where it is used:
 //   - In DynamicTableModel and SelectQuery when configuring joins.
@@ -43,7 +45,8 @@ func NewRelationJoin(rel *Relation, joinModel TableModel) *RelationJoin {
 // ApplyTo applies custom configurations or hooks to the query builder.
 //
 // Purpose:
-//   Provides an extension hook for applying custom scopes or modifiers to a joined query.
+//
+//	Provides an extension hook for applying custom scopes or modifiers to a joined query.
 //
 // Where it is used:
 //   - In SelectQuery when processing relation join modifiers.
@@ -57,7 +60,8 @@ func (j *RelationJoin) ApplyTo(q any) {
 // AppendAlias appends the dialect-quoted table alias or table name to the SQL buffer.
 //
 // Purpose:
-//   Quotes and appends the target relation's SQL alias to the query byte buffer.
+//
+//	Quotes and appends the target relation's SQL alias to the query byte buffer.
 //
 // Where it is used:
 //   - In query builders constructing qualified column references.
@@ -81,7 +85,8 @@ func (j *RelationJoin) AppendAlias(gen QueryGen, b []byte) []byte {
 // AppendAliasColumn appends a namespaced column alias (e.g., relation__col) to the SQL buffer.
 //
 // Purpose:
-//   Generates uniquely prefixed column aliases for joined tables to avoid name collisions in SELECT.
+//
+//	Generates uniquely prefixed column aliases for joined tables to avoid name collisions in SELECT.
 //
 // Where it is used:
 //   - In SelectQuery when projecting columns from joined relations.
@@ -104,8 +109,9 @@ func (j *RelationJoin) AppendAliasColumn(gen QueryGen, b []byte, col string) []b
 // AppendHasOneJoin generates and appends the SQL "LEFT JOIN ... ON ..." clause to the buffer.
 //
 // Purpose:
-//   Renders the dialect-formatted JOIN clause including table name, alias, ON conditions,
-//   and any additional custom JOIN predicates.
+//
+//	Renders the dialect-formatted JOIN clause including table name, alias, ON conditions,
+//	and any additional custom JOIN predicates.
 //
 // Where it is used:
 //   - In SelectQuery.AppendQuery when assembling relational FROM and JOIN clauses.
@@ -169,7 +175,8 @@ func (j *RelationJoin) AppendHasOneJoin(gen QueryGen, b []byte, q any) ([]byte, 
 // SelectMany executes child query loading for HasMany relationships.
 //
 // Purpose:
-//   Provides an execution hook for fetching child collection rows in 1:N relations.
+//
+//	Provides an execution hook for fetching child collection rows in 1:N relations.
 //
 // Where it is used:
 //   - In eager loading stages of SelectQuery execution.
@@ -177,14 +184,18 @@ func (j *RelationJoin) AppendHasOneJoin(gen QueryGen, b []byte, q any) ([]byte, 
 // When can it be used:
 //   - When resolving HasMany relationship queries.
 func (j *RelationJoin) SelectMany(ctx context.Context, q any) error {
-	// Hook for subquery selection when executing HasMany
-	return nil
+	name := "<unnamed>"
+	if j != nil && j.Relation != nil && j.Relation.Name != "" {
+		name = j.Relation.Name
+	}
+	return fmt.Errorf("generic RDBMS has-many loading for relation %q is unsupported; use the CRUD engine relation hydrator or a native adapter implementation", name)
 }
 
 // SelectM2M executes junction table query loading for ManyToMany relationships.
 //
 // Purpose:
-//   Provides an execution hook for fetching associative rows in M:N relations.
+//
+//	Provides an execution hook for fetching associative rows in M:N relations.
 //
 // Where it is used:
 //   - In eager loading stages of SelectQuery execution.
@@ -192,6 +203,9 @@ func (j *RelationJoin) SelectMany(ctx context.Context, q any) error {
 // When can it be used:
 //   - When resolving ManyToMany relationship queries.
 func (j *RelationJoin) SelectM2M(ctx context.Context, q any) error {
-	// Hook for subquery selection when executing ManyToMany
-	return nil
+	name := "<unnamed>"
+	if j != nil && j.Relation != nil && j.Relation.Name != "" {
+		name = j.Relation.Name
+	}
+	return fmt.Errorf("generic RDBMS many-to-many loading for relation %q is unsupported; use the CRUD engine relation hydrator with junction metadata", name)
 }

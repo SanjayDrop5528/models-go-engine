@@ -2,8 +2,9 @@
 //
 // File: mock.go
 // Usage:
-//   Provides MockAdapter and MockTransaction which simulate schema alterations, CRUD queries,
-//   and transactions purely in memory without requiring external database instances.
+//
+//	Provides MockAdapter and MockTransaction which simulate schema alterations, CRUD queries,
+//	and transactions purely in memory without requiring external database instances.
 package adapter
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/plan"
 	"github.com/SanjayDrop5528/models-go-engine/query"
 	"github.com/SanjayDrop5528/models-go-engine/schema"
+	"reflect"
 	"sync"
 )
 
@@ -29,7 +31,8 @@ type MockAdapter struct {
 // NewMockAdapter creates a new in-memory MockAdapter.
 //
 // Purpose:
-//   Instantiates an in-memory test double of the Adapter interface.
+//
+//	Instantiates an in-memory test double of the Adapter interface.
 //
 // Where it is used:
 //   - Used by unit test suites in models-go-engine packages.
@@ -47,7 +50,8 @@ func NewMockAdapter() *MockAdapter {
 // Name returns the identifier of the mock adapter.
 //
 // Purpose:
-//   Identifies the mock adapter name.
+//
+//	Identifies the mock adapter name.
 //
 // Where it is used:
 //   - Used during adapter registration and logging.
@@ -59,7 +63,8 @@ func (a *MockAdapter) Name() string { return "mock" }
 // DatabaseName returns the logical mock database name.
 //
 // Purpose:
-//   Identifies the mock database name.
+//
+//	Identifies the mock database name.
 //
 // Where it is used:
 //   - Used in database routing.
@@ -71,7 +76,8 @@ func (a *MockAdapter) DatabaseName() string { return "mock" }
 // NativeClient returns the underlying mock instance.
 //
 // Purpose:
-//   Exposes the underlying test double instance.
+//
+//	Exposes the underlying test double instance.
 //
 // Where it is used:
 //   - Used in test assertions.
@@ -83,7 +89,8 @@ func (a *MockAdapter) NativeClient() any { return a }
 // Connect simulates database connection initialization.
 //
 // Purpose:
-//   Simulates establishing a database connection.
+//
+//	Simulates establishing a database connection.
 //
 // Where it is used:
 //   - Called during adapter bootstrap.
@@ -95,7 +102,8 @@ func (a *MockAdapter) Connect(ctx context.Context) error { return nil }
 // Ping simulates checking database connectivity.
 //
 // Purpose:
-//   Simulates health check ping.
+//
+//	Simulates health check ping.
 //
 // Where it is used:
 //   - Called during health checks.
@@ -107,7 +115,8 @@ func (a *MockAdapter) Ping(ctx context.Context) error { return nil }
 // Close simulates closing the mock connection.
 //
 // Purpose:
-//   Simulates teardown of database resources.
+//
+//	Simulates teardown of database resources.
 //
 // Where it is used:
 //   - Called during test cleanup and server shutdown.
@@ -119,7 +128,8 @@ func (a *MockAdapter) Close(ctx context.Context) error { return nil }
 // EnsureMetadataTables simulates metadata schema initialization.
 //
 // Purpose:
-//   Satisfies metadata persistence interface for mock adapter.
+//
+//	Satisfies metadata persistence interface for mock adapter.
 //
 // Where it is used:
 //   - Called during project metadata initialization.
@@ -133,7 +143,8 @@ func (a *MockAdapter) EnsureMetadataTables(ctx context.Context) error {
 // ImportLiveMetadata simulates reverse introspection of metadata.
 //
 // Purpose:
-//   Simulates loading model configurations from live database.
+//
+//	Simulates loading model configurations from live database.
 //
 // Where it is used:
 //   - Called during project import routines.
@@ -147,7 +158,8 @@ func (a *MockAdapter) ImportLiveMetadata(ctx context.Context) ([]*model.ModelCon
 // GetSchema returns the in-memory schema definition for the requested model.
 //
 // Purpose:
-//   Retrieves stored mock schema definition for a table or collection.
+//
+//	Retrieves stored mock schema definition for a table or collection.
 //
 // Where it is used:
 //   - Called by SchemaService during diffing and testing.
@@ -167,7 +179,8 @@ func (a *MockAdapter) GetSchema(ctx context.Context, m model.ModelRef) (*schema.
 // ValidateSchemaPlan simulates schema plan validation.
 //
 // Purpose:
-//   Validates the given schema plan in the mock adapter.
+//
+//	Validates the given schema plan in the mock adapter.
 //
 // Where it is used:
 //   - Called prior to executing mock schema changes.
@@ -181,7 +194,8 @@ func (a *MockAdapter) ValidateSchemaPlan(ctx context.Context, p *plan.SchemaPlan
 // PreviewSchemaChange simulates generating native preview actions for mock execution.
 //
 // Purpose:
-//   Produces mock preview action statements for the operations in the schema plan.
+//
+//	Produces mock preview action statements for the operations in the schema plan.
 //
 // Where it is used:
 //   - Called by SchemaService.Preview in tests.
@@ -211,7 +225,8 @@ func (a *MockAdapter) PreviewSchemaChange(ctx context.Context, p *plan.SchemaPla
 // ApplySchemaChange applies the schema modifications to the in-memory mock schema table.
 //
 // Purpose:
-//   Mutates the in-memory Schema structure with added/removed columns and created tables.
+//
+//	Mutates the in-memory Schema structure with added/removed columns and created tables.
 //
 // Where it is used:
 //   - Called by SchemaService.Apply in tests.
@@ -259,7 +274,8 @@ func (a *MockAdapter) ApplySchemaChange(ctx context.Context, p *plan.SchemaPlan)
 // Create inserts a record into the in-memory table.
 //
 // Purpose:
-//   Stores a record in memory and assigns an auto-incrementing ID if none provided.
+//
+//	Stores a record in memory and assigns an auto-incrementing ID if none provided.
 //
 // Where it is used:
 //   - Called by CRUD service tests.
@@ -287,7 +303,8 @@ func (a *MockAdapter) Create(ctx context.Context, m model.ModelRef, data map[str
 // Find retrieves records matching filter conditions from memory.
 //
 // Purpose:
-//   Scans in-memory records and returns those matching filter values.
+//
+//	Scans in-memory records and returns those matching filter values.
 //
 // Where it is used:
 //   - Called by CRUD service Find tests.
@@ -303,26 +320,75 @@ func (a *MockAdapter) Find(ctx context.Context, m model.ModelRef, q query.Query)
 		match := true
 		for _, flt := range q.Filters {
 			val, exists := r[flt.Field]
-			if !exists || fmt.Sprintf("%v", val) != fmt.Sprintf("%v", flt.Value) {
+			if !exists || !mockFilterMatches(val, flt) {
 				match = false
 				break
 			}
 		}
 		if match {
 			cp := make(map[string]any)
-			for k, v := range r {
-				cp[k] = v
+			if len(q.Fields) > 0 {
+				for _, field := range q.Fields {
+					if value, ok := r[field]; ok {
+						cp[field] = value
+					}
+				}
+			} else {
+				for k, v := range r {
+					cp[k] = v
+				}
 			}
 			res = append(res, cp)
 		}
 	}
-	return res, int64(len(res)), nil
+	total := int64(len(res))
+	start := q.Pagination.Offset
+	if start < 0 {
+		start = 0
+	}
+	if start > len(res) {
+		start = len(res)
+	}
+	end := len(res)
+	if q.Pagination.Limit > 0 && start+q.Pagination.Limit < end {
+		end = start + q.Pagination.Limit
+	}
+	return res[start:end], total, nil
+}
+
+func mockFilterMatches(actual any, filter query.Filter) bool {
+	switch filter.Op {
+	case query.OpIn, query.OpNin:
+		found := false
+		value := reflect.ValueOf(filter.Value)
+		if value.IsValid() && (value.Kind() == reflect.Slice || value.Kind() == reflect.Array) {
+			for i := 0; i < value.Len(); i++ {
+				if fmt.Sprintf("%v", actual) == fmt.Sprintf("%v", value.Index(i).Interface()) {
+					found = true
+					break
+				}
+			}
+		}
+		if filter.Op == query.OpNin {
+			return !found
+		}
+		return found
+	case query.OpNeq:
+		return fmt.Sprintf("%v", actual) != fmt.Sprintf("%v", filter.Value)
+	case query.OpIsNull:
+		return actual == nil
+	case query.OpIsNotNull:
+		return actual != nil
+	default:
+		return fmt.Sprintf("%v", actual) == fmt.Sprintf("%v", filter.Value)
+	}
 }
 
 // FindOne retrieves a single record by primary key identifier from memory.
 //
 // Purpose:
-//   Finds the specific record whose id matches the provided parameter.
+//
+//	Finds the specific record whose id matches the provided parameter.
 //
 // Where it is used:
 //   - Called by CRUD service FindOne tests.
@@ -333,8 +399,12 @@ func (a *MockAdapter) FindOne(ctx context.Context, m model.ModelRef, id any) (ma
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	records := a.data[m.StorageName]
+	primaryKey := m.PrimaryKey
+	if primaryKey == "" {
+		primaryKey = "id"
+	}
 	for _, r := range records {
-		if fmt.Sprintf("%v", r["id"]) == fmt.Sprintf("%v", id) {
+		if fmt.Sprintf("%v", r[primaryKey]) == fmt.Sprintf("%v", id) {
 			cp := make(map[string]any)
 			for k, v := range r {
 				cp[k] = v
@@ -345,10 +415,27 @@ func (a *MockAdapter) FindOne(ctx context.Context, m model.ModelRef, id any) (ma
 	return nil, fmt.Errorf("record not found")
 }
 
+func (a *MockAdapter) FindOneWithQuery(ctx context.Context, m model.ModelRef, id any, q query.Query) (map[string]any, error) {
+	primaryKey := m.PrimaryKey
+	if primaryKey == "" {
+		primaryKey = "id"
+	}
+	q = q.Where(primaryKey, query.OpEq, id).LimitOffset(1, 0)
+	rows, _, err := a.Find(ctx, m, q)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("record '%v' not found", id)
+	}
+	return rows[0], nil
+}
+
 // Update replaces an existing record in memory by ID.
 //
 // Purpose:
-//   Updates matching record fields with the provided payload.
+//
+//	Updates matching record fields with the provided payload.
 //
 // Where it is used:
 //   - Called by CRUD service Update tests.
@@ -372,7 +459,8 @@ func (a *MockAdapter) Update(ctx context.Context, m model.ModelRef, id any, data
 // Patch updates specific fields on an existing record in memory.
 //
 // Purpose:
-//   Merges payload keys into an existing mock record.
+//
+//	Merges payload keys into an existing mock record.
 //
 // Where it is used:
 //   - Called by CRUD service Patch tests.
@@ -397,7 +485,8 @@ func (a *MockAdapter) Patch(ctx context.Context, m model.ModelRef, id any, data 
 // Delete removes a record by primary key identifier from memory.
 //
 // Purpose:
-//   Removes the matching record slice element from in-memory storage.
+//
+//	Removes the matching record slice element from in-memory storage.
 //
 // Where it is used:
 //   - Called by CRUD service Delete tests.
@@ -420,7 +509,8 @@ func (a *MockAdapter) Delete(ctx context.Context, m model.ModelRef, id any) erro
 // Execute returns a synthetic execution response for custom commands.
 //
 // Purpose:
-//   Emulates operation execution (function, procedure, batch) in memory.
+//
+//	Emulates operation execution (function, procedure, batch) in memory.
 //
 // Where it is used:
 //   - Called by operation execution tests.
@@ -443,7 +533,8 @@ func (a *MockAdapter) Execute(ctx context.Context, req execution.ExecutionReques
 // Begin starts a mock transaction.
 //
 // Purpose:
-//   Returns a MockTransaction wrapper around the mock adapter.
+//
+//	Returns a MockTransaction wrapper around the mock adapter.
 //
 // Where it is used:
 //   - Called by transactional tests.
@@ -464,7 +555,8 @@ type MockTransaction struct {
 // Create inserts a record in the mock transaction.
 //
 // Purpose:
-//   Delegates Create to the underlying mock adapter.
+//
+//	Delegates Create to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -478,7 +570,8 @@ func (tx *MockTransaction) Create(ctx context.Context, m model.ModelRef, data ma
 // Find queries records in the mock transaction.
 //
 // Purpose:
-//   Delegates Find to the underlying mock adapter.
+//
+//	Delegates Find to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -492,7 +585,8 @@ func (tx *MockTransaction) Find(ctx context.Context, m model.ModelRef, q query.Q
 // FindOne queries a single record in the mock transaction.
 //
 // Purpose:
-//   Delegates FindOne to the underlying mock adapter.
+//
+//	Delegates FindOne to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -503,10 +597,15 @@ func (tx *MockTransaction) FindOne(ctx context.Context, m model.ModelRef, id any
 	return tx.adapter.FindOne(ctx, m, id)
 }
 
+func (tx *MockTransaction) FindOneWithQuery(ctx context.Context, m model.ModelRef, id any, q query.Query) (map[string]any, error) {
+	return tx.adapter.FindOneWithQuery(ctx, m, id, q)
+}
+
 // Update modifies a record in the mock transaction.
 //
 // Purpose:
-//   Delegates Update to the underlying mock adapter.
+//
+//	Delegates Update to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -520,7 +619,8 @@ func (tx *MockTransaction) Update(ctx context.Context, m model.ModelRef, id any,
 // Patch partially updates a record in the mock transaction.
 //
 // Purpose:
-//   Delegates Patch to the underlying mock adapter.
+//
+//	Delegates Patch to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -534,7 +634,8 @@ func (tx *MockTransaction) Patch(ctx context.Context, m model.ModelRef, id any, 
 // Delete removes a record in the mock transaction.
 //
 // Purpose:
-//   Delegates Delete to the underlying mock adapter.
+//
+//	Delegates Delete to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -548,7 +649,8 @@ func (tx *MockTransaction) Delete(ctx context.Context, m model.ModelRef, id any)
 // Execute dispatches an execution request in the mock transaction.
 //
 // Purpose:
-//   Delegates Execute to the underlying mock adapter.
+//
+//	Delegates Execute to the underlying mock adapter.
 //
 // Where it is used:
 //   - Called during transactional tests.
@@ -562,7 +664,8 @@ func (tx *MockTransaction) Execute(ctx context.Context, req execution.ExecutionR
 // Commit records that the transaction committed.
 //
 // Purpose:
-//   Marks the mock transaction as committed.
+//
+//	Marks the mock transaction as committed.
 //
 // Where it is used:
 //   - Called at the end of successful transactional blocks.
@@ -577,7 +680,8 @@ func (tx *MockTransaction) Commit(ctx context.Context) error {
 // Rollback records that the transaction rolled back.
 //
 // Purpose:
-//   Marks the mock transaction as rolled back.
+//
+//	Marks the mock transaction as rolled back.
 //
 // Where it is used:
 //   - Called upon error in transactional blocks.
@@ -588,4 +692,3 @@ func (tx *MockTransaction) Rollback(ctx context.Context) error {
 	tx.rolledBack = true
 	return nil
 }
-

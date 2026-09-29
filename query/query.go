@@ -2,16 +2,21 @@
 //
 // File: query.go
 // Usage:
-//   This file defines the canonical Query struct, Filter operators, Sort orders, Joins,
-//   and Pagination parameters used uniformly across PostgreSQL, MySQL, MongoDB, and In-Memory
-//   adapters. It provides a fluent API for building complex filtering, projection, grouping,
-//   and relational queries without writing vendor-specific SQL or aggregation pipelines.
+//
+//	This file defines the canonical Query struct, Filter operators, Sort orders, Joins,
+//	and Pagination parameters used uniformly across PostgreSQL, MySQL, MongoDB, and In-Memory
+//	adapters. It provides a fluent API for building complex filtering, projection, grouping,
+//	and relational queries without writing vendor-specific SQL or aggregation pipelines.
 package query
 
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
+	"time"
 )
+
+var debugTraceSequence uint64
 
 // FilterOp defines the comparison operator in dynamic filters.
 type FilterOp string
@@ -73,10 +78,10 @@ const (
 
 // JoinSpec defines a join clause across databases.
 type JoinSpec struct {
-	Type  string   `json:"type"` // "LEFT", "INNER", "RIGHT", "JOIN"
-	Table string   `json:"table"`
-	On    string   `json:"on"`
-	Args  []any    `json:"args,omitempty"`
+	Type  string `json:"type"` // "LEFT", "INNER", "RIGHT", "JOIN"
+	Table string `json:"table"`
+	On    string `json:"on"`
+	Args  []any  `json:"args,omitempty"`
 }
 
 // RelationOpts configures eager relation loading behavior.
@@ -115,12 +120,12 @@ type RawExpr struct {
 
 // IndexHintSpec specifies database-specific index hints.
 type IndexHintSpec struct {
-	Use            []string `json:"use,omitempty"`
-	UseForJoin     []string `json:"use_for_join,omitempty"`
-	UseForOrderBy  []string `json:"use_for_order_by,omitempty"`
-	UseForGroupBy  []string `json:"use_for_group_by,omitempty"`
-	Ignore         []string `json:"ignore,omitempty"`
-	Force          []string `json:"force,omitempty"`
+	Use           []string `json:"use,omitempty"`
+	UseForJoin    []string `json:"use_for_join,omitempty"`
+	UseForOrderBy []string `json:"use_for_order_by,omitempty"`
+	UseForGroupBy []string `json:"use_for_group_by,omitempty"`
+	Ignore        []string `json:"ignore,omitempty"`
+	Force         []string `json:"force,omitempty"`
 }
 
 // WhereGroupSpec represents a parenthesized condition group.
@@ -133,46 +138,109 @@ type WhereGroupSpec struct {
 // It serves as a single universal data structure supporting PostgreSQL, MySQL,
 // MongoDB, SQLite, and In-Memory stores.
 type Query struct {
+	// Debug enables verbose runtime logging for this query only.
+	Debug                bool   `json:"debug,omitempty"`
+	DebugTraceID         string `json:"-"`
+	DebugIncludeArgs     bool   `json:"debug_include_args,omitempty"`
+	SlowQueryThresholdMS int    `json:"slow_query_threshold_ms,omitempty"`
+
 	// Projections & Targets
-	Tables           []string         `json:"tables,omitempty"`
-	Fields           []string         `json:"fields,omitempty"`
-	ColumnExprs      []RawExpr        `json:"column_exprs,omitempty"`
-	ExcludedColumns  []string         `json:"excluded_columns,omitempty"`
-	ModelTarget      any              `json:"-"`
-	DistinctFields   []string         `json:"distinct_fields,omitempty"`
-	IsDistinct       bool             `json:"is_distinct,omitempty"`
+	Tables          []string  `json:"tables,omitempty"`
+	Fields          []string  `json:"fields,omitempty"`
+	ColumnExprs     []RawExpr `json:"column_exprs,omitempty"`
+	ExcludedColumns []string  `json:"excluded_columns,omitempty"`
+	ModelTarget     any       `json:"-"`
+	DistinctFields  []string  `json:"distinct_fields,omitempty"`
+	IsDistinct      bool      `json:"is_distinct,omitempty"`
 
 	// Filters & Groups
-	Filters          []Filter         `json:"filters,omitempty"`
-	RawWheres        []RawExpr        `json:"raw_wheres,omitempty"`
-	WhereGroups      []WhereGroupSpec `json:"where_groups,omitempty"`
-	LogicalOp        LogicalOp        `json:"logical_op,omitempty"`
-	Groups           []string         `json:"groups,omitempty"`
-	Havings          []RawExpr        `json:"havings,omitempty"`
+	Filters     []Filter         `json:"filters,omitempty"`
+	RawWheres   []RawExpr        `json:"raw_wheres,omitempty"`
+	WhereGroups []WhereGroupSpec `json:"where_groups,omitempty"`
+	LogicalOp   LogicalOp        `json:"logical_op,omitempty"`
+	Groups      []string         `json:"groups,omitempty"`
+	Havings     []RawExpr        `json:"havings,omitempty"`
 
 	// Joins & Relations
-	Joins            []JoinSpec       `json:"joins,omitempty"`
-	Relations        []string         `json:"relations,omitempty"`
-	RelationSpecs    []RelationSpec   `json:"relation_specs,omitempty"`
-	LoadWithChildren bool             `json:"load_with_children,omitempty"`
+	Joins            []JoinSpec     `json:"joins,omitempty"`
+	Relations        []string       `json:"relations,omitempty"`
+	RelationSpecs    []RelationSpec `json:"relation_specs,omitempty"`
+	LoadWithChildren bool           `json:"load_with_children,omitempty"`
 
 	// Set Operations
-	Unions           []UnionSpec      `json:"unions,omitempty"`
+	Unions []UnionSpec `json:"unions,omitempty"`
 
 	// Sorting & Pagination
-	Sorts            []Sort           `json:"sorts,omitempty"`
-	Pagination       Pagination       `json:"pagination"`
-	CountTotal       bool             `json:"count_total,omitempty"`
+	Sorts      []Sort     `json:"sorts,omitempty"`
+	Pagination Pagination `json:"pagination"`
+	CountTotal bool       `json:"count_total,omitempty"`
 
 	// Performance & Optimization
-	IndexHints       IndexHintSpec    `json:"index_hints,omitempty"`
-	CommentText      string           `json:"comment,omitempty"`
+	IndexHints  IndexHintSpec `json:"index_hints,omitempty"`
+	CommentText string        `json:"comment,omitempty"`
+}
+
+func (q Query) DebugArguments(args []any) any {
+	if q.DebugIncludeArgs {
+		return args
+	}
+	return fmt.Sprintf("<redacted:%d argument(s)>", len(args))
+}
+
+func (q Query) DebugValue(value any, valueCount int) any {
+	if q.DebugIncludeArgs {
+		return value
+	}
+	return fmt.Sprintf("<redacted:%d value(s)>", valueCount)
+}
+
+func (q Query) DebugFilters(filters []Filter) any {
+	if q.DebugIncludeArgs {
+		return filters
+	}
+	shape := make([]string, 0, len(filters))
+	for _, filter := range filters {
+		shape = append(shape, fmt.Sprintf("%s:%s", filter.Field, filter.Op))
+	}
+	return shape
+}
+
+func (q Query) DebugRelationSpecs(specs []RelationSpec) any {
+	if q.DebugIncludeArgs {
+		return specs
+	}
+	redacted := make([]RelationSpec, 0, len(specs))
+	for _, spec := range specs {
+		copySpec := spec
+		copySpec.Conditions = nil
+		copySpec.On = nil
+		if len(spec.SubRelations) > 0 {
+			children := q.DebugRelationSpecs(spec.SubRelations)
+			copySpec.SubRelations, _ = children.([]RelationSpec)
+		}
+		redacted = append(redacted, copySpec)
+	}
+	return redacted
+}
+
+func (q Query) IsSlow(duration time.Duration) bool {
+	return q.SlowQueryThresholdMS > 0 && duration >= time.Duration(q.SlowQueryThresholdMS)*time.Millisecond
+}
+
+// EnsureDebugTrace assigns a process-local correlation ID when debug logging
+// is enabled. The ID is internal and is never serialized into API responses.
+func (q Query) EnsureDebugTrace() Query {
+	if q.Debug && q.DebugTraceID == "" {
+		q.DebugTraceID = fmt.Sprintf("query-%06d", atomic.AddUint64(&debugTraceSequence, 1))
+	}
+	return q
 }
 
 // New returns a fresh, fluent Query instance with standard defaults.
 //
 // Purpose:
-//   Convenience constructor for NewQuery.
+//
+//	Convenience constructor for NewQuery.
 //
 // Where it is used:
 //   - Used in test files, example servers, and application repositories.
@@ -186,8 +254,9 @@ func New() Query {
 // NewQuery returns a default Query instance.
 //
 // Purpose:
-//   Initializes a Query object with default logical conjunction (OpAnd), LoadWithChildren enabled,
-//   and standard pagination limits (limit: 50, offset: 0).
+//
+//	Initializes a Query object with default logical conjunction (OpAnd), LoadWithChildren enabled,
+//	and standard pagination limits (limit: 50, offset: 0).
 //
 // Where it is used:
 //   - Universal entry point for building queries passed to adapter.Find, FindOne, and dataset compilation.

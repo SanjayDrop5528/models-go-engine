@@ -2,7 +2,8 @@
 //
 // File: schema.go
 // Usage:
-//   Provides normalized schema definitions and conversion utilities between higher-level models and live database physical schemas.
+//
+//	Provides normalized schema definitions and conversion utilities between higher-level models and live database physical schemas.
 package schema
 
 import (
@@ -41,12 +42,17 @@ type SchemaIndex struct {
 
 // SchemaRelation defines a foreign key or collection reference.
 type SchemaRelation struct {
-	Name          string `json:"name"`
-	Column        string `json:"column"`
-	ForeignTable  string `json:"foreign_table"`
-	ForeignColumn string `json:"foreign_column"`
-	OnDelete      string `json:"on_delete,omitempty"`
-	OnUpdate      string `json:"on_update,omitempty"`
+	Name              string             `json:"name"`
+	Type              model.RelationType `json:"type,omitempty"`
+	Column            string             `json:"column"`
+	ForeignTable      string             `json:"foreign_table"`
+	ForeignColumn     string             `json:"foreign_column"`
+	LoadWithChildren  bool               `json:"load_with_children,omitempty"`
+	JunctionModel     string             `json:"junction_model,omitempty"`
+	JunctionSourceKey string             `json:"junction_source_key,omitempty"`
+	JunctionTargetKey string             `json:"junction_target_key,omitempty"`
+	OnDelete          string             `json:"on_delete,omitempty"`
+	OnUpdate          string             `json:"on_update,omitempty"`
 }
 
 // Schema represents the database-independent schema of a table or collection.
@@ -63,7 +69,8 @@ type Schema struct {
 // GetAttribute finds an attribute by name.
 //
 // Purpose:
-//   Looks up a column or field definition by name within the schema's attributes list.
+//
+//	Looks up a column or field definition by name within the schema's attributes list.
 //
 // Where it is used:
 //   - Used during diff calculations, column alterations, and validator checks.
@@ -82,7 +89,8 @@ func (s *Schema) GetAttribute(name string) *SchemaAttribute {
 // GetIndex finds an index by name.
 //
 // Purpose:
-//   Searches the schema's indexes slice for an index matching the given name.
+//
+//	Searches the schema's indexes slice for an index matching the given name.
 //
 // Where it is used:
 //   - Used during diff engine index comparison and DDL migration planning.
@@ -101,7 +109,8 @@ func (s *Schema) GetIndex(name string) *SchemaIndex {
 // FromModel converts a Model metadata definition to a Schema representation.
 //
 // Purpose:
-//   Transforms high-level Model domain metadata into a normalized, database-independent Schema structure.
+//
+//	Transforms high-level Model domain metadata into a normalized, database-independent Schema structure.
 //
 // Where it is used:
 //   - Called by SchemaService during diff calculation and migration planning.
@@ -169,12 +178,17 @@ func FromModel(m *model.Model) *Schema {
 
 	for _, rel := range m.Relations {
 		s.Relations = append(s.Relations, SchemaRelation{
-			Name:          rel.Name,
-			Column:        rel.ForeignKey,
-			ForeignTable:  rel.TargetModel,
-			ForeignColumn: rel.TargetKey,
-			OnDelete:      rel.OnDelete,
-			OnUpdate:      rel.OnUpdate,
+			Name:              rel.Name,
+			Type:              rel.Type,
+			Column:            rel.ForeignKey,
+			ForeignTable:      rel.TargetModel,
+			ForeignColumn:     rel.TargetKey,
+			LoadWithChildren:  rel.LoadWithChildren,
+			JunctionModel:     rel.JunctionModel,
+			JunctionSourceKey: rel.JunctionSourceKey,
+			JunctionTargetKey: rel.JunctionTargetKey,
+			OnDelete:          rel.OnDelete,
+			OnUpdate:          rel.OnUpdate,
 		})
 	}
 

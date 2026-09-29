@@ -51,3 +51,26 @@ func TestParsePaginationRequest(t *testing.T) {
 		t.Fatalf("expected 1 DESC sort, got: %+v", q.Sorts)
 	}
 }
+
+func TestParsePaginationRequestIncludesRelations(t *testing.T) {
+	q := query.ParsePaginationRequest(query.PaginationRequest{
+		Relations:            []string{"Customer", "OrderProducts"},
+		RelationSpecs:        []query.RelationSpec{{Name: "Lines", Fields: []string{"id", "quantity"}, Order: []query.Sort{{Field: "position", Order: query.SortAsc}}}},
+		Debug:                true,
+		DebugIncludeArgs:     true,
+		SlowQueryThresholdMS: 250,
+	})
+
+	if len(q.Relations) != 2 || q.Relations[0] != "Customer" || q.Relations[1] != "OrderProducts" {
+		t.Fatalf("expected requested relations to be preserved, got %v", q.Relations)
+	}
+	if !q.Debug {
+		t.Fatal("expected debug flag to be preserved")
+	}
+	if !q.DebugIncludeArgs || q.SlowQueryThresholdMS != 250 {
+		t.Fatalf("expected debug controls to be preserved, got include_args=%v slow_ms=%d", q.DebugIncludeArgs, q.SlowQueryThresholdMS)
+	}
+	if len(q.RelationSpecs) != 1 || q.RelationSpecs[0].Name != "Lines" || len(q.RelationSpecs[0].Fields) != 2 || len(q.RelationSpecs[0].Order) != 1 {
+		t.Fatalf("expected structured relation options to be preserved, got %+v", q.RelationSpecs)
+	}
+}

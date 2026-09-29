@@ -3,9 +3,10 @@
 //
 // File: adapter.go
 // Usage:
-//   This file provides the core Adapter and Transaction contracts implemented by database
-//   drivers (PostgreSQL, MySQL, MongoDB, and In-Memory). It also defines the Adapter Registry
-//   which catalogs active driver instances and allows unified multi-database access.
+//
+//	This file provides the core Adapter and Transaction contracts implemented by database
+//	drivers (PostgreSQL, MySQL, MongoDB, and In-Memory). It also defines the Adapter Registry
+//	which catalogs active driver instances and allows unified multi-database access.
 package adapter
 
 import (
@@ -29,6 +30,7 @@ type Transaction interface {
 	Create(ctx context.Context, model model.ModelRef, data map[string]any) (map[string]any, error)
 	Find(ctx context.Context, model model.ModelRef, q query.Query) ([]map[string]any, int64, error)
 	FindOne(ctx context.Context, model model.ModelRef, id any) (map[string]any, error)
+	FindOneWithQuery(ctx context.Context, model model.ModelRef, id any, q query.Query) (map[string]any, error)
 	Update(ctx context.Context, model model.ModelRef, id any, data map[string]any) (map[string]any, error)
 	Patch(ctx context.Context, model model.ModelRef, id any, data map[string]any) (map[string]any, error)
 	Delete(ctx context.Context, model model.ModelRef, id any) error
@@ -89,7 +91,8 @@ type Registry struct {
 // NewRegistry creates a new adapter registry.
 //
 // Purpose:
-//   Initializes an empty thread-safe Registry for database adapters.
+//
+//	Initializes an empty thread-safe Registry for database adapters.
 //
 // Where it is used:
 //   - Instantiated during application bootstrap to manage multi-database connections.
@@ -105,7 +108,8 @@ func NewRegistry() *Registry {
 // Register adds an adapter under a name.
 //
 // Purpose:
-//   Registers a database adapter instance under a unique driver or tenant key.
+//
+//	Registers a database adapter instance under a unique driver or tenant key.
 //
 // Where it is used:
 //   - Called after establishing database connections in service or server initialization.
@@ -121,7 +125,8 @@ func (r *Registry) Register(name string, a Adapter) {
 // Get retrieves an adapter by name.
 //
 // Purpose:
-//   Looks up a registered database adapter, returning an error if not found.
+//
+//	Looks up a registered database adapter, returning an error if not found.
 //
 // Where it is used:
 //   - Called by service routers, execution engines, and dataset services to obtain driver instances.

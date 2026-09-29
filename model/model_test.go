@@ -25,6 +25,7 @@ func TestBuildModelGeneratesRelationOnlyForOrbitalReference(t *testing.T) {
 			JSONField:                  "organisation_id",
 			DataType:                   model.TypeUUID,
 			IsOrbitalReference:         true,
+			LoadWithChildren:           true,
 			OrbitalReferenceModelID:    &targetModel,
 			OrbitalReferenceFieldID:    &targetField,
 			OrbitalReferenceValidation: model.OrbitalValidationExists,
@@ -56,6 +57,9 @@ func TestBuildModelGeneratesRelationOnlyForOrbitalReference(t *testing.T) {
 	}
 	if rel.ForeignKey != "organisation_id" || rel.TargetModel != "organisation" || rel.TargetKey != "id" {
 		t.Fatalf("unexpected relation metadata: %+v", rel)
+	}
+	if !rel.LoadWithChildren {
+		t.Fatal("expected load_with_children to propagate from orbital field to generated relation")
 	}
 }
 

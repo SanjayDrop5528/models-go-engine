@@ -3,10 +3,11 @@
 //
 // File: model.go
 // Usage:
-//   This file defines the primary Model and Attribute structures used throughout runtime
-//   CRUD operations, query compilation, validation, and schema management. It provides
-//   factories and converter methods to translate between metadata persistence entities
-//   (ModelConfig, DataModel) and runtime execution entities (Model, Attribute, ModelRef).
+//
+//	This file defines the primary Model and Attribute structures used throughout runtime
+//	CRUD operations, query compilation, validation, and schema management. It provides
+//	factories and converter methods to translate between metadata persistence entities
+//	(ModelConfig, DataModel) and runtime execution entities (Model, Attribute, ModelRef).
 package model
 
 import (
@@ -38,7 +39,8 @@ type ModelRef struct {
 // NewModelRef creates a ModelRef with standard default values.
 //
 // Purpose:
-//   Constructs a lightweight ModelRef token used by database adapters to locate a target table or collection.
+//
+//	Constructs a lightweight ModelRef token used by database adapters to locate a target table or collection.
 //
 // Where it is used:
 //   - Used across all adapter CRUD calls (Create, FindOne, Find, Update, Delete).
@@ -135,13 +137,17 @@ const (
 
 // Relation defines a relationship to another model.
 type Relation struct {
-	Name        string       `json:"name"`
-	Type        RelationType `json:"type"`
-	TargetModel string       `json:"target_model"`
-	ForeignKey  string       `json:"foreign_key"`
-	TargetKey   string       `json:"target_key"`
-	OnDelete    string       `json:"on_delete,omitempty"`
-	OnUpdate    string       `json:"on_update,omitempty"`
+	Name              string       `json:"name"`
+	Type              RelationType `json:"type"`
+	TargetModel       string       `json:"target_model"`
+	ForeignKey        string       `json:"foreign_key"`
+	TargetKey         string       `json:"target_key"`
+	LoadWithChildren  bool         `json:"load_with_children,omitempty"`
+	JunctionModel     string       `json:"junction_model,omitempty"`
+	JunctionSourceKey string       `json:"junction_source_key,omitempty"`
+	JunctionTargetKey string       `json:"junction_target_key,omitempty"`
+	OnDelete          string       `json:"on_delete,omitempty"`
+	OnUpdate          string       `json:"on_update,omitempty"`
 }
 
 // PrimaryKey defines the primary key constraint for a model.
@@ -174,7 +180,8 @@ type Model struct {
 // Ref returns a ModelRef for this model.
 //
 // Purpose:
-//   Extracts a ModelRef descriptor from the model, populating ID, Name, StorageName, Database, and PrimaryKey.
+//
+//	Extracts a ModelRef descriptor from the model, populating ID, Name, StorageName, Database, and PrimaryKey.
 //
 // Where it is used:
 //   - Used when dispatching adapter operations for this model.
@@ -216,7 +223,8 @@ func (m *Model) Ref() ModelRef {
 // GetAttribute finds an attribute by name, ref_name, column_name, or json_field (case-insensitive search).
 //
 // Purpose:
-//   Performs a flexible, case-insensitive attribute search across multiple identifier aliases.
+//
+//	Performs a flexible, case-insensitive attribute search across multiple identifier aliases.
 //
 // Where it is used:
 //   - Called by ValidateData, ValidatePartialData, query builders, and relation generators.
@@ -238,7 +246,8 @@ func (m *Model) GetAttribute(name string) *Attribute {
 // IsPrimaryKey returns true if the attribute is part of the model's primary key.
 //
 // Purpose:
-//   Determines whether a given field name belongs to the primary key definition or has IsPrimaryKey set.
+//
+//	Determines whether a given field name belongs to the primary key definition or has IsPrimaryKey set.
 //
 // Where it is used:
 //   - Called during validation and SQL query construction for WHERE clauses.
@@ -264,7 +273,8 @@ func (m *Model) IsPrimaryKey(name string) bool {
 // GetPrimaryKeyAttributes returns all attributes marked as primary key.
 //
 // Purpose:
-//   Collects all primary key attributes (single column or composite).
+//
+//	Collects all primary key attributes (single column or composite).
 //
 // Where it is used:
 //   - Used by DDL generators, constraint validators, and schema inspectors.
@@ -300,10 +310,10 @@ type ModelConfig struct {
 	Schema               string            `json:"schema,omitempty"`       // Database schema (e.g. public, tenant_a, hr, sales)
 	Name                 string            `json:"name"`                   // Name used by query engine
 	Table                string            `json:"table,omitempty"`        // Underlying table name
-	RefName              string            `json:"ref_name,omitempty"`      // Optional reference name
+	RefName              string            `json:"ref_name,omitempty"`     // Optional reference name
 	IsTable              bool              `json:"is_table,omitempty"`     // true if mapped to table
 	IsAttributeReference bool              `json:"is_attribute_reference"` // true means this model can be used as a model/attribute reference
-	Description          string            `json:"description,omitempty"`   // Model description
+	Description          string            `json:"description,omitempty"`  // Model description
 	Status               ModelConfigStatus `json:"status"`                 // draft, active, inactive, archived
 	Version              int               `json:"version"`                // Model configuration version
 	IsSystem             bool              `json:"is_system"`              // System-defined model
@@ -329,23 +339,23 @@ type ModelConfig struct {
 //	    Status:       model.DataModelStatusActive,
 //	}
 type DataModel struct {
-	ID                         string                `json:"id"`                                        // Field ID
-	ModelID                    string                `json:"model_id"`                                  // model_config reference (FK)
-	ColumnName                 string                `json:"column_name"`                               // Actual DB column/field
-	JSONField                  string                `json:"json_field"`                                // API/JSON property
-	RefName                    string                `json:"ref_name,omitempty"`                         // Reference display name
-	Description                string                `json:"description,omitempty"`                     // Description
-	DataType                   DataType              `json:"data_type"`                                 // Logical datatype
-	CustomTypeID               *string               `json:"custom_type_id,omitempty"`                 // Reference to model_config (Address struct)
-	CustomType                 string                `json:"custom_type,omitempty"`                    // Specific custom type (e.g. geo_point_radius)
-	IsArray                    bool                  `json:"is_array"`                                  // Array field
-	IsNullable                 bool                  `json:"is_nullable"`                               // NULL allowed
-	IsRequired                 bool                  `json:"is_required"`                               // Application mandatory
-	IsPrimaryKey               bool                  `json:"is_primary_key"`                            // Primary key
-	IsUnique                   bool                  `json:"is_unique"`                                 // Unique
-	IsImmutable                bool                  `json:"is_immutable"`                              // Cannot update
-	IsGenerated                bool                  `json:"is_generated"`                              // System/DB generated
-	DefaultValue               any                   `json:"default_value,omitempty"`                   // Default value
+	ID                         string                `json:"id"`                       // Field ID
+	ModelID                    string                `json:"model_id"`                 // model_config reference (FK)
+	ColumnName                 string                `json:"column_name"`              // Actual DB column/field
+	JSONField                  string                `json:"json_field"`               // API/JSON property
+	RefName                    string                `json:"ref_name,omitempty"`       // Reference display name
+	Description                string                `json:"description,omitempty"`    // Description
+	DataType                   DataType              `json:"data_type"`                // Logical datatype
+	CustomTypeID               *string               `json:"custom_type_id,omitempty"` // Reference to model_config (Address struct)
+	CustomType                 string                `json:"custom_type,omitempty"`    // Specific custom type (e.g. geo_point_radius)
+	IsArray                    bool                  `json:"is_array"`                 // Array field
+	IsNullable                 bool                  `json:"is_nullable"`              // NULL allowed
+	IsRequired                 bool                  `json:"is_required"`              // Application mandatory
+	IsPrimaryKey               bool                  `json:"is_primary_key"`           // Primary key
+	IsUnique                   bool                  `json:"is_unique"`                // Unique
+	IsImmutable                bool                  `json:"is_immutable"`             // Cannot update
+	IsGenerated                bool                  `json:"is_generated"`             // System/DB generated
+	DefaultValue               any                   `json:"default_value,omitempty"`  // Default value
 	Min                        *float64              `json:"min,omitempty"`
 	Max                        *float64              `json:"max,omitempty"`
 	MinLength                  *int                  `json:"min_length,omitempty"`
@@ -355,23 +365,25 @@ type DataModel struct {
 	Precision                  *int                  `json:"precision,omitempty"`
 	Scale                      *int                  `json:"scale,omitempty"`
 	Items                      *ItemRule             `json:"items,omitempty"`
-	IsOrbitalReference         bool                  `json:"is_orbital_reference"`                      // Field references another model/field
-	OrbitalReferenceModelID    *string               `json:"orbital_reference_model_id,omitempty"`      // Referenced model
-	OrbitalReferenceFieldID    *string               `json:"orbital_reference_field_id,omitempty"`      // Referenced field
+	IsOrbitalReference         bool                  `json:"is_orbital_reference"`                   // Field references another model/field
+	LoadWithChildren           bool                  `json:"load_with_children,omitempty"`           // Automatically load this orbital relation on reads
+	OrbitalReferenceModelID    *string               `json:"orbital_reference_model_id,omitempty"`   // Referenced model
+	OrbitalReferenceFieldID    *string               `json:"orbital_reference_field_id,omitempty"`   // Referenced field
 	OrbitalReferenceValidation OrbitalValidationType `json:"orbital_reference_validation,omitempty"` // exists, exists_active, exists_in_scope, not_exists
-	Reference                  *OrbitalRefSpec       `json:"reference,omitempty"`                       // Full reference specification
-	Status                     DataModelStatus       `json:"status"`                                    // active / inactive
-	CreatedAt                  time.Time             `json:"created_at"`                                // Creation
-	CreatedBy                  string                `json:"created_by"`                                // Created By
-	UpdatedAt                  time.Time             `json:"updated_at"`                                // Updated
-	UpdatedBy                  string                `json:"updated_by"`                                // Updated By
+	Reference                  *OrbitalRefSpec       `json:"reference,omitempty"`                    // Full reference specification
+	Status                     DataModelStatus       `json:"status"`                                 // active / inactive
+	CreatedAt                  time.Time             `json:"created_at"`                             // Creation
+	CreatedBy                  string                `json:"created_by"`                             // Created By
+	UpdatedAt                  time.Time             `json:"updated_at"`                             // Updated
+	UpdatedBy                  string                `json:"updated_by"`                             // Updated By
 }
 
 // ToAttribute converts a DataModel field to an execution Attribute.
 //
 // Purpose:
-//   Translates a persistent DataModel catalog record into an active runtime Attribute,
-//   configuring validation rulesets, data types, orbital references, precision, and scale.
+//
+//	Translates a persistent DataModel catalog record into an active runtime Attribute,
+//	configuring validation rulesets, data types, orbital references, precision, and scale.
 //
 // Where it is used:
 //   - Used by BuildModel and schema synchronization routines.
@@ -450,8 +462,9 @@ func (dm *DataModel) ToAttribute() Attribute {
 // BuildModel converts a ModelConfig and a list of DataModel fields into an active execution Model.
 //
 // Purpose:
-//   Constructs an executable Model instance combining high-level entity configuration,
-//   active field attributes, primary keys, and orbital relationship edges.
+//
+//	Constructs an executable Model instance combining high-level entity configuration,
+//	active field attributes, primary keys, and orbital relationship edges.
 //
 // Where it is used:
 //   - Called by model services and metadata loaders to assemble complete entities.
@@ -532,8 +545,9 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 // GenerateRelationsFromOrbitalReferences converts DataModel orbital reference metadata into executable model.Relation entries.
 //
 // Purpose:
-//   Inspects fields with IsOrbitalReference = true and synthesizes foreign-key Relation entries
-//   linking source columns to target model primary keys or target attributes.
+//
+//	Inspects fields with IsOrbitalReference = true and synthesizes foreign-key Relation entries
+//	linking source columns to target model primary keys or target attributes.
 //
 // Where it is used:
 //   - Called by BuildModel when converting database field definitions into complete models.
@@ -619,13 +633,14 @@ func GenerateRelationsFromOrbitalReferences(fields []*DataModel, resolveTargetPK
 		}
 
 		relations = append(relations, Relation{
-			Name:        relName,
-			Type:        RelManyToOne,
-			TargetModel: targetModel,
-			TargetKey:   targetCol,
-			ForeignKey:  col,
-			OnDelete:    onDelete,
-			OnUpdate:    onUpdate,
+			Name:             relName,
+			Type:             RelManyToOne,
+			TargetModel:      targetModel,
+			TargetKey:        targetCol,
+			ForeignKey:       col,
+			LoadWithChildren: f.LoadWithChildren,
+			OnDelete:         onDelete,
+			OnUpdate:         onUpdate,
 		})
 	}
 

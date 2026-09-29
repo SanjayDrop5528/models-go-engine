@@ -3,15 +3,17 @@
 //
 // File: model_service.go
 // Usage:
-//   This file implements the ModelService, orchestrating CRUD and lifecycle state transitions
-//   for entity models, model configurations (ModelConfig), data field specifications (DataModel),
-//   and compiled active execution models. It enforces validation rules on drafts and provides
-//   the Reinit engine to rebuild runtime models from stored metadata.
+//
+//	This file implements the ModelService, orchestrating CRUD and lifecycle state transitions
+//	for entity models, model configurations (ModelConfig), data field specifications (DataModel),
+//	and compiled active execution models. It enforces validation rules on drafts and provides
+//	the Reinit engine to rebuild runtime models from stored metadata.
 package service
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/SanjayDrop5528/models-go-engine/mapping"
 	"github.com/SanjayDrop5528/models-go-engine/model"
@@ -27,7 +29,8 @@ type ModelService struct {
 // NewModelService creates a new ModelService.
 //
 // Purpose:
-//   Initializes a ModelService wired to the central ModelRegistry.
+//
+//	Initializes a ModelService wired to the central ModelRegistry.
 //
 // Where it is used:
 //   - Instantiated in API server bootstrapping and engine initialization.
@@ -43,7 +46,8 @@ func NewModelService(reg *registry.ModelRegistry) *ModelService {
 // CreateDraft registers a new model definition draft.
 //
 // Purpose:
-//   Validates and saves a new model draft, generating a UUID if not provided.
+//
+//	Validates and saves a new model draft, generating a UUID if not provided.
 //
 // Where it is used:
 //   - Called by model designer APIs when drafting new entities.
@@ -63,7 +67,8 @@ func (s *ModelService) CreateDraft(ctx context.Context, m *model.Model) (*model.
 // UpdateDraft updates an existing model draft.
 //
 // Purpose:
-//   Validates and updates an existing draft entity model.
+//
+//	Validates and updates an existing draft entity model.
 //
 // Where it is used:
 //   - Called by model editor APIs during draft modifications.
@@ -81,7 +86,8 @@ func (s *ModelService) UpdateDraft(ctx context.Context, id string, m *model.Mode
 // GetDraft retrieves a model definition draft or active version.
 //
 // Purpose:
-//   Retrieves the latest draft or falls back to active version if no draft exists.
+//
+//	Retrieves the latest draft or falls back to active version if no draft exists.
 //
 // Where it is used:
 //   - Called by model designer and schema inspection endpoints.
@@ -95,7 +101,8 @@ func (s *ModelService) GetDraft(ctx context.Context, id string) (*model.Model, e
 // GetActive retrieves the active published model definition.
 //
 // Purpose:
-//   Looks up the currently active, published version of an entity model.
+//
+//	Looks up the currently active, published version of an entity model.
 //
 // Where it is used:
 //   - Called by execution engines, CRUD services, and validation pipelines.
@@ -103,13 +110,88 @@ func (s *ModelService) GetDraft(ctx context.Context, id string) (*model.Model, e
 // When can it be used:
 //   - When resolving model metadata for live database operations.
 func (s *ModelService) GetActive(ctx context.Context, id string) (*model.Model, error) {
-	return s.registry.GetActive(id)
+	active, err := s.registry.GetActive(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.withInverseRelations(active), nil
+}
+
+func (s *ModelService) withInverseRelations(parent *model.Model) *model.Model {
+	if parent == nil {
+		return nil
+	}
+	existing := make(map[string]bool, len(parent.Relations))
+	for _, relation := range parent.Relations {
+		existing[strings.ToLower(relation.Name)] = true
+	}
+	for _, child := range s.registry.List() {
+		if child == nil || child.ID == parent.ID || child.Status != model.StatusActive {
+			continue
+		}
+		matchingReferences := 0
+		for _, candidate := range child.Relations {
+			if (candidate.Type == model.RelManyToOne || candidate.Type == model.RelOneToOne) && matchesModelTarget(candidate.TargetModel, parent) {
+				matchingReferences++
+			}
+		}
+		for _, forward := range child.Relations {
+			if forward.Type != model.RelManyToOne && forward.Type != model.RelOneToOne {
+				continue
+			}
+			if !matchesModelTarget(forward.TargetModel, parent) {
+				continue
+			}
+			name := pluralModelName(child.Name)
+			if matchingReferences > 1 {
+				name = strings.TrimSpace(forward.Name) + name
+			}
+			if existing[strings.ToLower(name)] {
+				continue
+			}
+			parent.Relations = append(parent.Relations, model.Relation{
+				Name:             name,
+				Type:             model.RelOneToMany,
+				TargetModel:      child.ID,
+				ForeignKey:       forward.ForeignKey,
+				TargetKey:        forward.TargetKey,
+				LoadWithChildren: forward.LoadWithChildren,
+			})
+			existing[strings.ToLower(name)] = true
+		}
+	}
+	return parent
+}
+
+func matchesModelTarget(target string, m *model.Model) bool {
+	for _, candidate := range []string{m.ID, m.Name, m.StorageName, m.Table} {
+		if candidate != "" && strings.EqualFold(strings.TrimSpace(target), strings.TrimSpace(candidate)) {
+			return true
+		}
+	}
+	return false
+}
+
+func pluralModelName(name string) string {
+	name = strings.ReplaceAll(strings.TrimSpace(name), " ", "")
+	if name == "" {
+		return "Relations"
+	}
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, "y") && len(name) > 1 && !strings.ContainsRune("aeiou", rune(lower[len(lower)-2])) {
+		return name[:len(name)-1] + "ies"
+	}
+	if strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "x") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh") {
+		return name + "es"
+	}
+	return name + "s"
 }
 
 // List returns all registered models.
 //
 // Purpose:
-//   Retrieves a slice of all registered models across drafts and active entities.
+//
+//	Retrieves a slice of all registered models across drafts and active entities.
 //
 // Where it is used:
 //   - Called by admin and navigation catalog endpoints.
@@ -123,7 +205,8 @@ func (s *ModelService) List(ctx context.Context) []*model.Model {
 // Delete removes a model metadata definition.
 //
 // Purpose:
-//   Evicts a model definition from the registry.
+//
+//	Evicts a model definition from the registry.
 //
 // Where it is used:
 //   - Called by model deletion endpoints.
@@ -137,7 +220,8 @@ func (s *ModelService) Delete(ctx context.Context, id string) error {
 // CreateModelConfig registers a new model_config.
 //
 // Purpose:
-//   Validates and saves a new model configuration entity to the registry.
+//
+//	Validates and saves a new model configuration entity to the registry.
 //
 // Where it is used:
 //   - Called by model administration APIs when introducing a new model entity.
@@ -157,7 +241,8 @@ func (s *ModelService) CreateModelConfig(ctx context.Context, cfg *model.ModelCo
 // GetModelConfig retrieves a model_config by ID or name.
 //
 // Purpose:
-//   Looks up a model configuration by its unique UUID or name.
+//
+//	Looks up a model configuration by its unique UUID or name.
 //
 // Where it is used:
 //   - Called by schema inspector and model configuration endpoints.
@@ -171,7 +256,8 @@ func (s *ModelService) GetModelConfig(ctx context.Context, idOrName string) (*mo
 // ListModelConfigs returns all model_configs.
 //
 // Purpose:
-//   Retrieves all configured model entities.
+//
+//	Retrieves all configured model entities.
 //
 // Where it is used:
 //   - Called by management consoles and Reinit routines.
@@ -185,7 +271,8 @@ func (s *ModelService) ListModelConfigs(ctx context.Context) []*model.ModelConfi
 // UpdateModelConfig updates an existing model_config.
 //
 // Purpose:
-//   Validates and updates configuration settings on an existing model.
+//
+//	Validates and updates configuration settings on an existing model.
 //
 // Where it is used:
 //   - Called by model configuration editors.
@@ -203,7 +290,8 @@ func (s *ModelService) UpdateModelConfig(ctx context.Context, id string, cfg *mo
 // AddDataModel registers a field definition for a model.
 //
 // Purpose:
-//   Validates and stores a new column/field definition, ensuring custom types reference valid models.
+//
+//	Validates and stores a new column/field definition, ensuring custom types reference valid models.
 //
 // Where it is used:
 //   - Called by column editor APIs when adding attributes to a model.
@@ -228,7 +316,8 @@ func (s *ModelService) AddDataModel(ctx context.Context, dm *model.DataModel) (*
 // GetDataModel retrieves a field definition by model ID and field ID.
 //
 // Purpose:
-//   Looks up a specific attribute by its parent model ID and field ID.
+//
+//	Looks up a specific attribute by its parent model ID and field ID.
 //
 // Where it is used:
 //   - Called when inspecting or editing a specific field.
@@ -242,7 +331,8 @@ func (s *ModelService) GetDataModel(ctx context.Context, modelID, fieldID string
 // ListDataModels returns all field definitions for a model.
 //
 // Purpose:
-//   Retrieves all configured columns for a given model.
+//
+//	Retrieves all configured columns for a given model.
 //
 // Where it is used:
 //   - Called during Reinit compilation and UI schema exploration.
@@ -256,7 +346,8 @@ func (s *ModelService) ListDataModels(ctx context.Context, modelID string) []*mo
 // DeleteDataModel removes a field definition from a model.
 //
 // Purpose:
-//   Deletes an attribute definition from the registry.
+//
+//	Deletes an attribute definition from the registry.
 //
 // Where it is used:
 //   - Called when deleting an attribute or dropping a column from an entity.
@@ -270,8 +361,9 @@ func (s *ModelService) DeleteDataModel(ctx context.Context, modelID, fieldID str
 // Reinit rebuilds and compiles all models from ModelConfig and DataModel definitions.
 //
 // Purpose:
-//   Compiles persistent ModelConfig and DataModel metadata into executable Model instances,
-//   validating models and promoting active entities into the active registry cache.
+//
+//	Compiles persistent ModelConfig and DataModel metadata into executable Model instances,
+//	validating models and promoting active entities into the active registry cache.
 //
 // Where it is used:
 //   - Called during server startup, metadata synchronization, and schema reloading.
@@ -309,5 +401,3 @@ func (s *ModelService) Reinit(ctx context.Context, modelIDs ...string) ([]string
 	}
 	return reinitialized, nil
 }
-
-

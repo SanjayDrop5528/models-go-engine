@@ -197,6 +197,64 @@ func TestEngineHydratesManyToManyRelation(t *testing.T) {
 	}
 }
 
+func TestEngineHydratesInverseHasOneRelation(t *testing.T) {
+	ctx := context.Background()
+	registry := adapter.NewRegistry()
+	store := adapter.NewMockAdapter()
+	registry.Register("mock", store)
+
+	insurance := &model.Model{
+		ID: "insurance", Name: "Insurance", StorageName: "insurances", Database: "mock",
+		PrimaryKey: &model.PrimaryKey{Columns: []string{"id"}},
+	}
+	vehicle := &model.Model{
+		ID: "vehicle", Name: "Vehicle", StorageName: "vehicles", Database: "mock",
+		PrimaryKey: &model.PrimaryKey{Columns: []string{"id"}},
+		Relations: []model.Relation{{
+			Name: "insurance", Type: model.RelOneToOne, TargetModel: "insurance",
+			ForeignKey: "vehicle_id", TargetKey: "id", Inverse: true, LoadWithChildren: true,
+		}},
+	}
+
+	_, _ = store.Create(ctx, vehicle.Ref(), map[string]any{"id": "vehicle-1", "name": "Truck"})
+	_, _ = store.Create(ctx, insurance.Ref(), map[string]any{"id": "insurance-1", "vehicle_id": "vehicle-1", "policy": "P-1"})
+
+	engine := NewEngine(registry)
+	engine.SetModelResolver(testModelResolver{"insurance": insurance})
+	rows, _, err := engine.Find(ctx, vehicle, query.New().Column("name"))
+	if err != nil {
+		t.Fatalf("Find failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one vehicle, got %d", len(rows))
+	}
+	if _, leaked := rows[0]["id"]; leaked {
+		t.Fatal("inverse hydration key leaked through the requested projection")
+	}
+	got, ok := rows[0]["insurance"].(map[string]any)
+	if !ok || got["policy"] != "P-1" {
+		t.Fatalf("expected inverse has-one object, got %T %+v", rows[0]["insurance"], rows[0]["insurance"])
+	}
+}
+
+func TestFindOneWithQueryDoesNotDiscardFilters(t *testing.T) {
+	ctx := context.Background()
+	registry := adapter.NewRegistry()
+	store := adapter.NewMockAdapter()
+	registry.Register("mock", store)
+	item := &model.Model{
+		ID: "item", Name: "Item", StorageName: "items", Database: "mock",
+		PrimaryKey: &model.PrimaryKey{Columns: []string{"id"}},
+	}
+	_, _ = store.Create(ctx, item.Ref(), map[string]any{"id": "one", "deleted": true})
+
+	engine := NewEngine(registry)
+	_, err := engine.FindOneWithQuery(ctx, item, "one", query.New().Where("deleted", query.OpEq, false))
+	if err == nil {
+		t.Fatal("FindOneWithQuery discarded its caller-supplied filter")
+	}
+}
+
 func TestAutomaticRelationDebugLogging(t *testing.T) {
 	previousWriter := log.Writer()
 	previousFlags := log.Flags()

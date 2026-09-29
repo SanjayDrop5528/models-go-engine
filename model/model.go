@@ -142,6 +142,7 @@ type Relation struct {
 	TargetModel       string       `json:"target_model"`
 	ForeignKey        string       `json:"foreign_key"`
 	TargetKey         string       `json:"target_key"`
+	Inverse           bool         `json:"inverse,omitempty"`
 	LoadWithChildren  bool         `json:"load_with_children,omitempty"`
 	JunctionModel     string       `json:"junction_model,omitempty"`
 	JunctionSourceKey string       `json:"junction_source_key,omitempty"`

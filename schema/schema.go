@@ -47,6 +47,7 @@ type SchemaRelation struct {
 	Column            string             `json:"column"`
 	ForeignTable      string             `json:"foreign_table"`
 	ForeignColumn     string             `json:"foreign_column"`
+	Inverse           bool               `json:"inverse,omitempty"`
 	LoadWithChildren  bool               `json:"load_with_children,omitempty"`
 	JunctionModel     string             `json:"junction_model,omitempty"`
 	JunctionSourceKey string             `json:"junction_source_key,omitempty"`
@@ -183,6 +184,7 @@ func FromModel(m *model.Model) *Schema {
 			Column:            rel.ForeignKey,
 			ForeignTable:      rel.TargetModel,
 			ForeignColumn:     rel.TargetKey,
+			Inverse:           rel.Inverse,
 			LoadWithChildren:  rel.LoadWithChildren,
 			JunctionModel:     rel.JunctionModel,
 			JunctionSourceKey: rel.JunctionSourceKey,

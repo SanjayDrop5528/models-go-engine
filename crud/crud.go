@@ -196,7 +196,8 @@ func (e *Engine) FindOneWithQuery(ctx context.Context, m *model.Model, id any, q
 	if q.Debug {
 		log.Printf("[Query Debug][%s][Engine] phase=dispatch operation=FindOne model=%s table=%s primary_key=%s id=%v relations=%v relation_specs=%v fields=%v", q.DebugTraceID, m.ID, ref.StorageName, ref.PrimaryKey, q.DebugValue(id, 1), q.Relations, q.DebugRelationSpecs(q.RelationSpecs), q.Fields)
 	}
-	if !q.Debug && len(q.Relations) == 0 && len(q.RelationSpecs) == 0 && len(q.Fields) == 0 && len(q.ExcludedColumns) == 0 {
+	if !q.Debug && len(q.Relations) == 0 && len(q.RelationSpecs) == 0 && len(q.Fields) == 0 && len(q.ExcludedColumns) == 0 &&
+		len(q.Filters) == 0 && len(q.RawWheres) == 0 && len(q.WhereGroups) == 0 && len(q.Joins) == 0 {
 		return adp.FindOne(ctx, ref, id)
 	}
 	if queryAdapter, ok := adp.(findOneQueryAdapter); ok {
@@ -310,7 +311,7 @@ func withHydrationFields(q query.Query, m *model.Model) (query.Query, []string) 
 			continue
 		}
 		key := relation.ForeignKey
-		if relation.Type == model.RelOneToMany || (relation.Type == model.RelManyToMany && key == "") {
+		if relation.Inverse || relation.Type == model.RelOneToMany || (relation.Type == model.RelManyToMany && key == "") {
 			key = relation.TargetKey
 		}
 		if key == "" {
@@ -352,11 +353,12 @@ func removeHydrationFields(rows []map[string]any, fields []string) {
 
 func withoutEngineHydratedRelations(q query.Query, m *model.Model, adp adapter.Adapter) query.Query {
 	remove := make(map[string]bool)
+	forceEngineHydration, _ := m.Metadata["engine_hydrate_relations"].(bool)
 	for _, relation := range m.Relations {
 		// PostgreSQL keeps its optimized native object-join path. Declared
 		// collection relations use the shared hydrator because generated inverse
 		// aliases and M:N junction metadata live on model.Relation.
-		if !strings.EqualFold(adp.Name(), "postgres") || relation.Type == model.RelOneToMany || relation.Type == model.RelManyToMany {
+		if forceEngineHydration || !strings.EqualFold(adp.Name(), "postgres") || relation.Type == model.RelOneToMany || relation.Type == model.RelManyToMany {
 			remove[strings.ToLower(relation.Name)] = true
 		}
 	}
@@ -474,13 +476,19 @@ func hydrateDeclaredRelations(ctx context.Context, adp adapter.Adapter, resolver
 
 			switch relation.Type {
 			case model.RelOneToOne, model.RelManyToOne:
-				value := row[relation.ForeignKey]
+				parentField := relation.ForeignKey
+				childField := targetKey
+				if relation.Inverse {
+					parentField = targetKey
+					childField = relation.ForeignKey
+				}
+				value := row[parentField]
 				if value == nil {
 					row[relation.Name] = nil
 					hydratedRows++
 					continue
 				}
-				childQuery = childQuery.Where(targetKey, query.OpEq, value).LimitOffset(1, 0)
+				childQuery = childQuery.Where(childField, query.OpEq, value).LimitOffset(1, 0)
 				children, _, err := adp.Find(ctx, targetRef, childQuery)
 				if err != nil {
 					return fmt.Errorf("loading object relation '%s': %w", relation.Name, err)

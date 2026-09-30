@@ -3,17 +3,18 @@
 //
 // File: engine.go
 // Usage:
-//   Provides the central Engine struct which coordinates model configuration, schema diffs, previews,
-//   migrations, orbital relationship validation, and data queries for a database adapter.
+//
+//	Provides the central Engine struct which coordinates model configuration, schema diffs, previews,
+//	migrations, orbital relationship validation, and data queries for a database adapter.
 package project
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
 	"github.com/SanjayDrop5528/models-go-engine/ai"
+	"github.com/SanjayDrop5528/models-go-engine/dataset/compiler"
 	datasetrepo "github.com/SanjayDrop5528/models-go-engine/dataset/repository"
 	datasetres "github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
 	datasetsvc "github.com/SanjayDrop5528/models-go-engine/dataset/service"
@@ -28,6 +29,7 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/schema"
 	"github.com/SanjayDrop5528/models-go-engine/service"
 	"github.com/SanjayDrop5528/models-go-engine/validation"
+	"log"
 	"strings"
 	"sync"
 )
@@ -49,7 +51,8 @@ type Engine struct {
 // NewEngine creates a new base Engine for a Project.
 //
 // Purpose:
-//   Instantiates the unified project engine with its dataset repo, function registry, model registry, and AI service.
+//
+//	Instantiates the unified project engine with its dataset repo, function registry, model registry, and AI service.
 //
 // Where it is used:
 //   - Initialized in New and NewProject in project/core.go.
@@ -57,11 +60,18 @@ type Engine struct {
 // When can it be used:
 //   - Call when instantiating a project workspace engine.
 func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
+	reg := registry.NewModelRegistry()
 	dsRepo := datasetrepo.NewAdapterDataSetRepository(adp)
 	fnReg := datasetres.NewFunctionRegistry()
-	modelResolver := datasetres.NewModelResolver(nil)
+	modelResolver := datasetres.NewModelResolver(reg)
 	dsSvc := datasetsvc.NewDataSetService(dsRepo, modelResolver, modelResolver, fnReg, adp)
-	reg := registry.NewModelRegistry()
+	if provider, ok := adp.(interface {
+		DataSetCompiler() compiler.DataSetCompiler
+	}); ok {
+		if dataSetCompiler := provider.DataSetCompiler(); dataSetCompiler != nil {
+			dsSvc.RegisterCompiler(adp.Name(), dataSetCompiler)
+		}
+	}
 	aiSvc := ai.NewAIService(nil, reg, dsSvc)
 
 	return &Engine{
@@ -79,7 +89,8 @@ func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 // GetAIService returns the AI query planner service.
 //
 // Purpose:
-//   Provides access to natural language dataset generation and conversational context.
+//
+//	Provides access to natural language dataset generation and conversational context.
 //
 // Where it is used:
 //   - Used by AI endpoints and query assistance tools.
@@ -93,7 +104,8 @@ func (e *Engine) GetAIService() *ai.AIService {
 // GenerateDataSetFromPrompt translates natural language to an executable DataSet with persistent conversation memory.
 //
 // Purpose:
-//   Transforms user natural language requests into structured dataset definitions using the AI service.
+//
+//	Transforms user natural language requests into structured dataset definitions using the AI service.
 //
 // Where it is used:
 //   - Called by AI assistant endpoints and conversational studio UI.
@@ -113,7 +125,8 @@ func (e *Engine) GenerateDataSetFromPrompt(ctx context.Context, req *ai.Generate
 // GetActiveAIConversationID returns the current active conversation ID tracked inside the engine.
 //
 // Purpose:
-//   Tracks the conversational session ID for AI interaction memory.
+//
+//	Tracks the conversational session ID for AI interaction memory.
 //
 // Where it is used:
 //   - Called by conversational endpoints to preserve chat threads.
@@ -130,7 +143,8 @@ func (e *Engine) GetActiveAIConversationID() string {
 // ResetAIConversation clears the conversation memory tracked inside the engine.
 //
 // Purpose:
-//   Clears the active conversation context in the AI planner.
+//
+//	Clears the active conversation context in the AI planner.
 //
 // Where it is used:
 //   - Called when resetting or starting a new conversational AI session.
@@ -146,7 +160,8 @@ func (e *Engine) ResetAIConversation() {
 // GetDataSetService returns the dataset engine service instance.
 //
 // Purpose:
-//   Provides access to the dataset compiler, planner, and executor.
+//
+//	Provides access to the dataset compiler, planner, and executor.
 //
 // Where it is used:
 //   - Used by dataset API routes and pipeline runners.
@@ -160,7 +175,8 @@ func (e *Engine) GetDataSetService() *datasetsvc.DataSetService {
 // GetDataSetRepository returns the dataset repository.
 //
 // Purpose:
-//   Provides access to the persistence store for dataset definitions.
+//
+//	Provides access to the persistence store for dataset definitions.
 //
 // Where it is used:
 //   - Used during dataset loading and serialization.
@@ -174,7 +190,8 @@ func (e *Engine) GetDataSetRepository() datasetrepo.DataSetRepository {
 // GetFunctionRegistry returns the function registry for datasets.
 //
 // Purpose:
-//   Provides lookup and registration of custom functions and aggregations for datasets.
+//
+//	Provides lookup and registration of custom functions and aggregations for datasets.
 //
 // Where it is used:
 //   - Used by dataset compilers and custom function resolvers.
@@ -188,7 +205,8 @@ func (e *Engine) GetFunctionRegistry() *datasetres.InMemFunctionRegistry {
 // GetProject returns the parent Project metadata.
 //
 // Purpose:
-//   Accesses project metadata and adapter configuration.
+//
+//	Accesses project metadata and adapter configuration.
 //
 // Where it is used:
 //   - Used by admin handlers and project context queries.
@@ -202,7 +220,8 @@ func (e *Engine) GetProject() *Project {
 // GetAdapter returns the configured database adapter.
 //
 // Purpose:
-//   Exposes the underlying Adapter instance bound to this engine.
+//
+//	Exposes the underlying Adapter instance bound to this engine.
 //
 // Where it is used:
 //   - Used by services requiring direct adapter access.
@@ -216,7 +235,8 @@ func (e *Engine) GetAdapter() adapter.Adapter {
 // GetDatabaseName returns the target database name of the connected adapter.
 //
 // Purpose:
-//   Retrieves the active database or keyspace name from the adapter.
+//
+//	Retrieves the active database or keyspace name from the adapter.
 //
 // Where it is used:
 //   - Used in logging, connection diagnostic endpoints, and schema references.
@@ -233,7 +253,8 @@ func (e *Engine) GetDatabaseName() string {
 // NativeClient returns the underlying native database handle (*sql.DB, *mongo.Client, etc.).
 //
 // Purpose:
-//   Provides escape-hatch access to the raw driver connection handle.
+//
+//	Provides escape-hatch access to the raw driver connection handle.
 //
 // Where it is used:
 //   - Used by advanced applications needing direct raw SQL / Mongo driver operations.
@@ -250,7 +271,8 @@ func (e *Engine) NativeClient() any {
 // GetNativeClient returns the underlying native database handle (*sql.DB, *mongo.Client, etc.).
 //
 // Purpose:
-//   Aliases NativeClient for convenience.
+//
+//	Aliases NativeClient for convenience.
 //
 // Where it is used:
 //   - Used in server handlers and test suites.
@@ -264,7 +286,8 @@ func (e *Engine) GetNativeClient() any {
 // GetRegistry returns the underlying model registry.
 //
 // Purpose:
-//   Provides direct access to the model and operation registry.
+//
+//	Provides direct access to the model and operation registry.
 //
 // Where it is used:
 //   - Used by test suites, API controllers, and schema services.
@@ -278,7 +301,8 @@ func (e *Engine) GetRegistry() *registry.ModelRegistry {
 // EnsureMetadataTables ensures system metadata tables ('model_configs' and 'data_models') exist in the adapter.
 //
 // Purpose:
-//   Initializes persistent tables used to store project models in the database.
+//
+//	Initializes persistent tables used to store project models in the database.
 //
 // Where it is used:
 //   - Called during project bootstrap and initialization.
@@ -295,7 +319,8 @@ func (e *Engine) EnsureMetadataTables(ctx context.Context) error {
 // ImportLiveMetadata delegates live database schema introspection to the adapter and populates registry and metadata tables.
 //
 // Purpose:
-//   Introspects the target database to extract tables and columns, generating ModelConfigs and DataModels in the registry.
+//
+//	Introspects the target database to extract tables and columns, generating ModelConfigs and DataModels in the registry.
 //
 // Where it is used:
 //   - Called by POST /api/project/import-live endpoints and project setup wizards.
@@ -387,7 +412,8 @@ func (e *Engine) ImportLiveMetadata(ctx context.Context) (map[string]any, error)
 // CreateModelConfig validates and stores a new ModelConfig.
 //
 // Purpose:
-//   Registers a new model configuration, persists it to the metadata table, and compiles a draft model.
+//
+//	Registers a new model configuration, persists it to the metadata table, and compiles a draft model.
 //
 // Where it is used:
 //   - Called by POST /api/models endpoints and model definition creators.
@@ -430,7 +456,8 @@ func (e *Engine) CreateModelConfig(ctx context.Context, cfg *model.ModelConfig) 
 // UpdateModelConfig updates an existing ModelConfig.
 //
 // Purpose:
-//   Updates model configuration metadata and recompiles the draft model.
+//
+//	Updates model configuration metadata and recompiles the draft model.
 //
 // Where it is used:
 //   - Called by PUT /api/models/:model endpoints.
@@ -465,7 +492,8 @@ func (e *Engine) UpdateModelConfig(ctx context.Context, id string, cfg *model.Mo
 // GetModelConfig retrieves a ModelConfig by ID or Name.
 //
 // Purpose:
-//   Looks up model configuration by identifier or name.
+//
+//	Looks up model configuration by identifier or name.
 //
 // Where it is used:
 //   - Called by GET /api/models/:model endpoints.
@@ -479,7 +507,8 @@ func (e *Engine) GetModelConfig(ctx context.Context, idOrName string) (*model.Mo
 // ListModelConfigs returns all ModelConfigs in the project.
 //
 // Purpose:
-//   Retrieves all model configurations, prioritizing database metadata tables with in-memory fallback.
+//
+//	Retrieves all model configurations, prioritizing database metadata tables with in-memory fallback.
 //
 // Where it is used:
 //   - Called by GET /api/models list endpoints.
@@ -517,7 +546,6 @@ func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 	return all
 }
 
-
 // =========================================================================
 // 2. DataModel Field Management & Custom Type Checks
 // =========================================================================
@@ -525,7 +553,8 @@ func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 // AddDataModel validates and adds a field definition to a model.
 //
 // Purpose:
-//   Validates attribute types and constraints, verifies custom types, persists to storage, and rebuilds draft model.
+//
+//	Validates attribute types and constraints, verifies custom types, persists to storage, and rebuilds draft model.
 //
 // Where it is used:
 //   - Called by POST /api/models/:model/fields endpoints and schema builders.
@@ -581,7 +610,8 @@ func (e *Engine) AddDataModel(ctx context.Context, dm *model.DataModel) (*model.
 // CreateDataModel validates and adds a field definition to a model (alias for AddDataModel).
 //
 // Purpose:
-//   Aliases AddDataModel for API compatibility.
+//
+//	Aliases AddDataModel for API compatibility.
 //
 // Where it is used:
 //   - Used by field creation handlers.
@@ -595,7 +625,8 @@ func (e *Engine) CreateDataModel(ctx context.Context, dm *model.DataModel) (*mod
 // GetDataModel retrieves a data_model field definition.
 //
 // Purpose:
-//   Looks up field attribute metadata by model ID and field ID.
+//
+//	Looks up field attribute metadata by model ID and field ID.
 //
 // Where it is used:
 //   - Called by GET /api/models/:model/fields/:field endpoints.
@@ -609,7 +640,8 @@ func (e *Engine) GetDataModel(ctx context.Context, modelID, fieldID string) (*mo
 // ListDataModels returns all field definitions for a model.
 //
 // Purpose:
-//   Retrieves all column and field definitions belonging to a model.
+//
+//	Retrieves all column and field definitions belonging to a model.
 //
 // Where it is used:
 //   - Called by GET /api/models/:model/fields endpoints.
@@ -623,7 +655,8 @@ func (e *Engine) ListDataModels(ctx context.Context, modelID string) []*model.Da
 // DeleteDataModel removes a field definition from a model.
 //
 // Purpose:
-//   Deletes a column from the registry, deletes from metadata tables, and updates draft models.
+//
+//	Deletes a column from the registry, deletes from metadata tables, and updates draft models.
 //
 // Where it is used:
 //   - Called by DELETE /api/models/:model/fields/:field endpoints.
@@ -662,7 +695,8 @@ func (e *Engine) DeleteDataModel(ctx context.Context, modelID, fieldID string) e
 // DeleteModelConfig removes a model_config and its compiled model from registry.
 //
 // Purpose:
-//   Removes a model definition from database metadata tables and in-memory catalogs.
+//
+//	Removes a model definition from database metadata tables and in-memory catalogs.
 //
 // Where it is used:
 //   - Called by DELETE /api/models/:model endpoints.
@@ -680,7 +714,8 @@ func (e *Engine) DeleteModelConfig(ctx context.Context, idOrName string) error {
 // reconstructs the in-memory models, and activates them.
 //
 // Purpose:
-//   Loads persisted model definitions from the database metadata tables upon engine restart.
+//
+//	Loads persisted model definitions from the database metadata tables upon engine restart.
 //
 // Where it is used:
 //   - Called during New and NewProject startup.
@@ -765,7 +800,8 @@ func (e *Engine) RestoreFromDB(ctx context.Context) error {
 // GetSchema returns the live database schema for the model.
 //
 // Purpose:
-//   Introspects the target storage table or collection using the connected adapter.
+//
+//	Introspects the target storage table or collection using the connected adapter.
 //
 // Where it is used:
 //   - Called by GET /api/schema/:model/current endpoints.
@@ -783,7 +819,8 @@ func (e *Engine) GetSchema(ctx context.Context, modelID string) (*schema.Schema,
 // GetDiff computes the diff between live database schema and target model definition.
 //
 // Purpose:
-//   Compares current live schema against the draft model definition to identify additions, modifications, and drops.
+//
+//	Compares current live schema against the draft model definition to identify additions, modifications, and drops.
 //
 // Where it is used:
 //   - Called by GET /api/schema/:model/diff endpoints.
@@ -808,7 +845,8 @@ func (e *Engine) GetDiff(ctx context.Context, modelID string, hints diff.DiffHin
 // PreviewSchema computes the migration diff and generates SQL/DDL preview statements.
 //
 // Purpose:
-//   Produces adapter-specific native SQL or commands showing the exact statements that would be executed.
+//
+//	Produces adapter-specific native SQL or commands showing the exact statements that would be executed.
 //
 // Where it is used:
 //   - Called by POST /api/schema/:model/preview endpoints.
@@ -833,7 +871,8 @@ func (e *Engine) PreviewSchema(ctx context.Context, modelID string, hints diff.D
 // ApplySchema executes the complete safe migration flow against the project's adapter.
 //
 // Purpose:
-//   Executes safe diff-based migration: validates safety, applies adapter DDL, verifies schema post-apply, and promotes model to active.
+//
+//	Executes safe diff-based migration: validates safety, applies adapter DDL, verifies schema post-apply, and promotes model to active.
 //
 // Where it is used:
 //   - Called by POST /api/schema/:model/apply endpoints and deployment pipelines.
@@ -916,7 +955,8 @@ func (e *Engine) ApplySchema(ctx context.Context, modelID string, req service.Ap
 // SyncSchema introspects the database and synchronizes the local model definition.
 //
 // Purpose:
-//   Synchronizes the engine's model definition attributes and primary keys with the live database structure.
+//
+//	Synchronizes the engine's model definition attributes and primary keys with the live database structure.
 //
 // Where it is used:
 //   - Called by POST /api/schema/:model/sync endpoints.
@@ -969,7 +1009,8 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 // Create validates, verifies orbital references, coerces, and inserts a record.
 //
 // Purpose:
-//   Executes record creation: validates model constraints, verifies foreign/orbital links, sanitizes data, and delegates to adapter.
+//
+//	Executes record creation: validates model constraints, verifies foreign/orbital links, sanitizes data, and delegates to adapter.
 //
 // Where it is used:
 //   - Called by POST /api/data/:model endpoints.
@@ -977,7 +1018,7 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 // When can it be used:
 //   - Call when inserting new records into a managed table or collection.
 func (e *Engine) Create(ctx context.Context, modelID string, data map[string]any) (map[string]any, error) {
-	m, err := e.getOrBuildDraftModel(modelID)
+	m, err := e.getActiveModel(modelID)
 	if err != nil {
 		return nil, err
 	}
@@ -1019,7 +1060,8 @@ func (e *Engine) Create(ctx context.Context, modelID string, data map[string]any
 // Find executes a query against the adapter.
 //
 // Purpose:
-//   Executes filtered, sorted, and paginated searches through the connected database adapter.
+//
+//	Executes filtered, sorted, and paginated searches through the connected database adapter.
 //
 // Where it is used:
 //   - Called by GET /api/data/:model and query search endpoints.
@@ -1027,7 +1069,7 @@ func (e *Engine) Create(ctx context.Context, modelID string, data map[string]any
 // When can it be used:
 //   - Call when retrieving records matching filter conditions.
 func (e *Engine) Find(ctx context.Context, modelID string, q query.Query) ([]map[string]any, int64, error) {
-	m, err := e.getOrBuildDraftModel(modelID)
+	m, err := e.getActiveModel(modelID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1037,7 +1079,8 @@ func (e *Engine) Find(ctx context.Context, modelID string, q query.Query) ([]map
 // FindOne gets a record by primary key identifier.
 //
 // Purpose:
-//   Fetches an individual entity by its primary key.
+//
+//	Fetches an individual entity by its primary key.
 //
 // Where it is used:
 //   - Called by GET /api/data/:model/:id endpoints.
@@ -1045,7 +1088,7 @@ func (e *Engine) Find(ctx context.Context, modelID string, q query.Query) ([]map
 // When can it be used:
 //   - Call when retrieving a specific single record by ID.
 func (e *Engine) FindOne(ctx context.Context, modelID string, id any) (map[string]any, error) {
-	m, err := e.getOrBuildDraftModel(modelID)
+	m, err := e.getActiveModel(modelID)
 	if err != nil {
 		return nil, err
 	}
@@ -1055,7 +1098,8 @@ func (e *Engine) FindOne(ctx context.Context, modelID string, id any) (map[strin
 // Update updates fields in an existing record by payload keys.
 //
 // Purpose:
-//   Verifies record existence, validates partial inputs and orbital links, and updates record via adapter.
+//
+//	Verifies record existence, validates partial inputs and orbital links, and updates record via adapter.
 //
 // Where it is used:
 //   - Called by PUT /api/data/:model/:id endpoints.
@@ -1063,7 +1107,7 @@ func (e *Engine) FindOne(ctx context.Context, modelID string, id any) (map[strin
 // When can it be used:
 //   - Call when updating attributes of an existing record.
 func (e *Engine) Update(ctx context.Context, modelID string, id any, data map[string]any) (map[string]any, error) {
-	m, err := e.getOrBuildDraftModel(modelID)
+	m, err := e.getActiveModel(modelID)
 	if err != nil {
 		return nil, err
 	}
@@ -1114,7 +1158,8 @@ func (e *Engine) Update(ctx context.Context, modelID string, id any, data map[st
 // Patch partially updates fields in an existing record by payload keys.
 //
 // Purpose:
-//   Aliases Update for partial modification semantics.
+//
+//	Aliases Update for partial modification semantics.
 //
 // Where it is used:
 //   - Called by PATCH /api/data/:model/:id endpoints.
@@ -1128,7 +1173,8 @@ func (e *Engine) Patch(ctx context.Context, modelID string, id any, data map[str
 // Delete removes a record by primary key identifier.
 //
 // Purpose:
-//   Dispatches record deletion by ID to the adapter.
+//
+//	Dispatches record deletion by ID to the adapter.
 //
 // Where it is used:
 //   - Called by DELETE /api/data/:model/:id endpoints.
@@ -1136,17 +1182,33 @@ func (e *Engine) Patch(ctx context.Context, modelID string, id any, data map[str
 // When can it be used:
 //   - Call when removing a record from the database.
 func (e *Engine) Delete(ctx context.Context, modelID string, id any) error {
-	m, err := e.getOrBuildDraftModel(modelID)
+	m, err := e.getActiveModel(modelID)
 	if err != nil {
 		return err
 	}
 	return e.adapter.Delete(ctx, m.Ref(), id)
 }
 
+// getActiveModel is the mandatory data-operation gate. Draft models are used
+// by schema design and preview operations, but cannot be queried or mutated.
+func (e *Engine) getActiveModel(modelID string) (*model.Model, error) {
+	if m, err := e.registry.GetActive(modelID); err == nil && m != nil {
+		return m, nil
+	}
+	// Programmatically loaded models may already carry active status before the
+	// registry's active pointer is populated. They are still explicit engine
+	// models, unlike an unknown table discovered by database introspection.
+	if m, err := e.registry.GetDraft(modelID); err == nil && m != nil && m.Status == model.StatusActive {
+		return m, nil
+	}
+	return nil, fmt.Errorf("active engine model %q is not registered", modelID)
+}
+
 // GetOrBuildDraftModel retrieves or compiles an execution Model for the given ID.
 //
 // Purpose:
-//   Retrieves an existing model from the registry or synthesizes one from ModelConfig and DataModel field definitions.
+//
+//	Retrieves an existing model from the registry or synthesizes one from ModelConfig and DataModel field definitions.
 //
 // Where it is used:
 //   - Used internally by CRUD and schema operations, and by callers needing the compiled Model representation.
@@ -1160,7 +1222,8 @@ func (e *Engine) GetOrBuildDraftModel(modelID string) (*model.Model, error) {
 // ValidateOrbitalReferences checks orbital reference constraints against the live database adapter.
 //
 // Purpose:
-//   Public entrypoint to verify that all foreign keys and orbital links point to existing and active target entities.
+//
+//	Public entrypoint to verify that all foreign keys and orbital links point to existing and active target entities.
 //
 // Where it is used:
 //   - Called by validation controllers and external services before writing data.
@@ -1174,7 +1237,8 @@ func (e *Engine) ValidateOrbitalReferences(ctx context.Context, modelID string, 
 // getOrBuildDraftModel is the internal implementation for compiling models from metadata.
 //
 // Purpose:
-//   Resolves draft model from registry or compiles from ModelConfig + DataModels.
+//
+//	Resolves draft model from registry or compiles from ModelConfig + DataModels.
 //
 // Where it is used:
 //   - Used internally across CRUD and schema methods in Engine.
@@ -1186,11 +1250,19 @@ func (e *Engine) getOrBuildDraftModel(modelID string) (*model.Model, error) {
 	if m, err := e.registry.GetDraft(modelID); err == nil && m != nil {
 		return m, nil
 	}
+	if m, err := e.registry.GetActive(modelID); err == nil && m != nil {
+		return m, nil
+	}
 
 	// Try building from ModelConfig + DataModel
 	cfg, err := e.registry.GetModelConfig(modelID)
 	if err != nil {
-		return nil, fmt.Errorf("model '%s' not found in registry", modelID)
+		_ = e.RestoreFromDB(context.Background())
+		cfg, err = e.registry.GetModelConfig(modelID)
+	}
+
+	if err != nil || cfg == nil {
+		return nil, fmt.Errorf("model %q is not configured in the engine", modelID)
 	}
 
 	fields := e.registry.ListDataModels(cfg.ID)
@@ -1205,7 +1277,8 @@ func (e *Engine) getOrBuildDraftModel(modelID string) (*model.Model, error) {
 // validateOrbitalReferences verifies that foreign keys/orbital references satisfy constraints.
 //
 // Purpose:
-//   Queries target database tables to ensure referenced parent records exist and are in ACTIVE status.
+//
+//	Queries target database tables to ensure referenced parent records exist and are in ACTIVE status.
 //
 // Where it is used:
 //   - Called during Create and Update operations.
@@ -1347,7 +1420,8 @@ func (e *Engine) validateOrbitalReferences(ctx context.Context, modelID string, 
 // RegisterOperation stores metadata for an operation (function, procedure, command, etc.).
 //
 // Purpose:
-//   Saves an OperationConfig describing procedure or custom command parameters into the registry.
+//
+//	Saves an OperationConfig describing procedure or custom command parameters into the registry.
 //
 // Where it is used:
 //   - Called by POST /api/operations endpoints and initialization scripts.
@@ -1370,7 +1444,8 @@ func (e *Engine) RegisterOperation(ctx context.Context, op *operation.OperationC
 // GetOperation retrieves an operation metadata definition.
 //
 // Purpose:
-//   Looks up a registered operation by its name or ID.
+//
+//	Looks up a registered operation by its name or ID.
 //
 // Where it is used:
 //   - Called by GET /api/operations/:name endpoints.
@@ -1384,7 +1459,8 @@ func (e *Engine) GetOperation(ctx context.Context, nameOrID string) (*operation.
 // ListOperations returns all registered operations.
 //
 // Purpose:
-//   Lists all registered stored procedures, functions, and commands.
+//
+//	Lists all registered stored procedures, functions, and commands.
 //
 // Where it is used:
 //   - Called by GET /api/operations endpoints.
@@ -1398,7 +1474,8 @@ func (e *Engine) ListOperations(ctx context.Context) []*operation.OperationConfi
 // ExecuteOperation validates parameters and executes an operation through the adapter.
 //
 // Purpose:
-//   Coerces passed parameters according to operation metadata and dispatches execution to the adapter.
+//
+//	Coerces passed parameters according to operation metadata and dispatches execution to the adapter.
 //
 // Where it is used:
 //   - Called by POST /api/operations/:name/execute endpoints.
@@ -1462,7 +1539,8 @@ func (e *Engine) ExecuteOperation(ctx context.Context, nameOrID string, args map
 // Transaction executes a function within an atomic transaction with automatic rollback on error.
 //
 // Purpose:
-//   Wraps database operations in a transaction, committing on success or rolling back upon error/panic.
+//
+//	Wraps database operations in a transaction, committing on success or rolling back upon error/panic.
 //
 // Where it is used:
 //   - Called in multi-step workflows requiring ACID transactional atomicity.
@@ -1492,4 +1570,3 @@ func (e *Engine) Transaction(ctx context.Context, fn func(tx adapter.Transaction
 	}
 	return nil
 }
-

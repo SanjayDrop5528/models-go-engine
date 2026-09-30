@@ -201,9 +201,9 @@ func setupEnterpriseMultiSchemaEngine(t *testing.T) (*project.Engine, map[string
 	}
 
 	for _, m := range models {
-		_, err := engine.GetRegistry().SaveDraft(m)
+		_, err := engine.GetRegistry().SetActive(m.ID, m)
 		if err != nil {
-			t.Fatalf("failed to save draft model '%s': %v", m.ID, err)
+			t.Fatalf("failed to activate model '%s': %v", m.ID, err)
 		}
 	}
 
@@ -380,17 +380,17 @@ func TestEnterpriseMultiSchemaDomain_ValidationMatrix(t *testing.T) {
 	// 11. Date & Datetime invalid
 	t.Run("Date format invalid", func(t *testing.T) {
 		badDate := map[string]any{
-			"employee_code":   "EMP-000001",
-			"organization_id": "550e8400-e29b-41d4-a716-446655440000",
-			"department_id":   "550e8400-e29b-41d4-a716-446655440001",
-			"first_name":      "Sanjay",
-			"last_name":       "Kumar",
-			"email":           "sanjay@example.com",
-			"joining_date":    "28/08/2026", // Expected YYYY-MM-DD
-			"employment_type": "full_time",
+			"employee_code":    "EMP-000001",
+			"organization_id":  "550e8400-e29b-41d4-a716-446655440000",
+			"department_id":    "550e8400-e29b-41d4-a716-446655440001",
+			"first_name":       "Sanjay",
+			"last_name":        "Kumar",
+			"email":            "sanjay@example.com",
+			"joining_date":     "28/08/2026", // Expected YYYY-MM-DD
+			"employment_type":  "full_time",
 			"experience_years": 5.0,
-			"is_active":       true,
-			"created_at":      "2026-08-28T10:30:00Z",
+			"is_active":        true,
+			"created_at":       "2026-08-28T10:30:00Z",
 		}
 		err := validation.ValidateData(empModel, badDate)
 		if err == nil || !strings.Contains(err.Error(), "YYYY-MM-DD") {
@@ -401,18 +401,18 @@ func TestEnterpriseMultiSchemaDomain_ValidationMatrix(t *testing.T) {
 	// 12. Array item wrong length/type
 	t.Run("Array item rule violation", func(t *testing.T) {
 		badSkills := map[string]any{
-			"employee_code":   "EMP-000001",
-			"organization_id": "550e8400-e29b-41d4-a716-446655440000",
-			"department_id":   "550e8400-e29b-41d4-a716-446655440001",
-			"first_name":      "Sanjay",
-			"last_name":       "Kumar",
-			"email":           "sanjay@example.com",
-			"joining_date":    "2026-08-01",
-			"employment_type": "full_time",
+			"employee_code":    "EMP-000001",
+			"organization_id":  "550e8400-e29b-41d4-a716-446655440000",
+			"department_id":    "550e8400-e29b-41d4-a716-446655440001",
+			"first_name":       "Sanjay",
+			"last_name":        "Kumar",
+			"email":            "sanjay@example.com",
+			"joining_date":     "2026-08-01",
+			"employment_type":  "full_time",
 			"experience_years": 5.0,
-			"is_active":       true,
-			"skills":          []any{"G", "ValidGoSkill"}, // "G" is less than min_length 2
-			"created_at":      "2026-08-28T10:30:00Z",
+			"is_active":        true,
+			"skills":           []any{"G", "ValidGoSkill"}, // "G" is less than min_length 2
+			"created_at":       "2026-08-28T10:30:00Z",
 		}
 		err := validation.ValidateData(empModel, badSkills)
 		if err == nil || !strings.Contains(err.Error(), "min") {

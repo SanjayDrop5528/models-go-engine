@@ -3,8 +3,9 @@
 //
 // File: base.go
 // Usage:
-//   Defines base query structs, DB wrapper, CTE (WithQuery), index hints, order/limit/offset
-//   tracking, and WHERE clause builders shared across RDBMS query compilers.
+//
+//	Defines base query structs, DB wrapper, CTE (WithQuery), index hints, order/limit/offset
+//	tracking, and WHERE clause builders shared across RDBMS query compilers.
 package query
 
 import (
@@ -12,6 +13,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/dialect"
@@ -42,6 +44,12 @@ type Query interface {
 	AppendQuery(gen schema.QueryGen, b []byte) ([]byte, error)
 }
 
+// InValues expands a slice as a comma-separated SQL value list for IN (?).
+type InValues struct{ Values any }
+
+// In marks a slice for expansion by the relational query generator.
+func In(values any) InValues { return InValues{Values: values} }
+
 // QueryBuilder wraps a query in a fluent conditional builder.
 type QueryBuilder interface {
 	Where(query string, args ...any) QueryBuilder
@@ -63,7 +71,8 @@ type DB struct {
 // NewDB creates a new DB wrapper instance.
 //
 // Purpose:
-//   Initializes a DB query execution wrapper combining sql.DB and dialect formatting.
+//
+//	Initializes a DB query execution wrapper combining sql.DB and dialect formatting.
 //
 // Where it is used:
 //   - In rdbms.NewDB and relational adapter constructors.
@@ -84,7 +93,8 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 // Dialect returns the associated dialect.
 //
 // Purpose:
-//   Returns the active SQL dialect.
+//
+//	Returns the active SQL dialect.
 //
 // Where it is used:
 //   - In query compilation to inspect formatting rules.
@@ -98,7 +108,8 @@ func (db *DB) Dialect() dialect.Dialect {
 // QueryGen returns the query generator.
 //
 // Purpose:
-//   Provides the schema.QueryGen serializer for the database.
+//
+//	Provides the schema.QueryGen serializer for the database.
 //
 // Where it is used:
 //   - In SelectQuery when formatting query fragments.
@@ -112,7 +123,8 @@ func (db *DB) QueryGen() schema.QueryGen {
 // DB returns the underlying *sql.DB handle.
 //
 // Purpose:
-//   Exposes the raw database/sql connection pool handle.
+//
+//	Exposes the raw database/sql connection pool handle.
 //
 // Where it is used:
 //   - In connection execution routines.
@@ -126,7 +138,8 @@ func (db *DB) DB() *sql.DB {
 // NewSelect initializes a new SelectQuery on this DB.
 //
 // Purpose:
-//   Constructs a fresh SelectQuery builder bound to this database handle.
+//
+//	Constructs a fresh SelectQuery builder bound to this database handle.
 //
 // Where it is used:
 //   - In query callers constructing select operations.
@@ -135,6 +148,75 @@ func (db *DB) DB() *sql.DB {
 //   - When building a SELECT statement fluently.
 func (db *DB) NewSelect() *SelectQuery {
 	return NewSelectQuery(db)
+}
+
+// ExecContext executes a statement through the adapter-owned connection.
+func (db *DB) ExecContext(ctx context.Context, statement string, args ...any) (sql.Result, error) {
+	if db == nil || db.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	return db.db.ExecContext(ctx, statement, args...)
+}
+
+// QueryContext executes a query through the adapter-owned connection.
+func (db *DB) QueryContext(ctx context.Context, statement string, args ...any) (*sql.Rows, error) {
+	if db == nil || db.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	return db.db.QueryContext(ctx, statement, args...)
+}
+
+// QueryRowContext executes a single-row query through the adapter-owned connection.
+func (db *DB) QueryRowContext(ctx context.Context, statement string, args ...any) *sql.Row {
+	return db.db.QueryRowContext(ctx, statement, args...)
+}
+
+// PingContext verifies the adapter-owned connection.
+func (db *DB) PingContext(ctx context.Context) error {
+	if db == nil || db.db == nil {
+		return sql.ErrConnDone
+	}
+	return db.db.PingContext(ctx)
+}
+
+// NewRaw creates a parameterized raw query attached to this engine handle.
+func (db *DB) NewRaw(statement string, args ...any) *RawQuery {
+	return &RawQuery{conn: db.db, statement: statement, args: args}
+}
+
+// Table resolves the relational table name for a Go model type.
+func (db *DB) Table(modelType reflect.Type) *TableInfo {
+	return &TableInfo{SQLName: inferTable(modelType, "")}
+}
+
+// NewCreateTable starts a schema creation query owned by the engine.
+func (db *DB) NewCreateTable() *CreateTableQuery {
+	return &CreateTableQuery{conn: db.db}
+}
+
+// BeginTx starts a transaction while keeping query construction in the engine.
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	if db == nil || db.db == nil {
+		return nil, sql.ErrConnDone
+	}
+	tx, err := db.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{db: db, tx: tx}, nil
+}
+
+// RunInTx executes fn atomically and rolls back whenever fn returns an error.
+func (db *DB) RunInTx(ctx context.Context, opts *sql.TxOptions, fn func(context.Context, *Tx) error) error {
+	tx, err := db.BeginTx(ctx, opts)
+	if err != nil {
+		return err
+	}
+	if err := fn(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func (db *DB) makeQueryBytes() []byte {
@@ -155,7 +237,8 @@ type defaultQueryGen struct {
 // Dialect returns the generator's dialect.
 //
 // Purpose:
-//   Returns the bound SQL dialect for identifier and parameter formatting.
+//
+//	Returns the bound SQL dialect for identifier and parameter formatting.
 //
 // Where it is used:
 //   - In schema.QueryWithArgs formatting.
@@ -169,7 +252,8 @@ func (g *defaultQueryGen) Dialect() dialect.Dialect {
 // IsNop returns whether the generator is a no-op formatter.
 //
 // Purpose:
-//   Reports false since defaultQueryGen performs active query formatting.
+//
+//	Reports false since defaultQueryGen performs active query formatting.
 //
 // Where it is used:
 //   - In schema.QueryGen callers checking for formatting bypass.
@@ -183,7 +267,8 @@ func (g *defaultQueryGen) IsNop() bool {
 // AppendQuery formats a query string replacing ? placeholders with dialect parameters.
 //
 // Purpose:
-//   Replaces standard ? placeholders with dialect-specific syntax ($1 or ?) and inlines values where appropriate.
+//
+//	Replaces standard ? placeholders with dialect-specific syntax ($1 or ?) and inlines values where appropriate.
 //
 // Where it is used:
 //   - In query builders serializing parameterized SQL fragments.
@@ -219,7 +304,8 @@ func (g *defaultQueryGen) AppendQuery(b []byte, query string, args ...any) ([]by
 // appendValue formats and appends an argument literal into the buffer according to type.
 //
 // Purpose:
-//   Converts an argument value (nil, string, int, float, bool) into SQL literal syntax.
+//
+//	Converts an argument value (nil, string, int, float, bool) into SQL literal syntax.
 //
 // Where it is used:
 //   - In defaultQueryGen.AppendQuery when inlining argument values.
@@ -228,6 +314,18 @@ func (g *defaultQueryGen) AppendQuery(b []byte, query string, args ...any) ([]by
 //   - When serializing literal parameter values.
 func (g *defaultQueryGen) appendValue(b []byte, val any) []byte {
 	switch v := val.(type) {
+	case InValues:
+		value := reflect.ValueOf(v.Values)
+		if !value.IsValid() || (value.Kind() != reflect.Slice && value.Kind() != reflect.Array) || value.Len() == 0 {
+			return append(b, "NULL"...)
+		}
+		for i := 0; i < value.Len(); i++ {
+			if i > 0 {
+				b = append(b, ", "...)
+			}
+			b = g.appendValue(b, value.Index(i).Interface())
+		}
+		return b
 	case nil:
 		return append(b, "NULL"...)
 	case string:
@@ -256,7 +354,8 @@ type WithQuery struct {
 // NewWithQuery creates a new CTE WithQuery instance.
 //
 // Purpose:
-//   Initializes a Common Table Expression with a name and underlying query.
+//
+//	Initializes a Common Table Expression with a name and underlying query.
 //
 // Where it is used:
 //   - In SelectQuery.With.
@@ -273,7 +372,8 @@ func NewWithQuery(name string, query Query) *WithQuery {
 // Recursive marks the CTE as recursive.
 //
 // Purpose:
-//   Flags the CTE for WITH RECURSIVE rendering.
+//
+//	Flags the CTE for WITH RECURSIVE rendering.
 //
 // Where it is used:
 //   - In hierarchical or recursive graph queries.
@@ -288,7 +388,8 @@ func (w *WithQuery) Recursive() *WithQuery {
 // AppendQuery renders the CTE expression into the SQL buffer.
 //
 // Purpose:
-//   Renders "name AS (SELECT ...)" into the SQL buffer.
+//
+//	Renders "name AS (SELECT ...)" into the SQL buffer.
 //
 // Where it is used:
 //   - In SelectQuery.AppendQuery when serializing WITH clauses.

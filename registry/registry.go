@@ -2,18 +2,20 @@
 //
 // File: registry.go
 // Usage:
-//   Provides the thread-safe ModelRegistry which stores and coordinates model lifecycles
-//   (draft -> applying -> active), column definitions, and operations.
+//
+//	Provides the thread-safe ModelRegistry which stores and coordinates model lifecycles
+//	(draft -> applying -> active), column definitions, and operations.
 package registry
 
 import (
 	"errors"
 	"fmt"
-	"github.com/SanjayDrop5528/models-go-engine/model"
-	"github.com/SanjayDrop5528/models-go-engine/operation"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/SanjayDrop5528/models-go-engine/model"
+	"github.com/SanjayDrop5528/models-go-engine/operation"
 )
 
 // ModelRegistry provides thread-safe in-memory storage for active and draft model metadata definitions.
@@ -30,7 +32,8 @@ type ModelRegistry struct {
 // NewModelRegistry creates a new ModelRegistry.
 //
 // Purpose:
-//   Instantiates the thread-safe in-memory model and operation catalog.
+//
+//	Instantiates the thread-safe in-memory model and operation catalog.
 //
 // Where it is used:
 //   - Initialized during server bootstrap and used across services and adapters.
@@ -51,7 +54,8 @@ func NewModelRegistry() *ModelRegistry {
 // SaveOperationConfig stores an operation definition.
 //
 // Purpose:
-//   Persists or updates custom procedure, function, or command configuration in the registry.
+//
+//	Persists or updates custom procedure, function, or command configuration in the registry.
 //
 // Where it is used:
 //   - Called by operation registration APIs and project initializers.
@@ -82,7 +86,8 @@ func (r *ModelRegistry) SaveOperationConfig(op *operation.OperationConfig) (*ope
 // GetOperationConfig retrieves an operation definition by name or ID.
 //
 // Purpose:
-//   Looks up a registered procedure, function, or command configuration.
+//
+//	Looks up a registered procedure, function, or command configuration.
 //
 // Where it is used:
 //   - Called by execution handlers and function resolvers.
@@ -104,7 +109,8 @@ func (r *ModelRegistry) GetOperationConfig(nameOrID string) (*operation.Operatio
 // ListOperationConfigs returns all registered operation definitions.
 //
 // Purpose:
-//   Lists all registered procedures, functions, and commands in the system.
+//
+//	Lists all registered procedures, functions, and commands in the system.
 //
 // Where it is used:
 //   - Called by GET /api/operations endpoints and documentation generators.
@@ -131,7 +137,8 @@ func (r *ModelRegistry) ListOperationConfigs() []*operation.OperationConfig {
 // SaveModelConfig saves or updates a model_config.
 //
 // Purpose:
-//   Stores high-level model metadata (refName, database, description, version).
+//
+//	Stores high-level model metadata (refName, database, description, version).
 //
 // Where it is used:
 //   - Called by project management services and schema designers.
@@ -172,7 +179,8 @@ func (r *ModelRegistry) SaveModelConfig(cfg *model.ModelConfig) (*model.ModelCon
 // GetModelConfig retrieves a model_config by ID or Name.
 //
 // Purpose:
-//   Finds model configuration by identifier, name, or refName.
+//
+//	Finds model configuration by identifier, name, or refName.
 //
 // Where it is used:
 //   - Called by API controllers and project synchronization services.
@@ -195,7 +203,8 @@ func (r *ModelRegistry) GetModelConfig(idOrName string) (*model.ModelConfig, err
 // ListModelConfigs returns all stored model_configs.
 //
 // Purpose:
-//   Retrieves a slice of all registered model_config objects.
+//
+//	Retrieves a slice of all registered model_config objects.
 //
 // Where it is used:
 //   - Called by GET /api/models endpoints.
@@ -217,7 +226,8 @@ func (r *ModelRegistry) ListModelConfigs() []*model.ModelConfig {
 // SaveDataModel saves or updates a data_model field definition.
 //
 // Purpose:
-//   Stores field-level attribute metadata (type, length, precision, scale, constraints).
+//
+//	Stores field-level attribute metadata (type, length, precision, scale, constraints).
 //
 // Where it is used:
 //   - Called when configuring or modifying model attributes.
@@ -277,7 +287,8 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 // GetDataModel retrieves a data_model field definition by model ID and field ID (or column_name/json_field).
 //
 // Purpose:
-//   Looks up field metadata within a model scope.
+//
+//	Looks up field metadata within a model scope.
 //
 // Where it is used:
 //   - Called by field inspection endpoints and validators.
@@ -308,7 +319,8 @@ func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel,
 // ListDataModels returns all data_model fields for a model.
 //
 // Purpose:
-//   Returns all column and field definitions for a specified model.
+//
+//	Returns all column and field definitions for a specified model.
 //
 // Where it is used:
 //   - Called by GET /api/models/:model/fields endpoints.
@@ -334,7 +346,8 @@ func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 // DeleteDataModel removes a data_model field definition by ID or column_name.
 //
 // Purpose:
-//   Deletes a column or field definition from a model.
+//
+//	Deletes a column or field definition from a model.
 //
 // Where it is used:
 //   - Called by DELETE /api/models/:model/fields/:field endpoints.
@@ -363,7 +376,8 @@ func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 // SaveDraft saves or updates a model draft in DRAFT state.
 //
 // Purpose:
-//   Stores an unapplied model definition in draft state pending schema migration.
+//
+//	Stores an unapplied model definition in draft state pending schema migration.
 //
 // Where it is used:
 //   - Called when editing models in UI or creating new models.
@@ -400,7 +414,8 @@ func (r *ModelRegistry) SaveDraft(m *model.Model) (*model.Model, error) {
 // GetDraft returns the draft version of a model.
 //
 // Purpose:
-//   Retrieves the pending draft definition of a model (falling back to active if no draft exists).
+//
+//	Retrieves the pending draft definition of a model (falling back to active if no draft exists).
 //
 // Where it is used:
 //   - Called by SchemaService during diffing, previewing, and applying.
@@ -427,7 +442,8 @@ func (r *ModelRegistry) GetDraft(idOrName string) (*model.Model, error) {
 // GetActive returns the active, published version of a model.
 //
 // Purpose:
-//   Retrieves the currently live, verified model definition.
+//
+//	Retrieves the currently live, verified model definition.
 //
 // Where it is used:
 //   - Called by CRUD operations, query planners, and dataset resolvers.
@@ -449,7 +465,8 @@ func (r *ModelRegistry) GetActive(idOrName string) (*model.Model, error) {
 // SetStatus updates the status of a draft/active model.
 //
 // Purpose:
-//   Mutates the lifecycle status (DRAFT, APPLYING, ACTIVE, FAILED, DEGRADED) of a model.
+//
+//	Mutates the lifecycle status (DRAFT, APPLYING, ACTIVE, FAILED, DEGRADED) of a model.
 //
 // Where it is used:
 //   - Called by SchemaService during migration workflows.
@@ -475,7 +492,8 @@ func (r *ModelRegistry) SetStatus(idOrName string, status model.ModelStatus) err
 // SetActive promotes a draft model to ACTIVE status upon successful database migration.
 //
 // Purpose:
-//   Promotes a verified draft to active status, bumps version counter, and deletes the draft entry.
+//
+//	Promotes a verified draft to active status, bumps version counter, and deletes the draft entry.
 //
 // Where it is used:
 //   - Called by SchemaService.Apply upon migration success.
@@ -512,7 +530,8 @@ func (r *ModelRegistry) SetActive(idOrName string, m *model.Model) (*model.Model
 // List returns all models (preferring active, or draft if active does not exist).
 //
 // Purpose:
-//   Lists all registered models in the registry.
+//
+//	Lists all registered models in the registry.
 //
 // Where it is used:
 //   - Called by GET /api/models endpoints and validation engines.
@@ -543,7 +562,8 @@ func (r *ModelRegistry) List() []*model.Model {
 // Delete removes a model and its draft/active instances from registry.
 //
 // Purpose:
-//   Removes a model, its drafts, model_config, data_models, and alias entries from the registry.
+//
+//	Removes a model, its drafts, model_config, data_models, and alias entries from the registry.
 //
 // Where it is used:
 //   - Called by DELETE /api/models/:model endpoints.
@@ -567,7 +587,8 @@ func (r *ModelRegistry) Delete(idOrName string) error {
 // resolveID resolves an identifier or name into a canonical model ID.
 //
 // Purpose:
-//   Performs case-insensitive lookup across aliases, table names, and refNames.
+//
+//	Performs case-insensitive lookup across aliases, table names, and refNames.
 //
 // Where it is used:
 //   - Used internally by GetDraft, GetActive, SetActive, Delete, etc.
@@ -606,7 +627,8 @@ func (r *ModelRegistry) resolveID(idOrName string) string {
 // cloneModel creates a deep clone of a Model to ensure immutability outside mutex blocks.
 //
 // Purpose:
-//   Safely duplicates attributes, indexes, relations, and metadata maps.
+//
+//	Safely duplicates attributes, indexes, relations, and metadata maps.
 //
 // Where it is used:
 //   - Used internally by SaveDraft, GetDraft, GetActive, SetActive, and List.

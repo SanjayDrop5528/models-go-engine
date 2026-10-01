@@ -12,6 +12,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
+	"sync"
+
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
 	"github.com/SanjayDrop5528/models-go-engine/ai"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/compiler"
@@ -29,9 +33,6 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/schema"
 	"github.com/SanjayDrop5528/models-go-engine/service"
 	"github.com/SanjayDrop5528/models-go-engine/validation"
-	"log"
-	"strings"
-	"sync"
 )
 
 // Engine is the base project engine orchestrating model metadata, schema lifecycle,
@@ -504,6 +505,61 @@ func (e *Engine) GetModelConfig(ctx context.Context, idOrName string) (*model.Mo
 	return e.registry.GetModelConfig(idOrName)
 }
 
+// LoadModelOnDemand loads only one model's metadata from the adapter. It is
+// intentionally different from RestoreFromDB: request-time model resolution
+// must not hydrate every model for a tenant.
+func (e *Engine) LoadModelOnDemand(ctx context.Context, idOrName string) (*model.Model, error) {
+	if e.adapter == nil {
+		return nil, fmt.Errorf("model %q cannot be loaded without a database adapter", idOrName)
+	}
+	cfg, err := e.registry.GetModelConfig(idOrName)
+	if err != nil {
+		ref := model.ModelRef{StorageName: "model_configs", Name: "model_configs"}
+		rows, _, findErr := e.adapter.Find(ctx, ref, query.NewQuery().Where("(id = ? OR lower(name) = lower(?) OR lower(table) = lower(?) OR lower(schema) || '.' || lower(table) = lower(?))", idOrName, idOrName, idOrName, idOrName).LimitOffset(1, 0))
+		if findErr != nil || len(rows) == 0 {
+			return nil, fmt.Errorf("model %q is not configured in the tenant database", idOrName)
+		}
+		cfg, err = mapToModelConfig(rows[0])
+		if err != nil || cfg == nil {
+			return nil, fmt.Errorf("load model config %q: %w", idOrName, err)
+		}
+		_, _ = e.registry.SaveModelConfig(cfg)
+	}
+
+	fields := e.registry.ListDataModels(cfg.ID)
+	if len(fields) == 0 {
+		ref := model.ModelRef{StorageName: "data_models", Name: "data_models"}
+		rows, _, findErr := e.adapter.Find(ctx, ref, query.NewQuery().Where("model_id = ?", cfg.ID).LimitOffset(10000, 0))
+		if findErr != nil {
+			return nil, fmt.Errorf("load attributes for model %q: %w", idOrName, findErr)
+		}
+		for _, row := range rows {
+			field, mapErr := mapToDataModel(row)
+			if mapErr == nil && field != nil {
+				_, _ = e.registry.SaveDataModel(field)
+			}
+		}
+		fields = e.registry.ListDataModels(cfg.ID)
+	}
+
+	dbName := ""
+	if e.project != nil {
+		dbName = e.project.AdapterConfig.Database
+	}
+	built := model.BuildModel(cfg, fields, dbName, model.StorageRelational)
+	if built == nil {
+		return nil, fmt.Errorf("build model %q from tenant metadata failed", idOrName)
+	}
+	_, err = e.registry.SaveDraft(built)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Status == model.ModelConfigStatusActive {
+		_, err = e.registry.SetActive(cfg.ID, built)
+	}
+	return built, err
+}
+
 // ListModelConfigs returns all ModelConfigs in the project.
 //
 // Purpose:
@@ -739,19 +795,15 @@ func (e *Engine) RestoreFromDB(ctx context.Context) error {
 		dbName = e.adapter.Name()
 	}
 
-	log.Printf("[RestoreFromDB] Restoring models from database adapter '%s' (Database: '%s')...", e.adapter.Name(), dbName)
-
 	// 1. Fetch model_configs directly from database
 	mcRef := model.ModelRef{StorageName: "model_configs", Name: "model_configs"}
 	mcRows, _, err := e.adapter.Find(ctx, mcRef, query.NewQuery().LimitOffset(10000, 0))
-	if err != nil {
-		log.Printf("[RestoreFromDB] ⚠ Could not fetch 'model_configs' table from database '%s': %v", dbName, err)
-		return err
-	}
-	if len(mcRows) == 0 {
-		log.Printf("[RestoreFromDB] Info: 'model_configs' table in database '%s' is empty. No stored models to restore.", dbName)
+	if err != nil || len(mcRows) == 0 {
+		// If models do not exist, do not load or log anything
 		return nil
 	}
+
+	log.Printf("[RestoreFromDB] Restoring models from database adapter '%s' (Database: '%s')...", e.adapter.Name(), dbName)
 
 	var configs []*model.ModelConfig
 	for _, row := range mcRows {

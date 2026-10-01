@@ -2,18 +2,20 @@
 //
 // File: core.go
 // Usage:
-//   Defines Project and AdapterConfig domain structures and entrypoints (New, NewWithModels, NewProject)
-//   for bootstrapping dedicated engine instances wired to specific database adapters.
+//
+//	Defines Project and AdapterConfig domain structures and entrypoints (New, NewWithModels, NewProject)
+//	for bootstrapping dedicated engine instances wired to specific database adapters.
 package project
 
 import (
 	"context"
 	"errors"
-	"github.com/SanjayDrop5528/models-go-engine/adapter"
-	"github.com/SanjayDrop5528/models-go-engine/model"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/SanjayDrop5528/models-go-engine/adapter"
+	"github.com/SanjayDrop5528/models-go-engine/model"
 )
 
 // QueryContextConfig holds query execution parameters and context behavior.
@@ -61,7 +63,8 @@ type ProjectConfig struct {
 // New creates an Engine directly from a database adapter with zero configuration needed.
 //
 // Purpose:
-//   Quick-starts an engine workspace wired to a database adapter with default settings.
+//
+//	Quick-starts an engine workspace wired to a database adapter with default settings.
 //
 // Where it is used:
 //   - Used in standalone scripts, lightweight microservices, and integration tests.
@@ -87,7 +90,8 @@ func New(adp adapter.Adapter) *Engine {
 // NewWithModels creates an Engine loaded with initial ModelConfigs and DataModels.
 //
 // Purpose:
-//   Bootstraps an engine workspace and pre-loads model configurations and field definitions.
+//
+//	Bootstraps an engine workspace and pre-loads model configurations and field definitions.
 //
 // Where it is used:
 //   - Used when launching services from declarative configuration or seed files.
@@ -106,7 +110,8 @@ func NewWithModels(adp adapter.Adapter, configs []*model.ModelConfig, dataModels
 // and initializes the project's dedicated Engine.
 //
 // Purpose:
-//   Constructs a scoped Project entity, resolving environment variables and attaching an Engine instance.
+//
+//	Constructs a scoped Project entity, resolving environment variables and attaching an Engine instance.
 //
 // Where it is used:
 //   - Called by project management APIs and multi-tenant project initializers.

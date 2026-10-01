@@ -98,6 +98,7 @@ type Attribute struct {
 	Unique        bool            `json:"unique"`
 	IsPrimaryKey  bool            `json:"is_primary_key,omitempty"`
 	AutoIncrement bool            `json:"auto_increment"`
+	IsEncrypted   bool            `json:"is_encrypted,omitempty"`
 	Comment       string          `json:"comment,omitempty"`
 	Validation    *RuleSet        `json:"validation,omitempty"`
 	Reference     *OrbitalRefSpec `json:"reference,omitempty"`
@@ -343,6 +344,7 @@ type DataModel struct {
 	ID                         string                `json:"id"`                       // Field ID
 	ModelID                    string                `json:"model_id"`                 // model_config reference (FK)
 	ColumnName                 string                `json:"column_name"`              // Actual DB column/field
+	IsEncrypted                bool                  `json:"is_encrypted"`             // Value is encrypted at rest
 	JSONField                  string                `json:"json_field"`               // API/JSON property
 	RefName                    string                `json:"ref_name,omitempty"`       // Reference display name
 	Description                string                `json:"description,omitempty"`    // Description
@@ -454,6 +456,7 @@ func (dm *DataModel) ToAttribute() Attribute {
 		Default:      dm.DefaultValue,
 		Unique:       dm.IsUnique,
 		IsPrimaryKey: dm.IsPrimaryKey,
+		IsEncrypted:  dm.IsEncrypted,
 		Comment:      dm.Description,
 		Validation:   ruleSet,
 		Reference:    ref,
@@ -492,9 +495,20 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 
 	attrs := make([]Attribute, 0, len(fields))
 	var pkCols []string
+	var encryptedColumns []string
 	for _, f := range fields {
 		if f != nil && (f.Status == "" || f.Status == DataModelStatusActive) {
-			attrs = append(attrs, f.ToAttribute())
+			attribute := f.ToAttribute()
+			attrs = append(attrs, attribute)
+			if f.IsEncrypted {
+				column := f.ColumnName
+				if column == "" {
+					column = f.JSONField
+				}
+				if column != "" {
+					encryptedColumns = append(encryptedColumns, column)
+				}
+			}
 			if f.IsPrimaryKey {
 				pkName := f.ColumnName
 				if pkName == "" {
@@ -524,6 +538,10 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 		}
 	}
 
+	metadata := map[string]any{}
+	if len(encryptedColumns) > 0 {
+		metadata["encrypted_columns"] = encryptedColumns
+	}
 	return &Model{
 		ID:          cfg.ID,
 		Schema:      cfg.Schema,
@@ -538,6 +556,7 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 		Attributes:  attrs,
 		PrimaryKey:  pk,
 		Relations:   relations,
+		Metadata:    metadata,
 		CreatedAt:   cfg.CreatedAt,
 		UpdatedAt:   cfg.UpdatedAt,
 	}

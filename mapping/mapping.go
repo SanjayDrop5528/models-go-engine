@@ -2,8 +2,9 @@
 //
 // File: mapping.go
 // Usage:
-//   Provides type coercion and validation functions (CoerceValue, SanitizeInput, SanitizePartialInput)
-//   to ensure database payloads adhere to model schemas across inserts, updates, and reads.
+//
+//	Provides type coercion and validation functions (CoerceValue, SanitizeInput, SanitizePartialInput)
+//	to ensure database payloads adhere to model schemas across inserts, updates, and reads.
 package mapping
 
 import (
@@ -19,7 +20,8 @@ import (
 // GenerateUUID generates a compact 32-character hex RFC 4122 version 4 UUID string without hyphens.
 //
 // Purpose:
-//   Creates a cryptographically secure random UUID string for record primary keys.
+//
+//	Creates a cryptographically secure random UUID string for record primary keys.
 //
 // Where it is used:
 //   - Used by SanitizeInput for models requiring generated IDs, and by test suites.
@@ -42,7 +44,8 @@ func GenerateUUID() string {
 // CoerceValue safely converts an arbitrary input value (e.g. from JSON payload) to the target model DataType.
 //
 // Purpose:
-//   Transforms raw payload representations (strings, numbers, maps) into their strongly typed target model types.
+//
+//	Transforms raw payload representations (strings, numbers, maps) into their strongly typed target model types.
 //
 // Where it is used:
 //   - Called by SanitizeInput, SanitizePartialInput, query filters, and dataset compilers.
@@ -199,7 +202,8 @@ func CoerceValue(val any, targetType model.DataType) (any, error) {
 // isSequenceOrAuto checks if an attribute uses auto-increment, serial sequences, or identity generation.
 //
 // Purpose:
-//   Prevents overwriting database-managed auto-incrementing identity keys with synthetic UUIDs.
+//
+//	Prevents overwriting database-managed auto-incrementing identity keys with synthetic UUIDs.
 //
 // Where it is used:
 //   - Used internally by SanitizeInput when checking primary key defaults.
@@ -228,7 +232,8 @@ func isSequenceOrAuto(attr *model.Attribute) bool {
 // SanitizeInput validates and coerces incoming record payload according to Model attribute definitions.
 //
 // Purpose:
-//   Validates required fields, applies defaults, generates missing IDs, and coerces all attribute types for inserts.
+//
+//	Validates required fields, applies defaults, generates missing IDs, and coerces all attribute types for inserts.
 //
 // Where it is used:
 //   - Called by CRUD service Insert / Create operations across adapters.
@@ -259,7 +264,11 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 	for _, attr := range m.Attributes {
 		rawVal, exists := data[attr.Name]
 		if !exists {
-			if attr.Default != nil {
+			// Introspection returns database expressions such as
+			// CURRENT_TIMESTAMP as the column default. They must not be sent as
+			// string parameters ("CURRENT_TIMESTAMP"); omitting the field lets
+			// PostgreSQL execute the column default.
+			if attr.Default != nil && !isDatabaseDefaultExpression(attr.Default) {
 				sanitized[attr.Name] = attr.Default
 			} else if (attr.Name == "id" || m.IsPrimaryKey(attr.Name)) && (attr.Type == model.TypeString || attr.Type == model.TypeUUID || attr.Type == model.TypeText) && !isSequenceOrAuto(&attr) {
 				sanitized[attr.Name] = GenerateUUID()
@@ -280,6 +289,12 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 			sanitized[attr.Name] = nil
 			continue
 		}
+		if isDatabaseDefaultExpression(rawVal) && (attr.Type == model.TypeDateTime || attr.Type == model.TypeDate || attr.Type == model.TypeTime) {
+			// Treat a client-supplied SQL default marker the same as an
+			// introspected default: omit it and let PostgreSQL evaluate the
+			// column default instead of binding it as text.
+			continue
+		}
 
 		coerced, err := CoerceValue(rawVal, attr.Type)
 		if err != nil {
@@ -291,10 +306,27 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 	return sanitized, nil
 }
 
+func isDatabaseDefaultExpression(value any) bool {
+	text := strings.TrimSpace(strings.ToUpper(fmt.Sprintf("%v", value)))
+	if text == "" {
+		return false
+	}
+	return text == "CURRENT_TIMESTAMP" ||
+		text == "CURRENT_DATE" ||
+		text == "CURRENT_TIME" ||
+		text == "LOCALTIME" ||
+		text == "LOCALTIMESTAMP" ||
+		strings.HasPrefix(text, "NOW()") ||
+		strings.HasPrefix(text, "CURRENT_TIMESTAMP") ||
+		strings.HasPrefix(text, "NEXTVAL(") ||
+		strings.HasPrefix(text, "GEN_RANDOM_UUID(")
+}
+
 // SanitizePartialInput coerces and sanitizes ONLY the keys present in data payload for update operations.
 //
 // Purpose:
-//   Applies type coercion and non-null checks only to fields included in a partial update / patch request.
+//
+//	Applies type coercion and non-null checks only to fields included in a partial update / patch request.
 //
 // Where it is used:
 //   - Called by CRUD service Update operations.

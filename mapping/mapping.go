@@ -11,10 +11,12 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/SanjayDrop5528/models-go-engine/model"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SanjayDrop5528/models-go-engine/model"
+	"github.com/google/uuid"
 )
 
 // GenerateUUID generates a compact 32-character hex RFC 4122 version 4 UUID string without hyphens.
@@ -191,9 +193,23 @@ func CoerceValue(val any, targetType model.DataType) (any, error) {
 			return v, nil
 		}
 
+		// case model.TypeUUID:
+		// 	return fmt.Sprintf("%v", val), nil
 	case model.TypeUUID:
-		return fmt.Sprintf("%v", val), nil
+		switch v := val.(type) {
+		case uuid.UUID:
+			return v, nil
 
+		case string:
+			parsed, err := uuid.Parse(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid UUID '%s': %w", v, err)
+			}
+			return parsed, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported type %T for UUID", val)
+		}
 	default:
 		return val, nil
 	}
@@ -290,12 +306,6 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 				return nil, fmt.Errorf("field '%s' cannot be null", attr.Name)
 			}
 			sanitized[attr.Name] = nil
-			continue
-		}
-		if isDatabaseDefaultExpression(rawVal) && (attr.Type == model.TypeDateTime || attr.Type == model.TypeDate || attr.Type == model.TypeTime) {
-			// Treat a client-supplied SQL default marker the same as an
-			// introspected default: omit it and let PostgreSQL evaluate the
-			// column default instead of binding it as text.
 			continue
 		}
 

@@ -230,7 +230,7 @@ func (q Query) IsSlow(duration time.Duration) bool {
 // EnsureDebugTrace assigns a process-local correlation ID when debug logging
 // is enabled. The ID is internal and is never serialized into API responses.
 func (q Query) EnsureDebugTrace() Query {
-	if q.Debug && q.DebugTraceID == "" {
+	if (q.Debug || q.SlowQueryThresholdMS > 0) && q.DebugTraceID == "" {
 		q.DebugTraceID = fmt.Sprintf("query-%06d", atomic.AddUint64(&debugTraceSequence, 1))
 	}
 	return q

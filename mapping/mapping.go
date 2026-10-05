@@ -268,8 +268,11 @@ func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) 
 			// CURRENT_TIMESTAMP as the column default. They must not be sent as
 			// string parameters ("CURRENT_TIMESTAMP"); omitting the field lets
 			// PostgreSQL execute the column default.
-			if attr.Default != nil && !isDatabaseDefaultExpression(attr.Default) {
-				sanitized[attr.Name] = attr.Default
+			if attr.Default != nil {
+				if !isDatabaseDefaultExpression(attr.Default) {
+					sanitized[attr.Name] = attr.Default
+				}
+				continue
 			} else if (attr.Name == "id" || m.IsPrimaryKey(attr.Name)) && (attr.Type == model.TypeString || attr.Type == model.TypeUUID || attr.Type == model.TypeText) && !isSequenceOrAuto(&attr) {
 				sanitized[attr.Name] = GenerateUUID()
 			} else if !attr.Nullable && !attr.AutoIncrement && !isSequenceOrAuto(&attr) && !m.IsPrimaryKey(attr.Name) {
@@ -319,7 +322,12 @@ func isDatabaseDefaultExpression(value any) bool {
 		strings.HasPrefix(text, "NOW()") ||
 		strings.HasPrefix(text, "CURRENT_TIMESTAMP") ||
 		strings.HasPrefix(text, "NEXTVAL(") ||
-		strings.HasPrefix(text, "GEN_RANDOM_UUID(")
+		strings.HasPrefix(text, "GEN_RANDOM_UUID(") ||
+		// PostgreSQL introspection represents typed defaults as expressions,
+		// for example 'active'::character varying or 0::numeric. Binding the
+		// expression as a value stores the expression text and may overflow the
+		// target column; omit it so PostgreSQL evaluates the column default.
+		strings.Contains(text, "::")
 }
 
 // SanitizePartialInput coerces and sanitizes ONLY the keys present in data payload for update operations.

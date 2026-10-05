@@ -83,3 +83,17 @@ func TestSanitizeInput_AutoGenerateUUIDWhenIDMissing(t *testing.T) {
 		t.Fatalf("expected empty id to be replaced with UUID, got %v", sanitized3["id"])
 	}
 }
+
+func TestSanitizeInputOmitsPostgresCastDefault(t *testing.T) {
+	m := &model.Model{Attributes: []model.Attribute{
+		{Name: "id", Type: model.TypeUUID, Default: "gen_random_uuid()", IsPrimaryKey: true},
+		{Name: "status", Type: model.TypeString, Length: 20, Default: "'active'::character varying"},
+	}}
+	sanitized, err := mapping.SanitizeInput(m, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := sanitized["status"]; exists {
+		t.Fatalf("PostgreSQL cast default must be omitted, got %#v", sanitized["status"])
+	}
+}

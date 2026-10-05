@@ -287,7 +287,7 @@ func TestValidateData(t *testing.T) {
 				"age":      "not-a-number",
 			},
 			wantErr:     true,
-			errContains: "expects numeric value for type INT, got string",
+			errContains: "must be a valid whole number",
 		},
 		{
 			name: "boolean type mismatch",
@@ -791,8 +791,23 @@ func TestValidatePartialData(t *testing.T) {
 
 	// Invalid partial update: type mismatch
 	err = validation.ValidatePartialData(testModel, map[string]any{"age": "not-a-number"})
-	if err == nil || !strings.Contains(err.Error(), "expects numeric value") {
+	if err == nil || !strings.Contains(err.Error(), "must be a valid whole number") {
 		t.Errorf("expected numeric type error on patch, got: %v", err)
+	}
+}
+
+func TestValidateDataDefaultSatisfiesRequiredAndAttributeLength(t *testing.T) {
+	maxTwenty := 20
+	m := &model.Model{Attributes: []model.Attribute{
+		{Name: "id", Type: model.TypeUUID, Default: "gen_random_uuid()", Validation: &model.RuleSet{Required: true}},
+		{Name: "station_code", Type: model.TypeString, Length: maxTwenty},
+	}}
+	if err := validation.ValidateData(m, map[string]any{"station_code": "FS001"}); err != nil {
+		t.Fatalf("defaulted required field should be omitted: %v", err)
+	}
+	err := validation.ValidateData(m, map[string]any{"station_code": strings.Repeat("X", maxTwenty+1)})
+	if err == nil || !strings.Contains(err.Error(), "station_code must be 20 characters or fewer") {
+		t.Fatalf("expected friendly length error, got %v", err)
 	}
 }
 
@@ -834,4 +849,3 @@ func TestMultiValidationError(t *testing.T) {
 func floatPtr(v float64) *float64 {
 	return &v
 }
-

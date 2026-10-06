@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -169,20 +170,44 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		execReq := execution.ExecutionRequest{
 			Operation: operation.OpQuery,
 			Target:    compiled.ExecutableQuery,
-			Arguments: map[string]any{
+			Options: map[string]any{
 				"preview":    true,
 				"collection": ds.BaseCollection.Collection,
 				"schema":     ds.BaseCollection.Schema,
 			},
 		}
+		if s.adapter.Name() == "mongodb" {
+			execReq.Arguments = map[string]any{
+				"collection": ds.BaseCollection.Collection,
+			}
+		} else if len(compiled.Parameters) > 0 {
+			boundArgs := make(map[string]any)
+			for _, p := range compiled.Parameters {
+				if p.DefaultValue != nil {
+					boundArgs[p.ParamName] = p.DefaultValue
+				}
+			}
+			if len(boundArgs) > 0 {
+				execReq.Arguments = boundArgs
+			}
+		}
+
 		res, err := s.adapter.Execute(ctx, execReq)
-		if err == nil && res != nil {
+		if err != nil {
+			log.Printf("[DataSetService] Preview query execution failed: %v", err)
+		} else if res != nil {
 			if resMap, ok := res.Data.(map[string]any); ok {
 				if resRows, ok := resMap["rows"].([]map[string]any); ok {
 					rows = resRows
 				}
 			} else if rowSlice, ok := res.Data.([]map[string]any); ok {
 				rows = rowSlice
+			} else if sliceAny, ok := res.Data.([]any); ok {
+				for _, item := range sliceAny {
+					if m, ok := item.(map[string]any); ok {
+						rows = append(rows, m)
+					}
+				}
 			}
 		}
 	}

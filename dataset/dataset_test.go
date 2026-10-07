@@ -97,7 +97,7 @@ func (c *testPostgresCompiler) Compile(ctx context.Context, ast *planner.QueryAS
 	}
 	var joins []string
 	for _, j := range ast.Joins {
-		on := "\""+j.FromTable+"\".\""+j.FromField+"\" = \""+j.Alias+"\".\""+j.ToField+"\""
+		on := "\"" + j.FromTable + "\".\"" + j.FromField + "\" = \"" + j.Alias + "\".\"" + j.ToField + "\""
 		if len(j.JoinFilter) > 0 {
 			for k, v := range j.JoinFilter {
 				on += " AND \"" + j.Alias + "\".\"" + k + "\" = '" + strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(string(rune('0')), "0", ""), "", ""), "", "")) + strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(string(rune('0')), "0", ""), "", ""), "", ""))
@@ -671,7 +671,7 @@ func TestDataSetService_Execute_SaveModes(t *testing.T) {
 	if mockAdp.lastReq.Operation != "QUERY" {
 		t.Errorf("expected operation QUERY, got: %s", mockAdp.lastReq.Operation)
 	}
-	if !strings.Contains(mockAdp.lastReq.Target, `"pending"`) {
+	if !strings.Contains(mockAdp.lastReq.Target, `'pending'`) {
 		t.Errorf("expected target to have substituted pending, got: %s", mockAdp.lastReq.Target)
 	}
 }
@@ -740,19 +740,19 @@ func TestDataSet_PayloadVsDefaultValue_Precedence(t *testing.T) {
 	query := mockAdp.lastReq.Target
 
 	// param1 must use payload value
-	if !strings.Contains(query, `"payload_custom_1"`) {
+	if !strings.Contains(query, `'payload_custom_1'`) {
 		t.Errorf("expected param1 to use payload value 'payload_custom_1', got:\n%s", query)
 	}
 	// param2 must use default value
-	if !strings.Contains(query, `"default_val_2"`) {
+	if !strings.Contains(query, `'default_val_2'`) {
 		t.Errorf("expected param2 to use default value 'default_val_2', got:\n%s", query)
 	}
 	// param3 must fallback to default value
-	if !strings.Contains(query, `"default_val_3"`) {
+	if !strings.Contains(query, `'default_val_3'`) {
 		t.Errorf("expected param3 to fallback to default value 'default_val_3', got:\n%s", query)
 	}
 	// param4 must resolve from userToken
-	if !strings.Contains(query, `"org_secret_777"`) {
+	if !strings.Contains(query, `'org_secret_777'`) {
 		t.Errorf("expected param4 to resolve KTON token 'org_secret_777', got:\n%s", query)
 	}
 
@@ -766,7 +766,7 @@ func TestDataSet_PayloadVsDefaultValue_Precedence(t *testing.T) {
 		t.Fatalf("failed executing dataset with param4 override: %v", err)
 	}
 	query2 := mockAdp.lastReq.Target
-	if !strings.Contains(query2, `"override_org_888"`) {
+	if !strings.Contains(query2, `'override_org_888'`) {
 		t.Errorf("expected param4 to be overridden by payload 'override_org_888', got:\n%s", query2)
 	}
 }
@@ -840,6 +840,89 @@ func TestDataSet_ExecuteWithOptions_Payload(t *testing.T) {
 	}
 	if !strings.Contains(targetSQL, "\"_exec_sub\".\"id\" ASC") {
 		t.Errorf("expected target SQL to contain sort clause, got:\n%s", targetSQL)
+	}
+}
+
+func TestQueryDatasetUsesDefaultPipelineAndRuntimeReference(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	adp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, resolver.NewModelResolver(nil), resolver.NewModelResolver(nil), resolver.NewFunctionRegistry(), adp)
+	ds := &domain.DataSet{
+		ID: "query_mode_test", Name: "query_mode_test", ReferenceName: "query_mode_test", Driver: "postgres", SaveMode: domain.SaveModeQuery,
+		Pipeline:          `SELECT * FROM employees WHERE status = 'active'`,
+		ReferencePipeline: `SELECT * FROM employees WHERE status = {"paramName":"status","paramDataType":"string"}`,
+		FilterParams:      []domain.FilterParam{{ParamName: "status", ParamDataType: "string", DefaultValue: "active"}},
+	}
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Execute(ctx, ds.ReferenceName, nil); err != nil {
+		t.Fatal(err)
+	}
+	if adp.lastReq.Target != ds.Pipeline {
+		t.Fatalf("no input must use default pipeline, got %s", adp.lastReq.Target)
+	}
+	if _, err := svc.Execute(ctx, ds.ReferenceName, map[string]any{"status": "O'Reilly"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(adp.lastReq.Target, `status = 'O''Reilly'`) {
+		t.Fatalf("override must be escaped: %s", adp.lastReq.Target)
+	}
+}
+
+func TestQueryDatasetResolvesRelativeDateWithoutPayload(t *testing.T) {
+	ctx := context.Background()
+	repo := repository.NewDataSetRepository()
+	adp := &mockExecutionAdapter{}
+	svc := service.NewDataSetService(repo, resolver.NewModelResolver(nil), resolver.NewModelResolver(nil), resolver.NewFunctionRegistry(), adp)
+	ds := &domain.DataSet{
+		ID: "date_mode_test", Name: "date_mode_test", ReferenceName: "date_mode_test", Driver: "postgres", SaveMode: domain.SaveModeQuery,
+		Pipeline:          `SELECT * FROM attendance WHERE signed_in >= 'CD|+0|ST'`,
+		ReferencePipeline: `SELECT * FROM attendance WHERE signed_in >= {"paramName":"start","paramDataType":"timestamp"}`,
+		FilterParams:      []domain.FilterParam{{ParamName: "start", ParamDataType: "timestamp", DefaultValue: "CD|+0|ST"}},
+	}
+	if err := repo.Save(ctx, ds); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Execute(ctx, ds.ReferenceName, nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(adp.lastReq.Target, "CD|") {
+		t.Fatalf("relative date must resolve at execution: %s", adp.lastReq.Target)
+	}
+	if strings.Contains(adp.lastReq.Target, " UTC'") {
+		t.Fatalf("relative date must be a valid SQL timestamp literal: %s", adp.lastReq.Target)
+	}
+	if _, err := svc.Execute(ctx, ds.ReferenceName, map[string]any{"start": "2026-10-01"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(adp.lastReq.Target, `'2026-10-01`) {
+		t.Fatalf("runtime date must override default: %s", adp.lastReq.Target)
+	}
+}
+
+func TestRenderSQLFilterParamsDoesNotReprocessInsertedValues(t *testing.T) {
+	params := []domain.FilterParam{
+		{ParamName: "status", ParamDataType: "string", Paramvalue: ":name O'Reilly"},
+		{ParamName: "name", ParamDataType: "string", Paramvalue: "replacement"},
+	}
+	query, err := domain.RenderSQLFilterParams(params, `SELECT * FROM employees WHERE status = {"paramName":"status","paramDataType":"string"} AND name = :name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(query, `status = ':name O''Reilly'`) || !strings.Contains(query, `name = 'replacement'`) {
+		t.Fatalf("unexpected SQL parameter rendering: %s", query)
+	}
+}
+
+func TestRenderSQLRoutineParams(t *testing.T) {
+	query, err := domain.RenderSQLRoutineParams([]domain.FilterParam{{ParamName: "status", ParamDataType: "string", Paramvalue: "pending"}}, `SELECT * FROM employees WHERE (p_status IS NULL OR status = p_status)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(query, "p_status") || !strings.Contains(query, `status = 'pending'`) {
+		t.Fatalf("routine fallback must use bound value: %s", query)
 	}
 }
 
@@ -1050,6 +1133,3 @@ func TestDataSet_ExecuteWithOptions_MongoDB_AppendFilter(t *testing.T) {
 		t.Errorf("expected $match at index 1 for appendfilter=last, got: %v", stagesLast[1])
 	}
 }
-
-
-

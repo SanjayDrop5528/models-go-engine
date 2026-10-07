@@ -2,17 +2,19 @@
 //
 // File: filter_params.go
 // Usage:
-//   This file provides centralized parameter parsing, placeholder replacement, and dynamic
-//   token/date expression resolution for datasets across all database adapters (PostgreSQL,
-//   MySQL, MongoDB, and in-memory). It ensures that parameter values supplied in runtime payloads
-//   take precedence over default values, and that dynamic user tokens (KTON|key) and date macros
-//   (CD|+offset|mode) are uniformly resolved across all query execution and compilation modes.
+//
+//	This file provides centralized parameter parsing, placeholder replacement, and dynamic
+//	token/date expression resolution for datasets across all database adapters (PostgreSQL,
+//	MySQL, MongoDB, and in-memory). It ensures that parameter values supplied in runtime payloads
+//	take precedence over default values, and that dynamic user tokens (KTON|key) and date macros
+//	(CD|+offset|mode) are uniformly resolved across all query execution and compilation modes.
 package domain
 
 import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,8 +23,9 @@ import (
 // StructToMap converts any struct, map, or pointer into a map[string]any.
 //
 // Purpose:
-//   Normalizes diverse input representations (Go structs, JSON objects, maps) into a
-//   standard string-keyed map for safe lookup and parameter extraction.
+//
+//	Normalizes diverse input representations (Go structs, JSON objects, maps) into a
+//	standard string-keyed map for safe lookup and parameter extraction.
 //
 // Where it is used:
 //   - Called by CreateFilterParams and ConvertValueToDataType to inspect userToken objects.
@@ -57,9 +60,10 @@ func StructToMap(obj any) (map[string]any, error) {
 // CreateFilterParams resolves and replaces filter parameter placeholders in a pipeline/query string.
 //
 // Purpose:
-//   Replaces parameter definition placeholders (`{"paramName":"...","paramDataType":"..."}`) within
-//   raw pipeline or SQL query templates with actual concrete values. If a runtime value (Paramvalue)
-//   is provided, it is used; otherwise, it falls back to the defined DefaultValue.
+//
+//	Replaces parameter definition placeholders (`{"paramName":"...","paramDataType":"..."}`) within
+//	raw pipeline or SQL query templates with actual concrete values. If a runtime value (Paramvalue)
+//	is provided, it is used; otherwise, it falls back to the defined DefaultValue.
 //
 // Where it is used:
 //   - Used by DataSetService.Execute / ExecuteWithUserToken for direct query execution (SaveModeQuery).
@@ -116,8 +120,9 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 // dynamic user token fields (KTON|<key>) and current date expressions (CD|<offset>|<mode>).
 //
 // Purpose:
-//   Formats a given Go value or macro expression into a string suitable for query injection,
-//   performing dynamic token extraction and timezone-aware date calculations where necessary.
+//
+//	Formats a given Go value or macro expression into a string suitable for query injection,
+//	performing dynamic token extraction and timezone-aware date calculations where necessary.
 //
 // Where it is used:
 //   - Called by CreateFilterParams for each matched parameter.
@@ -125,12 +130,12 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 //
 // When can it be used:
 //   - When resolving string macros:
-//       "KTON|org_id"    -> Resolves to userToken["org_id"]
-//       "CD"             -> Resolves to current timestamp in user timezone
-//       "CD|+1"          -> Resolves to tomorrow (+1 day)
-//       "CD|-1"          -> Resolves to yesterday (-1 day)
-//       "CD|+0|ST"       -> Resolves to Start of Day (00:00:00) in user timezone
-//       "CD|+0|ED"       -> Resolves to End of Day (23:59:59) in user timezone
+//     "KTON|org_id"    -> Resolves to userToken["org_id"]
+//     "CD"             -> Resolves to current timestamp in user timezone
+//     "CD|+1"          -> Resolves to tomorrow (+1 day)
+//     "CD|-1"          -> Resolves to yesterday (-1 day)
+//     "CD|+0|ST"       -> Resolves to Start of Day (00:00:00) in user timezone
+//     "CD|+0|ED"       -> Resolves to End of Day (23:59:59) in user timezone
 //   - When converting numeric, boolean, or temporal primitive types into string representations.
 func ConvertValueToDataType(datatype string, defaultValue any, user any) string {
 	var replaceValue string
@@ -184,62 +189,60 @@ func ConvertValueToDataType(datatype string, defaultValue any, user any) string 
 		if stringValue, ok := defaultValue.(string); ok {
 			replaceValue = stringValue
 		}
-		if user != nil {
-			if valStr, ok := defaultValue.(string); ok {
-				parts := strings.Split(valStr, "|")
+		if valStr, ok := defaultValue.(string); ok {
+			parts := strings.Split(valStr, "|")
 
-				// Expecting format: KTON|key
-				if len(parts) == 2 && parts[0] == "KTON" {
-					key := parts[1]
-					if tokenMap, ok := user.(map[string]any); ok {
-						if val, exists := tokenMap[key]; exists {
-							replaceValue = fmt.Sprintf("%v", val)
+			// Expecting format: KTON|key
+			if len(parts) == 2 && parts[0] == "KTON" {
+				key := parts[1]
+				if tokenMap, ok := user.(map[string]any); ok {
+					if val, exists := tokenMap[key]; exists {
+						replaceValue = fmt.Sprintf("%v", val)
+					}
+				}
+			} else if len(parts) >= 1 && parts[0] == "CD" {
+				// Load timezone (fallback to UTC if invalid)
+				var tz string
+				if tokenMap, ok := user.(map[string]any); ok {
+					if tVal, ok := tokenMap["timezone"].(string); ok {
+						tz = tVal
+					}
+				}
+				loc, err := time.LoadLocation(tz)
+				if err != nil || loc == nil {
+					loc = time.UTC
+				}
+
+				now := time.Now().In(loc)
+				offset := 0
+				mode := ""
+
+				// Parse offset (e.g., +2, -1)
+				if len(parts) >= 2 {
+					offsetStr := parts[1]
+					if strings.HasPrefix(offsetStr, "+") || strings.HasPrefix(offsetStr, "-") {
+						if val, err := strconv.Atoi(offsetStr); err == nil {
+							offset = val
 						}
 					}
-				} else if len(parts) >= 1 && parts[0] == "CD" {
-					// Load timezone (fallback to UTC if invalid)
-					var tz string
-					if tokenMap, ok := user.(map[string]any); ok {
-						if tVal, ok := tokenMap["timezone"].(string); ok {
-							tz = tVal
-						}
-					}
-					loc, err := time.LoadLocation(tz)
-					if err != nil || loc == nil {
-						loc = time.UTC
-					}
+				}
 
-					now := time.Now().In(loc)
-					offset := 0
-					mode := ""
+				// Parse mode (ST / ED)
+				if len(parts) == 3 {
+					mode = parts[2]
+				}
 
-					// Parse offset (e.g., +2, -1)
-					if len(parts) >= 2 {
-						offsetStr := parts[1]
-						if strings.HasPrefix(offsetStr, "+") || strings.HasPrefix(offsetStr, "-") {
-							if val, err := strconv.Atoi(offsetStr); err == nil {
-								offset = val
-							}
-						}
-					}
+				// Apply day offset
+				result := now.AddDate(0, 0, offset)
 
-					// Parse mode (ST / ED)
-					if len(parts) == 3 {
-						mode = parts[2]
-					}
-
-					// Apply day offset
-					result := now.AddDate(0, 0, offset)
-
-					// Apply Start / End of Day in user's timezone
-					switch mode {
-					case "ST":
-						replaceValue = time.Date(result.Year(), result.Month(), result.Day(), 0, 0, 0, 0, loc).Format(time.RFC3339)
-					case "ED":
-						replaceValue = time.Date(result.Year(), result.Month(), result.Day(), 23, 59, 59, 0, loc).Format(time.RFC3339)
-					default:
-						replaceValue = result.Format(time.RFC3339)
-					}
+				// Apply Start / End of Day in user's timezone
+				switch mode {
+				case "ST":
+					replaceValue = time.Date(result.Year(), result.Month(), result.Day(), 0, 0, 0, 0, loc).Format(time.RFC3339)
+				case "ED":
+					replaceValue = time.Date(result.Year(), result.Month(), result.Day(), 23, 59, 59, 0, loc).Format(time.RFC3339)
+				default:
+					replaceValue = result.Format(time.RFC3339)
 				}
 			}
 		}
@@ -271,4 +274,92 @@ func ConvertValueToDataType(datatype string, defaultValue any, user any) string 
 	}
 
 	return replaceValue
+}
+
+var namedSQLParameter = regexp.MustCompile(`:[a-zA-Z_][a-zA-Z0-9_]*`)
+var routineSQLParameter = regexp.MustCompile(`\bp_[a-zA-Z_][a-zA-Z0-9_]*\b`)
+
+// RenderSQLFilterParams replaces saved dataset tokens with escaped SQL literals.
+// It also accepts older :name templates already stored in the catalog.
+func RenderSQLFilterParams(params []FilterParam, pipeline string) (string, error) {
+	literals := make(map[string]string, len(params))
+	for _, param := range params {
+		value := param.Paramvalue
+		if value == nil || value == "" {
+			value = param.DefaultValue
+		}
+		literal, err := SQLParameterLiteral(value, param.ParamDataType)
+		if err != nil {
+			return "", fmt.Errorf("parameter %q: %w", param.ParamName, err)
+		}
+		literals[strings.ToLower(param.ParamName)] = literal
+	}
+	pipeline = replaceSQLParameters(pipeline, namedSQLParameter, literals, ":")
+	for _, param := range params {
+		token := fmt.Sprintf(`{"paramName":"%s","paramDataType":"%s"}`, param.ParamName, param.ParamDataType)
+		pipeline = strings.ReplaceAll(pipeline, token, literals[strings.ToLower(param.ParamName)])
+	}
+	return pipeline, nil
+}
+
+// RenderSQLRoutineParams makes a saved routine body executable as a direct-query fallback.
+func RenderSQLRoutineParams(params []FilterParam, pipeline string) (string, error) {
+	literals := make(map[string]string, len(params))
+	for _, param := range params {
+		value := param.Paramvalue
+		if value == nil || value == "" {
+			value = param.DefaultValue
+		}
+		literal, err := SQLParameterLiteral(value, param.ParamDataType)
+		if err != nil {
+			return "", fmt.Errorf("parameter %q: %w", param.ParamName, err)
+		}
+		literals["p_"+strings.ToLower(param.ParamName)] = literal
+	}
+	return replaceSQLParameters(pipeline, routineSQLParameter, literals, ""), nil
+}
+
+func replaceSQLParameters(pipeline string, matcher *regexp.Regexp, literals map[string]string, prefix string) string {
+	var result strings.Builder
+	previous := 0
+	for _, position := range matcher.FindAllStringIndex(pipeline, -1) {
+		start, end := position[0], position[1]
+		result.WriteString(pipeline[previous:start])
+		name := strings.ToLower(strings.TrimPrefix(pipeline[start:end], prefix))
+		if prefix == ":" && start > 0 && pipeline[start-1] == ':' {
+			result.WriteString(pipeline[start:end])
+		} else if literal, ok := literals[name]; ok {
+			result.WriteString(literal)
+		} else {
+			result.WriteString(pipeline[start:end])
+		}
+		previous = end
+	}
+	result.WriteString(pipeline[previous:])
+	return result.String()
+}
+
+// SQLParameterLiteral formats a typed dataset value for a SQL query template.
+func SQLParameterLiteral(value any, dataType string) (string, error) {
+	if value == nil {
+		return "NULL", nil
+	}
+	if timestamp, ok := value.(time.Time); ok {
+		return "'" + timestamp.Format(time.RFC3339Nano) + "'", nil
+	}
+	switch strings.ToLower(dataType) {
+	case "int", "integer", "decimal", "numeric", "float":
+		if _, err := strconv.ParseFloat(fmt.Sprint(value), 64); err != nil {
+			return "", fmt.Errorf("must be numeric: %w", err)
+		}
+		return fmt.Sprint(value), nil
+	case "bool", "boolean":
+		parsed, err := strconv.ParseBool(fmt.Sprint(value))
+		if err != nil {
+			return "", fmt.Errorf("must be boolean: %w", err)
+		}
+		return strconv.FormatBool(parsed), nil
+	default:
+		return "'" + strings.ReplaceAll(fmt.Sprint(value), "'", "''") + "'", nil
+	}
 }

@@ -3,11 +3,12 @@
 //
 // File: dataset_service.go
 // Usage:
-//   This file defines the primary application-layer service (DataSetService) for all dynamic dataset operations.
-//   It connects the user-facing HTTP endpoints or programmatic clients with the underlying AST planner,
-//   domain validator, dialect compilers (PostgreSQL, MySQL, MongoDB), and physical database adapters.
-//   It coordinates design-time features (preview without saving, DDL generation for procedures/functions)
-//   and runtime features (executing saved datasets with payload/token parameter precedence).
+//
+//	This file defines the primary application-layer service (DataSetService) for all dynamic dataset operations.
+//	It connects the user-facing HTTP endpoints or programmatic clients with the underlying AST planner,
+//	domain validator, dialect compilers (PostgreSQL, MySQL, MongoDB), and physical database adapters.
+//	It coordinates design-time features (preview without saving, DDL generation for procedures/functions)
+//	and runtime features (executing saved datasets with payload/token parameter precedence).
 package service
 
 import (
@@ -55,8 +56,9 @@ type DataSetService struct {
 // NewDataSetService creates a new DataSetService instance.
 //
 // Purpose:
-//   Initializes the DataSetService with its required metadata repository, validators,
-//   AST planners, resolvers, and target database adapter.
+//
+//	Initializes the DataSetService with its required metadata repository, validators,
+//	AST planners, resolvers, and target database adapter.
 //
 // Where it is used:
 //   - Initialized in the engine setup layer (models-go-engine/project).
@@ -89,7 +91,8 @@ func NewDataSetService(
 // RegisterCompiler registers a custom compiler for a specific driver.
 //
 // Purpose:
-//   Adds or overrides a database-specific compiler implementation (e.g., "postgres", "mysql", "mongodb").
+//
+//	Adds or overrides a database-specific compiler implementation (e.g., "postgres", "mysql", "mongodb").
 //
 // Where it is used:
 //   - Called during adapter registration or project startup to hook in database-specific compilers.
@@ -105,8 +108,9 @@ func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompi
 // SetAdapter sets or updates the underlying execution adapter.
 //
 // Purpose:
-//   Attaches a physical database adapter (PostgreSQL, MySQL, MongoDB, Memory) to the dataset service
-//   for running preview queries, applying DDL routines, and executing queries.
+//
+//	Attaches a physical database adapter (PostgreSQL, MySQL, MongoDB, Memory) to the dataset service
+//	for running preview queries, applying DDL routines, and executing queries.
 //
 // Where it is used:
 //   - Called by Engine/Project when an adapter is initialized or swapped.
@@ -122,9 +126,10 @@ func (s *DataSetService) SetAdapter(adp adapter.Adapter) *DataSetService {
 // Preview compiles and executes the dataset without saving it to database metadata.
 //
 // Purpose:
-//   Validates the incoming dataset definition, plans an AST, compiles the executable query
-//   and reference pipeline for the specified driver, runs a live preview query through the adapter,
-//   and returns sample rows and compiled DDL without persisting to catalog storage.
+//
+//	Validates the incoming dataset definition, plans an AST, compiles the executable query
+//	and reference pipeline for the specified driver, runs a live preview query through the adapter,
+//	and returns sample rows and compiled DDL without persisting to catalog storage.
 //
 // Where it is used:
 //   - Called by the HTTP handler `POST /api/datasets/preview`.
@@ -238,9 +243,10 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 // Save validates, compiles pipelines, executes DDL (procedures/functions), and persists dataset metadata.
 //
 // Purpose:
-//   Validates the dataset definition, compiles the pipeline for the target dialect, applies any
-//   necessary DDL statements on the database (e.g. `CREATE OR REPLACE PROCEDURE` or `FUNCTION`),
-//   and saves the dataset definition to the system metadata catalog (`metadata_catalog.dataset`).
+//
+//	Validates the dataset definition, compiles the pipeline for the target dialect, applies any
+//	necessary DDL statements on the database (e.g. `CREATE OR REPLACE PROCEDURE` or `FUNCTION`),
+//	and saves the dataset definition to the system metadata catalog (`metadata_catalog.dataset`).
 //
 // Where it is used:
 //   - Called by the HTTP handler `POST /api/datasets`.
@@ -299,14 +305,16 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 // Execute resolves dataset by reference name, binds parameters safely, and runs the query.
 //
 // Purpose:
-//   Standard entry point to execute a saved dataset by its unique reference name with runtime arguments.
-//   Delegates to ExecuteWithUserToken with a nil userToken.
+//
+//	Standard entry point to execute a saved dataset by its unique reference name with runtime arguments.
+//	Delegates to ExecuteWithUserToken with a nil userToken.
 //
 // Where it is used:
 //   - Called by programmatic Go callers and simple execution APIs without authentication context.
 //
 // When can it be used:
 //   - When executing datasets that do not depend on session user tokens (KTON) or when default tokens suffice.
+//
 // Execute executes a saved dataset by reference name with runtime parameter bindings.
 func (s *DataSetService) Execute(ctx context.Context, referenceName string, runtimeParams map[string]any) ([]map[string]any, error) {
 	return s.ExecuteWithOptions(ctx, referenceName, &domain.ExecuteRequest{
@@ -341,6 +349,7 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 	// 1. Validate & Coerce Parameters: check payload first, else fallback to default value
 	boundArgs := make(map[string]any)
 	effectiveParams := make([]domain.FilterParam, len(ds.FilterParams))
+	hasRuntimeFilterParams := false
 	for i, p := range ds.FilterParams {
 		var val any
 		foundInPayload := false
@@ -350,6 +359,7 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 			if strings.EqualFold(k, p.ParamName) && v != nil && v != "" {
 				val = v
 				foundInPayload = true
+				hasRuntimeFilterParams = true
 				break
 			}
 		}
@@ -397,13 +407,42 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 
 	cleanName := strings.ReplaceAll(ds.ReferenceName, "-", "_")
 
-	// Determine base executable query with runtime parameters substituted
+	// QUERY uses its saved default pipeline until the caller supplies filter
+	// parameters. Runtime values use the saved reference template.
 	baseQuery := ds.Pipeline
-	if ds.ReferencePipeline != "" {
-		baseQuery = domain.CreateFilterParams(effectiveParams, ds.ReferencePipeline, req.UserToken)
+	if ds.SaveMode != domain.SaveModeQuery && ds.ReferencePipeline != "" {
+		baseQuery = ds.ReferencePipeline
+	}
+	if ds.SaveMode == domain.SaveModeQuery && hasRuntimeFilterParams && ds.ReferencePipeline != "" {
+		baseQuery = ds.ReferencePipeline
 	}
 	if baseQuery == "" {
-		baseQuery = ds.Pipeline
+		baseQuery = ds.ReferencePipeline
+	}
+	if strings.EqualFold(ds.Driver, "postgres") || strings.EqualFold(ds.Driver, "mysql") || ds.Driver == "" {
+		// Resolve dynamic defaults in the saved pipeline on every call. The
+		// reference pipeline gets the already-resolved effective values below.
+		for i, p := range ds.FilterParams {
+			if macro, ok := p.DefaultValue.(string); ok && (macro == "CD" || strings.HasPrefix(macro, "CD|") || strings.HasPrefix(macro, "KTON|")) {
+				literal, literalErr := domain.SQLParameterLiteral(effectiveParams[i].Paramvalue, p.ParamDataType)
+				if literalErr != nil {
+					return nil, domain.WrapError(domain.ErrInvalidParameterType, "dataset parameter substitution failed", literalErr)
+				}
+				baseQuery = strings.ReplaceAll(baseQuery, "'"+strings.ReplaceAll(macro, "'", "''")+"'", literal)
+			}
+		}
+		baseQuery, err = domain.RenderSQLFilterParams(effectiveParams, baseQuery)
+		if err != nil {
+			return nil, domain.WrapError(domain.ErrInvalidParameterType, "dataset parameter substitution failed", err)
+		}
+		if ds.SaveMode != domain.SaveModeQuery {
+			baseQuery, err = domain.RenderSQLRoutineParams(effectiveParams, baseQuery)
+			if err != nil {
+				return nil, domain.WrapError(domain.ErrInvalidParameterType, "dataset routine parameter substitution failed", err)
+			}
+		}
+	} else if ds.ReferencePipeline != "" && hasRuntimeFilterParams {
+		baseQuery = domain.CreateFilterParams(effectiveParams, ds.ReferencePipeline, req.UserToken)
 	}
 
 	// Build wrapped query with runtime filter, sort, and pagination if applicable
@@ -474,7 +513,7 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 	}
 
 	// For procedures or if direct execution returned no tabular rows, execute finalQuery
-	if len(rows) == 0 && finalQuery != "" {
+	if len(rows) == 0 && finalQuery != "" && execReq.Operation != operation.OpQuery {
 		qRes, qErr := s.adapter.Execute(ctx, execution.ExecutionRequest{
 			Operation: operation.OpQuery,
 			Target:    finalQuery,
@@ -931,7 +970,8 @@ func formatSQLSortClause(alias string, sortVal any) string {
 // coerceDataType parses and converts an arbitrary parameter value into its target Go data type.
 //
 // Purpose:
-//   Ensures parameter values match the declared data type before binding into queries or procedures.
+//
+//	Ensures parameter values match the declared data type before binding into queries or procedures.
 //
 // Where it is used:
 //   - Called internally by ExecuteWithUserToken for each bounded parameter.
@@ -967,7 +1007,8 @@ func coerceDataType(val any, targetType string) (any, error) {
 // compile delegates dataset compilation to the adapter's native compiler or a registered dialect compiler.
 //
 // Purpose:
-//   Converts an abstract syntax tree (QueryAST) into executable queries and reference pipelines.
+//
+//	Converts an abstract syntax tree (QueryAST) into executable queries and reference pipelines.
 //
 // Where it is used:
 //   - Called internally by Preview and Save.

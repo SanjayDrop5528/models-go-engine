@@ -286,7 +286,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 
 	// 5. Map Where Filters
 	if len(ds.Filter) > 0 {
-		ast.WhereFilters = p.parseFilterMap(ds.Filter, ds.BaseCollection.Collection, tableAliases)
+		ast.WhereFilters = p.parseFilterMap(ds.Filter, ds.BaseCollection.Collection, tableAliases, ds.SelectedList)
 	}
 
 	return ast, nil
@@ -347,12 +347,30 @@ func isAggregateFunctionName(name string) bool {
 //
 // When can it be used:
 //   - When translating raw JSON filter maps into relational filter AST nodes.
-func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable string, tableAliases map[string]string) []ASTCondition {
+func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable string, tableAliases map[string]string, selectedList []domain.SelectedField) []ASTCondition {
 	var conditions []ASTCondition
+	aliasMap := make(map[string]domain.SelectedField)
+	for _, s := range selectedList {
+		if s.HeaderName != "" {
+			aliasMap[strings.ToLower(s.HeaderName)] = s
+		}
+		if s.Field != "" {
+			aliasMap[strings.ToLower(s.Field)] = s
+		}
+	}
+
 	for k, v := range filter {
 		tbl := defaultTable
 		col := k
-		if idx := strings.Index(k, "."); idx >= 0 {
+
+		if sel, ok := aliasMap[strings.ToLower(k)]; ok && sel.Field != "" {
+			if idx := strings.Index(sel.Field, "."); idx >= 0 {
+				tbl = sel.Field[:idx]
+				col = sel.Field[idx+1:]
+			} else {
+				col = sel.Field
+			}
+		} else if idx := strings.Index(k, "."); idx >= 0 {
 			tbl = k[:idx]
 			col = k[idx+1:]
 		}

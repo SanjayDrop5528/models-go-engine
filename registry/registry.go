@@ -10,6 +10,7 @@ package registry
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -340,6 +341,9 @@ func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 		cp := *dm
 		result = append(result, &cp)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return strings.ToLower(result[i].ColumnName) < strings.ToLower(result[j].ColumnName)
+	})
 	return result
 }
 

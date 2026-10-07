@@ -157,11 +157,20 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		cols = append(cols, p)
 	}
 	for _, cc := range ds.CustomColumns {
-		cols = append(cols, domain.SelectedField{
-			Field:      cc.CustomColumnName,
-			HeaderName: cc.CustomLabelName,
-			DataType:   cc.Type,
-		})
+		alreadyPresent := false
+		for _, c := range cols {
+			if strings.EqualFold(c.Field, cc.CustomColumnName) {
+				alreadyPresent = true
+				break
+			}
+		}
+		if !alreadyPresent {
+			cols = append(cols, domain.SelectedField{
+				Field:      cc.CustomColumnName,
+				HeaderName: cc.CustomLabelName,
+				DataType:   cc.Type,
+			})
+		}
 	}
 
 	// 5. Execute preview query against adapter

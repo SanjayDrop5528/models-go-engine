@@ -272,6 +272,15 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 					existingCol = existing.JSONField
 				}
 				if strings.EqualFold(existingCol, targetCol) {
+					// Check if cp and existing refer to the same logical field being updated
+					// (e.g. caller passed column name as ID instead of composite ID, or vice versa)
+					if strings.EqualFold(existing.ColumnName, cp.ID) ||
+						strings.EqualFold(existing.JSONField, cp.ID) ||
+						cp.ID == fmt.Sprintf("%s_%s", cp.ModelID, existingCol) ||
+						existing.ID == fmt.Sprintf("%s_%s", cp.ModelID, cp.ID) {
+						delete(r.dataModels[cp.ModelID], existing.ID)
+						continue
+					}
 					return nil, fmt.Errorf("column name '%s' already exists in model '%s'. Duplicate column names are not allowed", targetCol, cp.ModelID)
 				}
 			}

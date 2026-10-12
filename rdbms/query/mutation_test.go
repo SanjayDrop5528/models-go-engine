@@ -66,3 +66,43 @@ func TestRawQueryExpandsInValues(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRawQueryScanClosesRowsInTx(t *testing.T) {
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO fixtures \(id, name\) VALUES \(\$1, \$2\) RETURNING id, name`).
+		WithArgs(10, "created").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(10, "created"))
+	mock.ExpectExec(`INSERT INTO events \(name\) VALUES \(\$1\)`).
+		WithArgs("created").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	db := NewDB(database, dialect.NewPostgreSQL())
+	ctx := context.Background()
+	err = db.RunInTx(ctx, nil, func(ctx context.Context, tx *Tx) error {
+		var f mutationFixture
+		if err := tx.NewRaw(`INSERT INTO fixtures (id, name) VALUES (?, ?) RETURNING id, name`, 10, "created").Scan(ctx, &f); err != nil {
+			return err
+		}
+		if f.ID != 10 || f.Name != "created" {
+			t.Fatalf("unexpected scanned fixture: %+v", f)
+		}
+		if _, err := tx.NewRaw(`INSERT INTO events (name) VALUES (?)`, "created").Exec(ctx); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+

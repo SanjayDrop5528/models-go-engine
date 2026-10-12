@@ -11,6 +11,10 @@ import (
 // by the engine query API: a struct, a slice of structs or maps, one scalar, or
 // one scalar destination per selected column.
 func scanRows(rows *sql.Rows, destinations ...any) error {
+	if rows == nil {
+		return nil
+	}
+	defer rows.Close()
 	if len(destinations) == 0 {
 		for rows.Next() {
 		}

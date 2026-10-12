@@ -154,6 +154,7 @@ func (q *RawQuery) Scan(ctx context.Context, destinations ...any) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 	return scanRows(rows, destinations...)
 }
 

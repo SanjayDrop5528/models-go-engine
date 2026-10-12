@@ -74,3 +74,18 @@ func TestParsePaginationRequestIncludesRelations(t *testing.T) {
 		t.Fatalf("expected structured relation options to be preserved, got %+v", q.RelationSpecs)
 	}
 }
+
+func TestParsePaginationRequestSupportsDatasetOperators(t *testing.T) {
+	q := query.ParsePaginationRequest(query.PaginationRequest{Filter: []query.FilterCondition{{Conditions: []query.ConditionGroup{
+		{Column: "id", Operator: "=", Value: 10},
+		{Column: "status", Operator: "not equals", Value: "deleted"},
+		{Column: "kind", Operator: "IN", Value: []any{"a", "b"}},
+		{Column: "kind", Operator: "NOT_IN", Value: []any{"x", "y"}},
+	}}}})
+	if len(q.Filters) != 4 {
+		t.Fatalf("expected four filters, got %d", len(q.Filters))
+	}
+	if q.Filters[0].Op != query.OpEq || q.Filters[1].Op != query.OpNeq || q.Filters[2].Op != query.OpIn || q.Filters[3].Op != query.OpNin {
+		t.Fatalf("unexpected operators: %+v", q.Filters)
+	}
+}

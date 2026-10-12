@@ -171,17 +171,18 @@ func parseConditionGroup(q *Query, cond ConditionGroup) {
 	}
 
 	col := cond.Column
-	opStr := strings.ToUpper(cond.Operator)
+	opStr := strings.ToUpper(strings.TrimSpace(cond.Operator))
+	opStr = strings.ReplaceAll(opStr, " ", "_")
 	val := cond.Value
 
 	switch opStr {
-	case "EQUALS":
+	case "EQUALS", "EQUAL", "EQ", "=":
 		if val == nil {
 			q.Filters = append(q.Filters, Filter{Field: col, Op: OpIsNull})
 		} else {
 			q.Filters = append(q.Filters, Filter{Field: col, Op: OpEq, Value: val})
 		}
-	case "NOTEQUAL":
+	case "NOTEQUAL", "NOT_EQUALS", "NOT_EQUAL", "NEQ", "!=", "<>":
 		if val == nil {
 			q.Filters = append(q.Filters, Filter{Field: col, Op: OpIsNotNull})
 		} else {
@@ -211,9 +212,9 @@ func parseConditionGroup(q *Query, cond ConditionGroup) {
 		q.Filters = append(q.Filters, Filter{Field: col, Op: OpIsNull})
 	case "NOTBLANK":
 		q.Filters = append(q.Filters, Filter{Field: col, Op: OpIsNotNull})
-	case "IN":
+	case "IN", "$IN":
 		q.Filters = append(q.Filters, Filter{Field: col, Op: OpIn, Value: val})
-	case "NOTIN":
+	case "NOTIN", "NOT_IN", "$NOTIN":
 		q.Filters = append(q.Filters, Filter{Field: col, Op: OpNin, Value: val})
 	default:
 		if cond.Operator != "" {

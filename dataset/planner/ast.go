@@ -2,10 +2,11 @@
 //
 // File: ast.go
 // Usage:
-//   This file defines the abstract syntax tree (AST) data models for dataset queries.
-//   It captures the root table, normalized relational joins, projected columns, custom/virtual
-//   calculated fields, aggregate expressions, filter conditions, group by dimensions, and
-//   runtime parameters in a vendor-neutral intermediate representation.
+//
+//	This file defines the abstract syntax tree (AST) data models for dataset queries.
+//	It captures the root table, normalized relational joins, projected columns, custom/virtual
+//	calculated fields, aggregate expressions, filter conditions, group by dimensions, and
+//	runtime parameters in a vendor-neutral intermediate representation.
 package planner
 
 import (
@@ -48,6 +49,8 @@ type ASTJoin struct {
 	JoinFilter    map[string]any
 	ConvertString bool
 	CastMode      string
+	Cardinality   string
+	OutputFormat  string
 }
 
 // ASTProjection represents a selected result column.

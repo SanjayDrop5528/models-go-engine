@@ -2,11 +2,12 @@
 //
 // File: planner.go
 // Usage:
-//   This file implements the core query planner (DataSetPlanner) for Dataset Studio.
-//   It takes a validated DataSet domain model, resolves table aliases, organizes relational
-//   joins, separates scalar projections from grouped/aggregate dimensions, builds custom
-//   column calculation ASTs, parses WHERE filter conditions and runtime parameters, and emits
-//   an optimized, dialect-independent QueryAST ready for adapter compilation.
+//
+//	This file implements the core query planner (DataSetPlanner) for Dataset Studio.
+//	It takes a validated DataSet domain model, resolves table aliases, organizes relational
+//	joins, separates scalar projections from grouped/aggregate dimensions, builds custom
+//	column calculation ASTs, parses WHERE filter conditions and runtime parameters, and emits
+//	an optimized, dialect-independent QueryAST ready for adapter compilation.
 package planner
 
 import (
@@ -26,7 +27,8 @@ type DataSetPlanner struct {
 // NewPlanner creates a new DataSetPlanner.
 //
 // Purpose:
-//   Initializes a DataSetPlanner with the provided FunctionResolver for function and aggregation introspection.
+//
+//	Initializes a DataSetPlanner with the provided FunctionResolver for function and aggregation introspection.
 //
 // Where it is used:
 //   - Instantiated in DataSetService.NewDataSetService.
@@ -43,8 +45,9 @@ func NewPlanner(fnr resolver.FunctionResolver) *DataSetPlanner {
 // BuildAST creates the QueryAST from a dataset definition.
 //
 // Purpose:
-//   Transforms an abstract DataSet domain struct into a fully-resolved, vendor-independent QueryAST.
-//   Resolves aliases, organizes joins, normalizes GROUP BY fields, and binds parameter definitions.
+//
+//	Transforms an abstract DataSet domain struct into a fully-resolved, vendor-independent QueryAST.
+//	Resolves aliases, organizes joins, normalizes GROUP BY fields, and binds parameter definitions.
 //
 // Where it is used:
 //   - Called by DataSetService.Preview to prepare AST for live preview compilation.
@@ -98,6 +101,8 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			JoinFilter:    j.Filter,
 			ConvertString: j.ConvertToString,
 			CastMode:      j.CastMode,
+			Cardinality:   j.Cardinality,
+			OutputFormat:  j.OutputFormat,
 		})
 		tableAliases[strings.ToLower(j.ToCollection)] = alias
 		if j.Schema != "" {
@@ -295,7 +300,8 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 // resolveTableAlias determines the effective alias or table name for a collection reference.
 //
 // Purpose:
-//   Maps schema-qualified names or raw table names to their registered join aliases.
+//
+//	Maps schema-qualified names or raw table names to their registered join aliases.
 //
 // Where it is used:
 //   - Used throughout BuildAST when resolving join targets, projection sources, and custom column fields.
@@ -320,7 +326,8 @@ func resolveTableAlias(table string, aliases map[string]string) string {
 // isAggregateFunctionName checks if a function name represents a standard SQL aggregate function.
 //
 // Purpose:
-//   Quickly identifies aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.) without registry lookup.
+//
+//	Quickly identifies aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.) without registry lookup.
 //
 // Where it is used:
 //   - Used by BuildAST to determine if a query requires GROUP BY semantics and projection pruning.
@@ -339,8 +346,9 @@ func isAggregateFunctionName(name string) bool {
 // parseFilterMap converts a raw map-based filter definition into a list of ASTCondition structs.
 //
 // Purpose:
-//   Deconstructs key-value filters (e.g. "employees.department_id": {"paramName": "dept_id", ...})
-//   into strongly-typed ASTCondition objects, detecting whether a value is a static literal or a parameter reference.
+//
+//	Deconstructs key-value filters (e.g. "employees.department_id": {"paramName": "dept_id", ...})
+//	into strongly-typed ASTCondition objects, detecting whether a value is a static literal or a parameter reference.
 //
 // Where it is used:
 //   - Called by BuildAST to parse WHERE filter dictionaries from ds.Filter.
@@ -410,7 +418,8 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 // isNumericString determines if a string literal contains a purely numeric value.
 //
 // Purpose:
-//   Distinguishes numeric literals (e.g. "100", "0.05") from column identifiers in custom expressions.
+//
+//	Distinguishes numeric literals (e.g. "100", "0.05") from column identifiers in custom expressions.
 //
 // Where it is used:
 //   - Used in BuildAST when analyzing custom column formula operands.

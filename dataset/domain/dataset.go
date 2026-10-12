@@ -87,6 +87,8 @@ type JoinCollection struct {
 	ConvertToString     bool                   `json:"convert_To_String,omitempty"`
 	CastMode            string                 `json:"cast_mode,omitempty"` // "BOTH", "FROM_ONLY", "TO_ONLY"
 	Filter              map[string]interface{} `json:"filter,omitempty"`    // Join filter applied on the ON clause
+	Cardinality         string                 `json:"cardinality,omitempty"`
+	OutputFormat        string                 `json:"outputFormat,omitempty"`
 }
 
 // DataSetCustomField defines a field reference within a custom column expression.
@@ -259,4 +261,3 @@ func (r *ExecuteRequest) NormalizeRuntimeParams() map[string]any {
 	}
 	return params
 }
-

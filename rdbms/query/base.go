@@ -596,6 +596,9 @@ func (q *baseQuery) setModel(m any) {
 			q.tableModel = tm
 			q.table = tm.Table()
 		}
+	} else if tm := BuildTableModelFromStruct(m); tm != nil {
+		q.tableModel = tm
+		q.table = tm.Table()
 	}
 }
 
@@ -603,6 +606,11 @@ func (q *baseQuery) setErr(err error) {
 	if q.err == nil {
 		q.err = err
 	}
+}
+
+// GetErr returns any error registered on the query.
+func (q *baseQuery) GetErr() error {
+	return q.err
 }
 
 func (q *baseQuery) addWith(w *WithQuery) {

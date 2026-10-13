@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/SanjayDrop5528/models-go-engine/model"
+	"github.com/SanjayDrop5528/models-go-engine/rdbms/query"
 	"github.com/SanjayDrop5528/models-go-engine/rdbms/schema"
 )
 
@@ -170,3 +171,9 @@ func NewTableModelFromModel(m *model.Model) schema.TableModel {
 		joins: joins,
 	}
 }
+
+// BuildTableModelFromStruct converts a Go struct or slice model into a schema.TableModel with introspected relations.
+func BuildTableModelFromStruct(m any) schema.TableModel {
+	return query.BuildTableModelFromStruct(m)
+}
+

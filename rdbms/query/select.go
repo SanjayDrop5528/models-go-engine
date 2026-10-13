@@ -759,10 +759,16 @@ func (q *SelectQuery) _forEachInlineRelJoin(fn func(*schema.RelationJoin) error,
 			if err := fn(j); err != nil {
 				return err
 			}
-			// When loadWithChildren is configured, recursively visit nested children
-			if q.loadWithChildren && j.LoadWithChildren && j.JoinModel != nil {
-				if err := q._forEachInlineRelJoin(fn, j.JoinModel.GetJoins()); err != nil {
-					return err
+			// When loadWithChildren is configured or child has active joins, visit nested children
+			if j.JoinModel != nil {
+				if sm, ok := j.JoinModel.(*StructTableModel); ok && sm.HasActiveJoins() {
+					if err := q._forEachInlineRelJoin(fn, sm.GetJoins()); err != nil {
+						return err
+					}
+				} else if q.loadWithChildren && j.LoadWithChildren {
+					if err := q._forEachInlineRelJoin(fn, j.JoinModel.GetJoins()); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -1057,7 +1063,18 @@ func (q *SelectQuery) appendColumns(gen schema.QueryGen, b []byte) (_ []byte, er
 			}
 		}
 	case q.table != nil:
-		if len(q.table.Fields) > 10 && gen != nil && gen.IsNop() {
+		if sm, ok := q.tableModel.(*StructTableModel); ok && sm.IsStructModel() {
+			if q.table.SQLAlias != "" {
+				if gen != nil {
+					b = gen.Dialect().AppendIdent(b, q.table.SQLAlias)
+					b = append(b, ".*"...)
+				} else {
+					b = append(b, fmt.Sprintf("%s.*", q.table.SQLAlias)...)
+				}
+			} else {
+				b = append(b, '*')
+			}
+		} else if len(q.table.Fields) > 10 && gen != nil && gen.IsNop() {
 			b = append(b, q.table.SQLAlias...)
 			b = append(b, '.')
 			b = gen.Dialect().AppendString(b, fmt.Sprintf("%d columns", len(q.table.Fields)))
@@ -1381,6 +1398,10 @@ func (q *SelectQuery) scanResult(ctx context.Context, dest ...any) (sql.Result, 
 		return nil, q.err
 	}
 
+	if len(dest) == 0 && q.model != nil {
+		dest = []any{q.model}
+	}
+
 	if q.table != nil {
 		if err := q.beforeSelectHook(ctx); err != nil {
 			return nil, err
@@ -1396,7 +1417,7 @@ func (q *SelectQuery) scanResult(ctx context.Context, dest ...any) (sql.Result, 
 		return nil, err
 	}
 	defer rows.Close()
-	if err := scanRows(rows, dest...); err != nil {
+	if err := scanRowsWithContext(ctx, rows, dest...); err != nil {
 		return nil, err
 	}
 

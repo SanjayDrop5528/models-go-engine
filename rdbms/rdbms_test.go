@@ -432,4 +432,64 @@ func TestNewTableModelFromModel_RelationQuery(t *testing.T) {
 	}
 }
 
+type testDriver struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type testVehicleModel struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type testVehicle struct {
+	ID             string            `json:"id"`
+	RegistrationNo string            `json:"registration_no"`
+	ModelID        string            `json:"model_id"`
+	Model          *testVehicleModel `json:"model"`
+}
+
+type testTrip struct {
+	ID                 string       `json:"id"`
+	AllocatedDriverID  string       `json:"allocated_driver_id"`
+	AllocatedVehicleID string       `json:"allocated_vehicle_id"`
+	AllocatedDriver    *testDriver  `json:"allocated_driver"`
+	AllocatedVehicle   *testVehicle `json:"allocated_vehicle"`
+}
+
+func (testTrip) TableName() string         { return "trip.regular_trips" }
+func (testDriver) TableName() string       { return "iam.employees" }
+func (testVehicle) TableName() string      { return "fleet.vehicle" }
+func (testVehicleModel) TableName() string { return "fleet.model" }
+
+func TestSelectQuery_StructModelWithRelations(t *testing.T) {
+	db := rdbms.NewDB(nil, dialect.NewPostgreSQL())
+
+	var trips []testTrip
+	q := db.NewSelect().
+		Model(&trips).
+		Relation("AllocatedDriver").
+		Relation("AllocatedVehicle").
+		Relation("AllocatedVehicle.Model")
+
+	if q.GetErr() != nil {
+		t.Fatalf("unexpected query error: %v", q.GetErr())
+	}
+
+	sqlStr := q.String()
+	if !strings.Contains(sqlStr, `FROM "trip"."regular_trips" AS "rt"`) {
+		t.Fatalf("expected FROM trip.regular_trips AS rt, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, `LEFT JOIN "iam"."employees" AS "allocated_driver" ON "allocated_driver"."id" = rt.allocated_driver_id`) {
+		t.Fatalf("expected join on allocated_driver, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, `LEFT JOIN "fleet"."vehicle" AS "allocated_vehicle" ON "allocated_vehicle"."id" = rt.allocated_vehicle_id`) {
+		t.Fatalf("expected join on allocated_vehicle, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, `LEFT JOIN "fleet"."model" AS "allocated_vehicle__model" ON "allocated_vehicle__model"."id" = allocated_vehicle.model_id`) {
+		t.Fatalf("expected join on allocated_vehicle.model, got: %s", sqlStr)
+	}
+}
+
+
 

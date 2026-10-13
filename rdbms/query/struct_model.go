@@ -64,12 +64,9 @@ func (s *StructTableModel) Clone() schema.TableModel {
 	}
 }
 
-// GetJoins returns active relation joins if any were requested, or all joins otherwise.
+// GetJoins returns only relation joins that were explicitly requested.
 func (s *StructTableModel) GetJoins() []*schema.RelationJoin {
-	if len(s.activeJoins) > 0 {
-		return s.activeJoins
-	}
-	return s.joins
+	return s.activeJoins
 }
 
 // HasActiveJoins reports whether any relations were explicitly activated on this table model.
@@ -202,29 +199,6 @@ func resolveTableName(t reflect.Type) string {
 		}
 	}
 
-	// Well-known repository entity fallbacks
-	name := t.Name()
-	switch name {
-	case "RegularTrip":
-		return "trip.regular_trips"
-	case "RegularTripPassenger", "TripPassenger":
-		return "trip.regular_trip_passengers"
-	case "RegularTripLog":
-		return "trip.regular_trip_log"
-	case "Employee":
-		return "iam.employees"
-	case "Vehicle":
-		return "fleet.vehicle"
-	case "Model":
-		return "fleet.model"
-	case "Make":
-		return "fleet.make"
-	case "WorkshopJob":
-		return "fleet.workshop_jobs"
-	case "PartInventory":
-		return "fleet.part_inventories"
-	}
-
 	return inferTable(t, "")
 }
 
@@ -249,20 +223,9 @@ func resolveTableAlias(t reflect.Type, tableName string, parentAlias string) str
 		}
 	}
 
-	// Well-known entity aliases commonly referenced in repo queries
 	raw := tableName
 	if dot := strings.LastIndex(raw, "."); dot >= 0 {
 		raw = raw[dot+1:]
-	}
-	switch raw {
-	case "regular_trips":
-		return "rt"
-	case "regular_trip_passengers":
-		return "rtp"
-	case "workshop_jobs":
-		return "wj"
-	case "ore_trips":
-		return "ot"
 	}
 
 	parts := strings.Split(raw, "_")
@@ -323,8 +286,8 @@ func inspectStructFieldsAndRelations(t reflect.Type, tm *StructTableModel, curre
 			// Target table alias for joins:
 			// e.g. "allocated_driver" or "allocated_vehicle__model"
 			targetRelAlias := snakeCase(relName)
-			if alias != "" && alias != "rt" && alias != "wj" && alias != "ot" {
-				targetRelAlias = alias + "__" + targetRelAlias
+			if currentAlias != "" {
+				targetRelAlias = currentAlias + "__" + targetRelAlias
 			}
 
 			visitedCopy := make(map[reflect.Type]bool, len(visited)+1)
@@ -429,12 +392,6 @@ func resolveRelationKeys(sourceType reflect.Type, relField reflect.StructField, 
 			relField.Name + "ID",
 			snakeCase(relField.Name) + "_id",
 			relField.Name + "Id",
-		}
-		// Special conventions
-		if relField.Name == "Employee" {
-			candidates = append(candidates, "EmpID", "empid", "employee_id", "EmployeeID")
-		} else if relField.Name == "AllocatedVehicle" {
-			candidates = append(candidates, "AllocatedVehicleID", "allocated_vehicle_id", "AllocatedVehilsID", "allocated_vechils_id")
 		}
 
 		for _, c := range candidates {

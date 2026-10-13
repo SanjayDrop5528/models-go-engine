@@ -243,10 +243,20 @@ func isStructAllZero(v reflect.Value) bool {
 }
 
 func taggedColumn(field reflect.StructField) string {
-	for _, key := range []string{"model", "json", "db", "bun"} {
-		value := strings.Split(field.Tag.Get(key), ",")[0]
-		if value != "" {
-			return value
+	for _, key := range []string{"bun", "model", "db"} {
+		tag := field.Tag.Get(key)
+		if tag == "-" {
+			return "-"
+		}
+		parts := strings.Split(tag, ",")
+		if parts[0] != "" {
+			return parts[0]
+		}
+	}
+	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+		parts := strings.Split(jsonTag, ",")
+		if parts[0] != "" {
+			return parts[0]
 		}
 	}
 	return ""

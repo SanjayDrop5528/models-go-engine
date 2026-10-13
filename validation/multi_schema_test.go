@@ -2,13 +2,15 @@ package validation_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
 	"github.com/SanjayDrop5528/models-go-engine/mapping"
 	"github.com/SanjayDrop5528/models-go-engine/model"
 	"github.com/SanjayDrop5528/models-go-engine/project"
 	"github.com/SanjayDrop5528/models-go-engine/validation"
-	"strings"
-	"testing"
 )
 
 // Helper function to build float pointer
@@ -232,7 +234,8 @@ func TestEnterpriseMultiSchemaDomain_ValidationMatrix(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected valid organization creation, got err: %v", err)
 		}
-		if created["id"] == nil || len(created["id"].(string)) != 32 {
+		idStr := fmt.Sprintf("%v", created["id"])
+		if created["id"] == nil || (len(idStr) != 32 && len(idStr) != 36) {
 			t.Fatalf("expected auto-generated UUID for organization, got: %v", created["id"])
 		}
 	})

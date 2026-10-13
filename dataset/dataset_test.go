@@ -1133,3 +1133,67 @@ func TestDataSet_ExecuteWithOptions_MongoDB_AppendFilter(t *testing.T) {
 		t.Errorf("expected $match at index 1 for appendfilter=last, got: %v", stagesLast[1])
 	}
 }
+
+type mockRowAdapter struct {
+	adapter.Adapter
+	resultRows []map[string]any
+}
+
+func (m *mockRowAdapter) Name() string { return "postgres" }
+
+func (m *mockRowAdapter) Execute(ctx context.Context, req execution.ExecutionRequest) (*execution.ExecutionResult, error) {
+	return &execution.ExecutionResult{
+		Data:   m.resultRows,
+		Status: "SUCCESS",
+	}, nil
+}
+
+func TestPreview_NormalizesRawJSONAndPostgresArrayRows(t *testing.T) {
+	svc := setupTestService()
+	mockAdp := &mockRowAdapter{
+		resultRows: []map[string]any{
+			{
+				"id":                        "d06a2be8-0676-4acc-804b-261e88bf7649",
+				"services_id":               "{9256960b-122e-4555-b507-dde679f71b2c,727100b8-b416-4ded-aac0-2491f6826401}",
+				"repair_service_name_alias": `[{"id": "9256960b-122e-4555-b507-dde679f71b2c", "service_name": "dsadsa"}]`,
+			},
+		},
+	}
+	svc.SetAdapter(mockAdp)
+
+	ds := &domain.DataSet{
+		Name:          "test_preview_normalization",
+		ReferenceName: "test_preview_normalization",
+		Driver:        "postgres",
+		BaseCollection: domain.BaseCollection{
+			Collection: "employees",
+		},
+		SelectedList: []domain.SelectedField{
+			{Field: "employees.id", HeaderName: "id", DataType: "uuid"},
+		},
+	}
+
+	res, err := svc.Preview(context.Background(), ds)
+	if err != nil {
+		t.Fatalf("Preview failed: %v", err)
+	}
+	if len(res.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(res.Rows))
+	}
+
+	aliasVal, ok := res.Rows[0]["repair_service_name_alias"].([]any)
+	if !ok {
+		t.Fatalf("expected repair_service_name_alias to be []any, got %T: %#v", res.Rows[0]["repair_service_name_alias"], res.Rows[0]["repair_service_name_alias"])
+	}
+	if len(aliasVal) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(aliasVal))
+	}
+
+	servicesVal, ok := res.Rows[0]["services_id"].([]any)
+	if !ok {
+		t.Fatalf("expected services_id to be []any, got %T: %#v", res.Rows[0]["services_id"], res.Rows[0]["services_id"])
+	}
+	if len(servicesVal) != 2 || servicesVal[0] != "9256960b-122e-4555-b507-dde679f71b2c" {
+		t.Fatalf("expected 2 uuids, got %#v", servicesVal)
+	}
+}

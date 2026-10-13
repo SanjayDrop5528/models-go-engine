@@ -229,6 +229,7 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 	if rows == nil {
 		rows = make([]map[string]any, 0)
 	}
+	rows = normalizeDatasetRows(rows)
 
 	return &PreviewResponse{
 		Columns:           cols,
@@ -548,6 +549,7 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 	if rows == nil {
 		rows = []map[string]any{}
 	}
+	rows = normalizeDatasetRows(rows)
 
 	return rows, nil
 }
@@ -1040,4 +1042,120 @@ func (s *DataSetService) compile(ctx context.Context, ast *planner.QueryAST, ds 
 	}
 
 	return comp.Compile(ctx, ast, ds)
+}
+
+func parseDatasetArray(s string) ([]any, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 || s[0] != '{' || s[len(s)-1] != '}' {
+		return nil, false
+	}
+	content := s[1 : len(s)-1]
+	if strings.TrimSpace(content) == "" {
+		return []any{}, true
+	}
+
+	var result []any
+	var current strings.Builder
+	inQuotes := false
+	escaped := false
+	hasQuote := false
+
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+		if escaped {
+			current.WriteByte(ch)
+			escaped = false
+			continue
+		}
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+		if ch == '"' {
+			inQuotes = !inQuotes
+			hasQuote = true
+			continue
+		}
+		if ch == ',' && !inQuotes {
+			elem := current.String()
+			if !hasQuote && strings.EqualFold(elem, "NULL") {
+				result = append(result, nil)
+			} else {
+				result = append(result, elem)
+			}
+			current.Reset()
+			hasQuote = false
+			continue
+		}
+		current.WriteByte(ch)
+	}
+
+	if inQuotes {
+		return nil, false
+	}
+
+	elem := current.String()
+	if !hasQuote && strings.EqualFold(elem, "NULL") {
+		result = append(result, nil)
+	} else {
+		result = append(result, elem)
+	}
+
+	return result, true
+}
+
+func normalizeDatasetValue(val any) any {
+	switch v := val.(type) {
+	case []byte:
+		if len(v) == 0 {
+			return ""
+		}
+		var obj map[string]any
+		if json.Unmarshal(v, &obj) == nil {
+			return obj
+		}
+		var arr []any
+		if json.Unmarshal(v, &arr) == nil {
+			return arr
+		}
+		s := string(v)
+		if strings.HasPrefix(strings.TrimSpace(s), "{") && strings.HasSuffix(strings.TrimSpace(s), "}") {
+			if pgArr, ok := parseDatasetArray(s); ok {
+				return pgArr
+			}
+		}
+		return s
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if len(trimmed) == 0 {
+			return v
+		}
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			var arr []any
+			if json.Unmarshal([]byte(trimmed), &arr) == nil {
+				return arr
+			}
+		}
+		if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+			var obj map[string]any
+			if json.Unmarshal([]byte(trimmed), &obj) == nil {
+				return obj
+			}
+			if pgArr, ok := parseDatasetArray(trimmed); ok {
+				return pgArr
+			}
+		}
+		return v
+	default:
+		return val
+	}
+}
+
+func normalizeDatasetRows(rows []map[string]any) []map[string]any {
+	for _, row := range rows {
+		for k, v := range row {
+			row[k] = normalizeDatasetValue(v)
+		}
+	}
+	return rows
 }

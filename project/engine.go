@@ -15,6 +15,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
 	"github.com/SanjayDrop5528/models-go-engine/ai"
@@ -1029,8 +1030,16 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 		return nil, fmt.Errorf("table/collection '%s' does not exist in database '%s'", m.StorageName, m.Database)
 	}
 
+	pkCols := make(map[string]bool)
+	if liveSchema.PrimaryKey != nil {
+		for _, col := range liveSchema.PrimaryKey.Columns {
+			pkCols[col] = true
+		}
+	}
+
 	newAttrs := make([]model.Attribute, 0, len(liveSchema.Attributes))
 	for _, sa := range liveSchema.Attributes {
+		isPK := sa.PrimaryKey || pkCols[sa.Name]
 		newAttrs = append(newAttrs, model.Attribute{
 			Name:          sa.Name,
 			Type:          sa.Type,
@@ -1041,6 +1050,7 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 			Default:       sa.Default,
 			Unique:        sa.Unique,
 			AutoIncrement: sa.AutoIncrement,
+			IsPrimaryKey:  isPK,
 			Comment:       sa.Comment,
 		})
 	}
@@ -1051,6 +1061,43 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 			Columns: liveSchema.PrimaryKey.Columns,
 		}
 	}
+
+	// Synchronize and refresh DataModel catalog entries for this model
+	existingFields := e.registry.ListDataModels(modelID)
+	for _, ef := range existingFields {
+		_ = e.DeleteDataModel(ctx, modelID, ef.ID)
+	}
+
+	for _, sa := range liveSchema.Attributes {
+		fieldID := fmt.Sprintf("%s_%s", modelID, sa.Name)
+		isPK := sa.PrimaryKey || pkCols[sa.Name]
+		dm := &model.DataModel{
+			ID:           fieldID,
+			ModelID:      modelID,
+			ColumnName:   sa.Name,
+			JSONField:    sa.Name,
+			DataType:     sa.Type,
+			IsNullable:   sa.Nullable,
+			IsRequired:   !sa.Nullable && !isPK,
+			IsPrimaryKey: isPK,
+			IsUnique:     sa.Unique,
+			DefaultValue: sa.Default,
+			Status:       model.DataModelStatusActive,
+			CreatedAt:    time.Now().UTC(),
+			UpdatedAt:    time.Now().UTC(),
+		}
+		if sa.Length > 0 {
+			dm.MaxLength = &sa.Length
+		}
+		if sa.Precision > 0 {
+			dm.Precision = &sa.Precision
+		}
+		if sa.Scale > 0 {
+			dm.Scale = &sa.Scale
+		}
+		_, _ = e.AddDataModel(ctx, dm)
+	}
+
 	return e.registry.SetActive(modelID, m)
 }
 

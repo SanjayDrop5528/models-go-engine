@@ -96,7 +96,7 @@ func NormalizeDataType(t string) DataType {
 		return TypeArray
 	case "ENUM":
 		return TypeEnum
-	case "CUSTOM":
+	case "CUSTOM", "CUSTOM_TYPE":
 		return TypeCustom
 	case "REFERENCE":
 		return TypeReference

@@ -17,11 +17,12 @@ type ConditionGroup struct {
 	Operator             string           `json:"operator" bson:"operator"`
 	Column               string           `json:"column" bson:"column"`
 	ParentCollectionName string           `json:"parentCollectionName,omitempty" bson:"parentCollectionName,omitempty"`
-	ValueType            any              `json:"value_type,omitempty" bson:"value_type,omitempty"`
-	Type                 string           `json:"type,omitempty" bson:"type,omitempty"`
-	Value                any              `json:"value,omitempty" bson:"value,omitempty"`
-	Clause               string           `json:"clause,omitempty" bson:"clause,omitempty"`
-	Conditions           []ConditionGroup `json:"conditions,omitempty" bson:"conditions,omitempty"`
+	Value_type           any              `json:"value_type,omitempty" bson:"value_type,omitempty"`
+	Type                 string           `json:"type" bson:"type"`
+	Value                any              `json:"value" bson:"value"`
+	Clause               string           `json:"clause" bson:"clause"`
+	NoParentClause       bool             `json:"no_parent_clause,omitempty" bson:"no_parent_clause,omitempty"`
+	Conditions           []ConditionGroup `json:"conditions" bson:"conditions"`
 }
 
 // FilterCondition defines a top-level group of filter conditions with a logical clause (AND/OR).
@@ -30,34 +31,52 @@ type FilterCondition struct {
 	Conditions []ConditionGroup `json:"conditions,omitempty" bson:"conditions,omitempty"`
 }
 
-// FilterParam defines custom parameter values for dynamic pipelines.
-type FilterParam struct {
-	ParamsName     string `json:"ParamsName"`
-	ParamsDataType string `json:"parmsDataType"`
-	DefaultValue   any    `json:"DefaultValue,omitempty"`
-	ParamsValue    any    `json:"Paramsvalue,omitempty"`
+// FieldValuePair specifies field and value mapping with optional default value.
+type FieldValuePair struct {
+	FieldName    string `json:"fieldname" bson:"fieldname"`
+	FieldValue   any    `json:"fieldvalue" bson:"fieldvalue"`
+	DefaultValue any    `json:"defaultvalue" bson:"defaultvalue"`
 }
 
-// SortParam defines sorting criteria per column.
-type SortParam struct {
-	ColID string `json:"colId" bson:"colId"`
-	Sort  string `json:"sort" bson:"sort"`
+// FilterParams defines custom parameter values for dynamic pipelines.
+type FilterParams struct {
+	ParamsName     string `json:"ParamsName" bson:"ParamsName"`
+	ParamsDataType string `json:"parmsDataType" bson:"parmsDataType"`
+	DefaultValue   any    `json:"DefaultValue,omitempty" bson:"DefaultValue,omitempty"`
+	ParamsValue    any    `json:"Paramsvalue,omitempty" bson:"Paramsvalue,omitempty"`
 }
+
+// FilterParam is an alias for FilterParams for backward compatibility.
+type FilterParam = FilterParams
+
+// SortCriteria defines sorting criteria per column.
+type SortCriteria struct {
+	Sort  string `json:"sort" bson:"sort"`
+	ColID string `json:"colId" bson:"colId"`
+}
+
+// SortParam is an alias for SortCriteria for backward compatibility.
+type SortParam = SortCriteria
 
 // PaginationRequest defines the structured POST filter payload compatible with AG-Grid and enterprise filter APIs.
 type PaginationRequest struct {
-	Debug                bool              `json:"debug,omitempty"`
-	DebugIncludeArgs     bool              `json:"debug_include_args,omitempty"`
-	SlowQueryThresholdMS int               `json:"slow_query_threshold_ms,omitempty"`
-	Start                int               `json:"start,omitempty"`
-	End                  int               `json:"end,omitempty"`
-	Filter               []FilterCondition `json:"filter,omitempty"`
-	FilterParam          []FilterParam     `json:"filterParam,omitempty"`
-	Sort                 []SortParam       `json:"sort,omitempty"`
-	IncludeTotal         *bool             `json:"includeTotal,omitempty"`
-	Fields               []string          `json:"fields,omitempty"`
-	Relations            []string          `json:"relations,omitempty"`
-	RelationSpecs        []RelationSpec    `json:"relation_specs,omitempty"`
+	Start             int               `json:"start,omitempty" bson:"start,omitempty" validate:"omitempty"`
+	End               int               `json:"end,omitempty" bson:"end,omitempty" validate:"omitempty"`
+	FilterColumns     []FieldValuePair  `json:"filterColumns,omitempty" bson:"filterColumns,omitempty" validate:"omitempty"`
+	Filter            []FilterCondition `json:"filter,omitempty" bson:"filter,omitempty" validate:"omitempty"`
+	Sort              []SortCriteria    `json:"sort,omitempty" bson:"sort,omitempty" validate:"omitempty"`
+	FirstFilterAppend bool              `json:"first_filter_append,omitempty" bson:"first_filter_append,omitempty" validate:"omitempty"`
+	FilterParam       []FilterParam     `json:"filterParams,omitempty" bson:"filterParams,omitempty"`
+
+	// Extended and backward-compatible fields
+	FilterAppendFirst    bool           `json:"filterAppendFirst,omitempty" bson:"filterAppendFirst,omitempty"`
+	Debug                bool           `json:"debug,omitempty"`
+	DebugIncludeArgs     bool           `json:"debug_include_args,omitempty"`
+	SlowQueryThresholdMS int            `json:"slow_query_threshold_ms,omitempty"`
+	IncludeTotal         *bool          `json:"includeTotal,omitempty"`
+	Fields               []string       `json:"fields,omitempty"`
+	Relations            []string       `json:"relations,omitempty"`
+	RelationSpecs        []RelationSpec `json:"relation_specs,omitempty"`
 }
 
 // WantsTotal returns true unless includeTotal is explicitly set to false.
@@ -92,6 +111,8 @@ type PaginationRequest struct {
 func (r PaginationRequest) WantsTotal() bool {
 	return r.IncludeTotal == nil || *r.IncludeTotal
 }
+
+
 
 // ParsePaginationRequest converts a PaginationRequest struct into a core Query object.
 //

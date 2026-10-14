@@ -210,8 +210,17 @@ func FromModel(m *model.Model) *Schema {
 			AutoIncrement: attr.AutoIncrement,
 			Comment:       attr.Comment,
 		}
-		if isPK && len(pkCols) == 0 {
-			pkCols = append(pkCols, attr.Name)
+		if isPK {
+			already := false
+			for _, c := range pkCols {
+				if c == attr.Name {
+					already = true
+					break
+				}
+			}
+			if !already {
+				pkCols = append(pkCols, attr.Name)
+			}
 		}
 		s.Attributes = append(s.Attributes, sAttr)
 	}

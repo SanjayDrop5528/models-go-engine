@@ -592,6 +592,13 @@ func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 	return nil
 }
 
+// ClearDataModels removes all in-memory data_model field definitions for a model.
+func (r *ModelRegistry) ClearDataModels(modelID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.dataModels, modelID)
+}
+
 // SaveDraft saves or updates a model draft in DRAFT state.
 //
 // Purpose:

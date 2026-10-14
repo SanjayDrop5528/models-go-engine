@@ -545,6 +545,10 @@ func (dm *DataModel) ToAttribute() Attribute {
 		}
 	}
 
+	length := 0
+	if dm.MaxLength != nil {
+		length = *dm.MaxLength
+	}
 	prec := 0
 	if dm.Precision != nil {
 		prec = *dm.Precision
@@ -555,22 +559,24 @@ func (dm *DataModel) ToAttribute() Attribute {
 	}
 
 	return Attribute{
-		Name:         name,
-		RefName:      dm.RefName,
-		ColumnName:   dm.ColumnName,
-		JSONField:    dm.JSONField,
-		Type:         normType,
-		CustomType:   dm.CustomType,
-		Precision:    prec,
-		Scale:        scale,
-		Nullable:     nullable,
-		Default:      dm.DefaultValue,
-		Unique:       dm.IsUnique,
-		IsPrimaryKey: dm.IsPrimaryKey,
-		IsEncrypted:  dm.IsEncrypted,
-		Comment:      dm.Description,
-		Validation:   ruleSet,
-		Reference:    ref,
+		Name:          name,
+		RefName:       dm.RefName,
+		ColumnName:    dm.ColumnName,
+		JSONField:     dm.JSONField,
+		Type:          normType,
+		CustomType:    dm.CustomType,
+		Length:        length,
+		Precision:     prec,
+		Scale:         scale,
+		Nullable:      nullable,
+		Default:       dm.DefaultValue,
+		Unique:        dm.IsUnique,
+		IsPrimaryKey:  dm.IsPrimaryKey,
+		AutoIncrement: dm.IsGenerated,
+		IsEncrypted:   dm.IsEncrypted,
+		Comment:       dm.Description,
+		Validation:    ruleSet,
+		Reference:     ref,
 	}
 }
 

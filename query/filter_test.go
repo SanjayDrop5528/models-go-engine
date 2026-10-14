@@ -1,8 +1,10 @@
 package query_test
 
 import (
-	"github.com/SanjayDrop5528/models-go-engine/query"
+	"encoding/json"
 	"testing"
+
+	"github.com/SanjayDrop5528/models-go-engine/query"
 )
 
 func TestParsePaginationRequest(t *testing.T) {
@@ -87,5 +89,51 @@ func TestParsePaginationRequestSupportsDatasetOperators(t *testing.T) {
 	}
 	if q.Filters[0].Op != query.OpEq || q.Filters[1].Op != query.OpNeq || q.Filters[2].Op != query.OpIn || q.Filters[3].Op != query.OpNin {
 		t.Fatalf("unexpected operators: %+v", q.Filters)
+	}
+}
+
+func TestPaginationRequestStandardJSONUnmarshal(t *testing.T) {
+	rawJSON := `{
+		"start": 10,
+		"end": 50,
+		"first_filter_append": true,
+		"filterColumns": [
+			{"fieldname": "tenant_id", "fieldvalue": "org-123", "defaultvalue": "default-org"}
+		],
+		"filter": [
+			{
+				"clause": "AND",
+				"conditions": [
+					{"operator": "EQUALS", "column": "status", "type": "string", "value": "active"}
+				]
+			}
+		],
+		"sort": [
+			{"sort": "desc", "colId": "created_at"}
+		],
+		"filterParams": [
+			{"ParamsName": "startDate", "parmsDataType": "date"}
+		]
+	}`
+
+	var req query.PaginationRequest
+	if err := json.Unmarshal([]byte(rawJSON), &req); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	if req.Start != 10 || req.End != 50 || !req.FirstFilterAppend {
+		t.Fatalf("basic fields mismatch: %+v", req)
+	}
+	if len(req.FilterColumns) != 1 || req.FilterColumns[0].FieldName != "tenant_id" || req.FilterColumns[0].FieldValue != "org-123" {
+		t.Fatalf("filterColumns mismatch: %+v", req.FilterColumns)
+	}
+	if len(req.Filter) != 1 || len(req.Filter[0].Conditions) != 1 || req.Filter[0].Conditions[0].Column != "status" {
+		t.Fatalf("filter mismatch: %+v", req.Filter)
+	}
+	if len(req.Sort) != 1 || req.Sort[0].ColID != "created_at" || req.Sort[0].Sort != "desc" {
+		t.Fatalf("sort mismatch: %+v", req.Sort)
+	}
+	if len(req.FilterParam) != 1 || req.FilterParam[0].ParamsName != "startDate" {
+		t.Fatalf("filterParam mismatch: %+v", req.FilterParam)
 	}
 }

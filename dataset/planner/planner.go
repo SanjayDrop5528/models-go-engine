@@ -12,6 +12,7 @@ package planner
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -100,7 +101,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			Schema: ds.BaseCollection.Schema,
 			Table:  ds.BaseCollection.Collection,
 			Alias:  ds.BaseCollection.Collection,
-			Filter: ds.BaseCollection.Filter,
+			Filter: normalizeFilterToMap(ds.BaseCollection.Filter),
 		},
 		Parameters: ds.FilterParams,
 	}
@@ -136,7 +137,7 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			ToTable:       j.ToCollection,
 			ToField:       j.ToCollectionField,
 			Alias:         alias,
-			JoinFilter:    j.Filter,
+			JoinFilter:    normalizeFilterToMap(j.Filter),
 			ConvertString: j.ConvertToString,
 			CastMode:      j.CastMode,
 			Cardinality:   j.Cardinality,
@@ -329,23 +330,48 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 
 	// 5. Map Where Filters
 	if len(ds.Filter) > 0 {
-		ast.WhereFilters = p.parseFilterMap(ds.Filter, ds.BaseCollection.Collection, tableAliases, ds.SelectedList)
+		ast.WhereFilters = p.parseFilterSlice(ds.Filter, ds.BaseCollection.Collection, tableAliases, ds.SelectedList)
 	}
 
 	return ast, nil
 }
 
+// normalizeFilterToMap converts any filter representation (map[string]any, []any, etc.) into a flat map[string]any.
+func normalizeFilterToMap(f any) map[string]any {
+	if f == nil {
+		return nil
+	}
+	if m, ok := f.(map[string]any); ok {
+		return m
+	}
+	if m, ok := f.(map[string]interface{}); ok {
+		res := make(map[string]any, len(m))
+		for k, v := range m {
+			res[k] = v
+		}
+		return res
+	}
+	if slice, ok := f.([]any); ok {
+		res := make(map[string]any)
+		for _, item := range slice {
+			if m, ok := item.(map[string]any); ok {
+				if col, ok := m["column"].(string); ok {
+					res[col] = m["value"]
+				} else {
+					for k, v := range m {
+						if k != "clause" && k != "conditions" {
+							res[k] = v
+						}
+					}
+				}
+			}
+		}
+		return res
+	}
+	return nil
+}
+
 // resolveTableAlias determines the effective alias or table name for a collection reference.
-//
-// Purpose:
-//
-//	Maps schema-qualified names or raw table names to their registered join aliases.
-//
-// Where it is used:
-//   - Used throughout BuildAST when resolving join targets, projection sources, and custom column fields.
-//
-// When can it be used:
-//   - Can be used whenever resolving an ambiguous column's source table or alias.
 func resolveTableAlias(table string, aliases map[string]string) string {
 	if table == "" {
 		return table
@@ -362,16 +388,6 @@ func resolveTableAlias(table string, aliases map[string]string) string {
 }
 
 // isAggregateFunctionName checks if a function name represents a standard SQL aggregate function.
-//
-// Purpose:
-//
-//	Quickly identifies aggregate functions (SUM, AVG, COUNT, MIN, MAX, etc.) without registry lookup.
-//
-// Where it is used:
-//   - Used by BuildAST to determine if a query requires GROUP BY semantics and projection pruning.
-//
-// When can it be used:
-//   - Can be used during AST building to detect aggregation vs scalar function calls.
 func isAggregateFunctionName(name string) bool {
 	switch strings.ToUpper(strings.TrimSpace(name)) {
 	case "SUM", "AVG", "COUNT", "COUNT_DISTINCT", "MIN", "MAX", "COUNT_ALL", "COUNT(*)", "COUNT_IF", "SUM_IF":
@@ -379,6 +395,105 @@ func isAggregateFunctionName(name string) bool {
 	default:
 		return false
 	}
+}
+
+// parseFilterSlice converts a slice-based filter definition ([]any) into a list of ASTCondition structs.
+// It supports AG-Grid condition groups, explicit condition maps, and flat key-value dictionaries.
+func (p *DataSetPlanner) parseFilterSlice(filter []any, defaultTable string, tableAliases map[string]string, selectedList []domain.SelectedField) []ASTCondition {
+	var conditions []ASTCondition
+	aliasMap := make(map[string]domain.SelectedField)
+	for _, s := range selectedList {
+		if s.HeaderName != "" {
+			aliasMap[strings.ToLower(s.HeaderName)] = s
+		}
+		if s.Field != "" {
+			aliasMap[strings.ToLower(s.Field)] = s
+		}
+	}
+
+	for _, item := range filter {
+		if item == nil {
+			continue
+		}
+		if cond, ok := item.(ASTCondition); ok {
+			conditions = append(conditions, cond)
+			continue
+		}
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Case A: Group containing nested conditions
+		if rawConds, hasConds := m["conditions"]; hasConds {
+			if condSlice, isSlice := rawConds.([]any); isSlice {
+				subConditions := p.parseFilterSlice(condSlice, defaultTable, tableAliases, selectedList)
+				conditions = append(conditions, subConditions...)
+				continue
+			}
+		}
+
+		// Case B: Explicit condition object: {"column": "status", "operator": "EQUALS", "value": "active"}
+		colRaw, hasCol := m["column"]
+		if !hasCol {
+			colRaw, hasCol = m["field"]
+		}
+		if hasCol {
+			colStr := fmt.Sprintf("%v", colRaw)
+			opStr := "EQUALS"
+			if op, hasOp := m["operator"].(string); hasOp && op != "" {
+				opStr = strings.ToUpper(strings.TrimSpace(op))
+			}
+			val := m["value"]
+
+			tbl := defaultTable
+			col := colStr
+			if sel, exists := aliasMap[strings.ToLower(colStr)]; exists && sel.Field != "" {
+				if idx := strings.Index(sel.Field, "."); idx >= 0 {
+					tbl = sel.Field[:idx]
+					col = sel.Field[idx+1:]
+				} else {
+					col = sel.Field
+				}
+			} else if idx := strings.Index(colStr, "."); idx >= 0 {
+				tbl = colStr[:idx]
+				col = colStr[idx+1:]
+			}
+			tbl = resolveTableAlias(tbl, tableAliases)
+
+			cond := ASTCondition{
+				Table:    tbl,
+				Column:   col,
+				Operator: opStr,
+				Value:    val,
+			}
+			if valMap, isMap := val.(map[string]any); isMap {
+				pName := ""
+				if pn, exists := valMap["paramName"].(string); exists {
+					pName = pn
+				} else if pn, exists := valMap["ParamsName"].(string); exists {
+					pName = pn
+				}
+				if pName != "" {
+					cond.IsParamRef = true
+					cond.ParamName = pName
+					if pType, typeExists := valMap["paramDataType"].(string); typeExists {
+						cond.ParamDataType = pType
+					} else if pType, typeExists := valMap["parmsDataType"].(string); typeExists {
+						cond.ParamDataType = pType
+					}
+				}
+			}
+			conditions = append(conditions, cond)
+			continue
+		}
+
+		// Case C: Standard key-value dictionary: {"status": "active", ...}
+		subConds := p.parseFilterMap(m, defaultTable, tableAliases, selectedList)
+		conditions = append(conditions, subConds...)
+	}
+
+	return conditions
 }
 
 // parseFilterMap converts a raw map-based filter definition into a list of ASTCondition structs.

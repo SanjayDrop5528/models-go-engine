@@ -13,12 +13,19 @@ package service
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SanjayDrop5528/models-go-engine/adapter"
@@ -32,6 +39,10 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/operation"
 )
 
+// DecryptFunc allows callers or shared libraries (e.g., FleetOne's utils.DecryptField)
+// to provide custom or DBMS-specific decryption algorithms (PGP sym decrypt, KMS, etc.).
+type DecryptFunc func(ctx context.Context, encrypted, key string) (string, error)
+
 // PreviewResponse contains column metadata, sample rows, and compiled pipelines for inspection.
 type PreviewResponse struct {
 	Columns           []domain.SelectedField `json:"columns"`
@@ -44,6 +55,7 @@ type PreviewResponse struct {
 
 // DataSetService orchestrates design-time Preview & Save, and runtime Execution.
 type DataSetService struct {
+	mu               sync.RWMutex
 	repo             repository.DataSetRepository
 	validator        *validator.DataSetValidator
 	planner          *planner.DataSetPlanner
@@ -51,6 +63,8 @@ type DataSetService struct {
 	modelResolver    resolver.ModelResolver
 	adapter          adapter.Adapter
 	compilers        map[string]compiler.DataSetCompiler
+	decryptionKey    string
+	decryptFunc      DecryptFunc
 }
 
 // NewDataSetService creates a new DataSetService instance.
@@ -142,7 +156,38 @@ func NewDataSetService(
 // Note:
 //   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompiler) *DataSetService {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.compilers[strings.ToLower(driver)] = c
+	return s
+}
+
+// SetDecryptionKey sets the secret decryption key used for decrypting sensitive dataset fields.
+func (s *DataSetService) SetDecryptionKey(key string) *DataSetService {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.decryptionKey = key
+	return s
+}
+
+// DecryptionKey returns the configured decryption key, falling back to environment variables.
+func (s *DataSetService) DecryptionKey() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.decryptionKey != "" {
+		return s.decryptionKey
+	}
+	if key := os.Getenv("DB_ENCRYPTION_KEY"); key != "" {
+		return key
+	}
+	return os.Getenv("DB_CONFIG_ENCRYPTION_KEY")
+}
+
+// SetDecryptFunc configures a custom decryption callback (e.g. bridging shared-lib's utils.DecryptField).
+func (s *DataSetService) SetDecryptFunc(fn DecryptFunc) *DataSetService {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.decryptFunc = fn
 	return s
 }
 
@@ -308,7 +353,10 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 	if rows == nil {
 		rows = make([]map[string]any, 0)
 	}
-	rows = normalizeDatasetRows(rows)
+	rows = s.normalizeAndDecryptDatasetRows(ctx, rows)
+	if len(ds.SelectedList) > 0 {
+		rows = projectDatasetRows(rows, ds)
+	}
 
 	return &PreviewResponse{
 		Columns:           cols,
@@ -712,7 +760,10 @@ func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName s
 	if rows == nil {
 		rows = []map[string]any{}
 	}
-	rows = normalizeDatasetRows(rows)
+	rows = s.normalizeAndDecryptDatasetRows(ctx, rows)
+	if len(ds.SelectedList) > 0 {
+		rows = projectDatasetRows(rows, ds)
+	}
 
 	return rows, nil
 }
@@ -726,10 +777,11 @@ func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.Execute
 	}
 
 	hasFilter := req.Filter != nil && len(req.Filter) > 0
-	hasSort := req.Sort != nil
+	hasSort := req.Sort != nil && len(req.Sort) > 0
+	hasDsSort := ds != nil && len(ds.Sort) > 0
 	hasPaging := req.Start > 0 || req.Limit > 0
 
-	if !hasFilter && !hasSort && !hasPaging && (ds == nil || len(ds.Filter) == 0) {
+	if !hasFilter && !hasSort && !hasDsSort && !hasPaging && (ds == nil || len(ds.Filter) == 0) {
 		return baseQuery
 	}
 
@@ -747,8 +799,10 @@ func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.Execute
 					stages = append(stages, matchStage)
 				}
 			}
-			if req.Sort != nil {
+			if hasSort {
 				stages = append(stages, map[string]any{"$sort": req.Sort})
+			} else if hasDsSort {
+				stages = append(stages, map[string]any{"$sort": ds.Sort})
 			}
 			if req.Start > 0 {
 				stages = append(stages, map[string]any{"$skip": req.Start})
@@ -773,37 +827,12 @@ func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.Execute
 
 		var reqConditions []string
 		if hasFilter {
-			var cols []string
-			for col := range req.Filter {
-				cols = append(cols, col)
-			}
-			sort.Strings(cols)
-			for _, col := range cols {
-				cond := formatSQLFilterCondition("_exec_sub", col, req.Filter[col])
-				if cond != "" {
-					reqConditions = append(reqConditions, cond)
-				}
-			}
+			reqConditions = extractSQLConditionsFromFilter("_exec_sub", req.Filter)
 		}
 
 		var dsConditions []string
 		if ds != nil && len(ds.Filter) > 0 {
-			var cols []string
-			for col := range ds.Filter {
-				cols = append(cols, col)
-			}
-			sort.Strings(cols)
-			for _, col := range cols {
-				if req != nil && req.Filter != nil {
-					if _, exists := req.Filter[col]; exists {
-						continue
-					}
-				}
-				cond := formatSQLFilterCondition("_exec_sub", col, ds.Filter[col])
-				if cond != "" {
-					dsConditions = append(dsConditions, cond)
-				}
-			}
+			dsConditions = extractSQLConditionsFromFilter("_exec_sub", ds.Filter)
 		}
 
 		var allConditions []string
@@ -822,6 +851,15 @@ func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.Execute
 
 		if hasSort {
 			sortClause := formatSQLSortClause("_exec_sub", req.Sort)
+			if sortClause == "" && hasDsSort {
+				sortClause = formatSQLSortClause("_exec_sub", ds.Sort)
+			}
+			if sortClause != "" {
+				sb.WriteString("\nORDER BY ")
+				sb.WriteString(sortClause)
+			}
+		} else if hasDsSort {
+			sortClause := formatSQLSortClause("_exec_sub", ds.Sort)
 			if sortClause != "" {
 				sb.WriteString("\nORDER BY ")
 				sb.WriteString(sortClause)
@@ -1129,21 +1167,45 @@ func formatSQLSortClause(alias string, sortVal any) string {
 	case []any:
 		var parts []string
 		for _, item := range s {
+			if str, ok := item.(string); ok {
+				if sc := formatSQLSortClause(alias, str); sc != "" {
+					parts = append(parts, sc)
+				}
+				continue
+			}
 			if m, ok := item.(map[string]any); ok {
-				f := fmt.Sprintf("%v", m["field"])
-				if f == "" {
+				f := fmt.Sprintf("%v", m["colId"])
+				if f == "" || f == "<nil>" {
+					f = fmt.Sprintf("%v", m["field"])
+				}
+				if f == "" || f == "<nil>" {
 					f = fmt.Sprintf("%v", m["col"])
 				}
-				d := fmt.Sprintf("%v", m["dir"])
-				if d == "" {
+				if f == "" || f == "<nil>" {
+					f = fmt.Sprintf("%v", m["column"])
+				}
+				d := fmt.Sprintf("%v", m["sort"])
+				if d == "" || d == "<nil>" {
+					d = fmt.Sprintf("%v", m["dir"])
+				}
+				if d == "" || d == "<nil>" {
 					d = fmt.Sprintf("%v", m["order"])
 				}
 				order := "ASC"
 				if strings.EqualFold(d, "desc") || d == "-1" {
 					order = "DESC"
 				}
-				if f != "" {
+				if f != "" && f != "<nil>" {
 					parts = append(parts, fmt.Sprintf("\"%s\".\"%s\" %s", alias, strings.ReplaceAll(f, "\"", ""), order))
+				} else {
+					for field, dir := range m {
+						dStr := fmt.Sprintf("%v", dir)
+						order := "ASC"
+						if strings.EqualFold(dStr, "desc") || dStr == "-1" {
+							order = "DESC"
+						}
+						parts = append(parts, fmt.Sprintf("\"%s\".\"%s\" %s", alias, strings.ReplaceAll(field, "\"", ""), order))
+					}
 				}
 			}
 		}
@@ -1334,6 +1396,160 @@ func normalizeDatasetValue(val any) any {
 	}
 }
 
+func (s *DataSetService) normalizeAndDecryptDatasetRows(ctx context.Context, rows []map[string]any) []map[string]any {
+	key := s.DecryptionKey()
+	for _, row := range rows {
+		for k, v := range row {
+			row[k] = s.decryptAndNormalizeValue(ctx, v, key)
+		}
+	}
+	return rows
+}
+
+func (s *DataSetService) decryptAndNormalizeValue(ctx context.Context, val any, key string) any {
+	if val == nil {
+		return nil
+	}
+	switch v := val.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if len(trimmed) == 0 {
+			return v
+		}
+		if key != "" && isEncryptedString(trimmed) {
+			decrypted, err := s.decryptString(ctx, trimmed, key)
+			if err == nil {
+				trimmed = strings.TrimSpace(decrypted)
+				v = trimmed
+			}
+		}
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			var arr []any
+			if json.Unmarshal([]byte(trimmed), &arr) == nil {
+				for i, item := range arr {
+					arr[i] = s.decryptAndNormalizeValue(ctx, item, key)
+				}
+				return arr
+			}
+		}
+		if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+			var obj map[string]any
+			if json.Unmarshal([]byte(trimmed), &obj) == nil {
+				for k2, v2 := range obj {
+					obj[k2] = s.decryptAndNormalizeValue(ctx, v2, key)
+				}
+				return obj
+			}
+			if pgArr, ok := parseDatasetArray(trimmed); ok {
+				return pgArr
+			}
+		}
+		return v
+	case map[string]any:
+		for k, item := range v {
+			v[k] = s.decryptAndNormalizeValue(ctx, item, key)
+		}
+		return v
+	case []map[string]any:
+		for i, item := range v {
+			for k, val2 := range item {
+				item[k] = s.decryptAndNormalizeValue(ctx, val2, key)
+			}
+			v[i] = item
+		}
+		return v
+	case []any:
+		for i, item := range v {
+			v[i] = s.decryptAndNormalizeValue(ctx, item, key)
+		}
+		return v
+	default:
+		return normalizeDatasetValue(val)
+	}
+}
+
+func isEncryptedString(v string) bool {
+	return strings.HasPrefix(v, "enc:") || strings.HasPrefix(v, "aes:")
+}
+
+func (s *DataSetService) decryptString(ctx context.Context, encrypted, key string) (string, error) {
+	if key == "" || !isEncryptedString(encrypted) {
+		return encrypted, nil
+	}
+
+	// 1. Check custom decryptor callback
+	s.mu.RLock()
+	customFn := s.decryptFunc
+	s.mu.RUnlock()
+	if customFn != nil {
+		dec, err := customFn(ctx, encrypted, key)
+		if err == nil {
+			return dec, nil
+		}
+	}
+
+	// 2. Built-in AES-256-GCM format ("aes:...")
+	if strings.HasPrefix(encrypted, "aes:") {
+		return decryptAESGCM(encrypted, key)
+	}
+
+	// 3. Built-in PostgreSQL PGP format ("enc:...") via SQL DB connection if available
+	if strings.HasPrefix(encrypted, "enc:") && s.adapter != nil {
+		if sqlDB, ok := s.adapter.NativeClient().(*sql.DB); ok && sqlDB != nil {
+			cleanB64 := strings.ReplaceAll(encrypted[4:], " ", "+")
+			cleanB64 = strings.ReplaceAll(cleanB64, "\n", "")
+			cleanB64 = strings.ReplaceAll(cleanB64, "\r", "")
+			cleanB64 = strings.TrimSpace(cleanB64)
+
+			var decrypted string
+			query := "SELECT iam.pgp_sym_decrypt(decode($1, 'base64'), $2)"
+			err := sqlDB.QueryRowContext(ctx, query, cleanB64, key).Scan(&decrypted)
+			if err == nil {
+				return decrypted, nil
+			}
+			queryFallback := "SELECT pgp_sym_decrypt(decode($1, 'base64'), $2)"
+			if err2 := sqlDB.QueryRowContext(ctx, queryFallback, cleanB64, key).Scan(&decrypted); err2 == nil {
+				return decrypted, nil
+			}
+		}
+	}
+
+	return encrypted, nil
+}
+
+func decryptAESGCM(encrypted, key string) (string, error) {
+	cleanAES := strings.ReplaceAll(encrypted[4:], " ", "+")
+	cleanAES = strings.ReplaceAll(cleanAES, "\n", "")
+	cleanAES = strings.ReplaceAll(cleanAES, "\r", "")
+	cleanAES = strings.TrimSpace(cleanAES)
+
+	data, err := base64.StdEncoding.DecodeString(cleanAES)
+	if err != nil {
+		return "", fmt.Errorf("decryptAESGCM: base64 decode: %w", err)
+	}
+
+	h := sha256.Sum256([]byte(key))
+	aesKey := h[:]
+
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return "", fmt.Errorf("decryptAESGCM: new cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("decryptAESGCM: new GCM: %w", err)
+	}
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return "", fmt.Errorf("decryptAESGCM: ciphertext too short")
+	}
+	plainBytes, err := gcm.Open(nil, data[:nonceSize], data[nonceSize:], nil)
+	if err != nil {
+		return "", fmt.Errorf("decryptAESGCM: decrypt failed: %w", err)
+	}
+	return string(plainBytes), nil
+}
+
 func normalizeDatasetRows(rows []map[string]any) []map[string]any {
 	for _, row := range rows {
 		for k, v := range row {
@@ -1342,3 +1558,296 @@ func normalizeDatasetRows(rows []map[string]any) []map[string]any {
 	}
 	return rows
 }
+
+// extractSQLConditionsFromFilter translates a []any filter slice into SQL WHERE condition strings.
+func extractSQLConditionsFromFilter(alias string, filter []any) []string {
+	var conditions []string
+	for _, item := range filter {
+		if item == nil {
+			continue
+		}
+		if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+			conditions = append(conditions, strings.TrimSpace(s))
+			continue
+		}
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Case A: Group condition with "conditions": [...]
+		if rawConds, hasConds := m["conditions"]; hasConds {
+			if condSlice, isSlice := rawConds.([]any); isSlice && len(condSlice) > 0 {
+				sub := extractSQLConditionsFromFilter(alias, condSlice)
+				if len(sub) > 0 {
+					clause := "AND"
+					if c, hasClause := m["clause"].(string); hasClause && strings.EqualFold(c, "OR") {
+						clause = "OR"
+					}
+					conditions = append(conditions, "("+strings.Join(sub, " "+clause+" ")+")")
+				}
+				continue
+			}
+		}
+
+		// Case B: Explicit condition object: {"column": "status", "operator": "EQUALS", "value": "active"}
+		colRaw, hasCol := m["column"]
+		if !hasCol {
+			colRaw, hasCol = m["field"]
+		}
+		if !hasCol {
+			colRaw, hasCol = m["colId"]
+		}
+		if hasCol {
+			colStr := fmt.Sprintf("%v", colRaw)
+			opStr := "EQUALS"
+			if op, hasOp := m["operator"].(string); hasOp && op != "" {
+				opStr = op
+			} else if op, hasOp := m["type"].(string); hasOp && op != "" {
+				opStr = op
+			}
+			val := m["value"]
+			if val == nil {
+				val = m["filter"]
+			}
+
+			cond := formatSQLFilterWithOperator(alias, colStr, opStr, val)
+			if cond != "" {
+				conditions = append(conditions, cond)
+			}
+			continue
+		}
+
+		// Case C: Standard key-value dictionary: {"status": "active", ...}
+		var cols []string
+		for col := range m {
+			cols = append(cols, col)
+		}
+		sort.Strings(cols)
+		for _, col := range cols {
+			cond := formatSQLFilterCondition(alias, col, m[col])
+			if cond != "" {
+				conditions = append(conditions, cond)
+			}
+		}
+	}
+	return conditions
+}
+
+// formatSQLFilterWithOperator formats a single condition with custom operator.
+func formatSQLFilterWithOperator(alias, col, op string, val any) string {
+	safeCol := col
+	if strings.Contains(safeCol, ".") {
+		parts := strings.Split(safeCol, ".")
+		safeCol = parts[len(parts)-1]
+	}
+	var colExpr string
+	if alias != "" {
+		colExpr = fmt.Sprintf("\"%s\".\"%s\"", alias, strings.ReplaceAll(safeCol, "\"", ""))
+	} else {
+		colExpr = fmt.Sprintf("\"%s\"", strings.ReplaceAll(safeCol, "\"", ""))
+	}
+
+	upperOp := strings.ToUpper(strings.TrimSpace(op))
+	switch upperOp {
+	case "EQUALS", "=", "EQ":
+		if val == nil {
+			return fmt.Sprintf("%s IS NULL", colExpr)
+		}
+		return fmt.Sprintf("%s = '%v'", colExpr, val)
+	case "NOTEQUALS", "!=", "<>", "NEQ":
+		if val == nil {
+			return fmt.Sprintf("%s IS NOT NULL", colExpr)
+		}
+		return fmt.Sprintf("%s != '%v'", colExpr, val)
+	case "CONTAINS", "LIKE":
+		return fmt.Sprintf("%s ILIKE '%%%v%%'", colExpr, val)
+	case "NOTCONTAINS", "NOT_LIKE":
+		return fmt.Sprintf("%s NOT ILIKE '%%%v%%'", colExpr, val)
+	case "STARTSWITH":
+		return fmt.Sprintf("%s ILIKE '%v%%'", colExpr, val)
+	case "ENDSWITH":
+		return fmt.Sprintf("%s ILIKE '%%%v'", colExpr, val)
+	case "GREATERTHAN", ">", "GT":
+		return fmt.Sprintf("%s > %v", colExpr, val)
+	case "GREATERTHANOREQUAL", ">=", "GTE":
+		return fmt.Sprintf("%s >= %v", colExpr, val)
+	case "LESSTHAN", "<", "LT":
+		return fmt.Sprintf("%s < %v", colExpr, val)
+	case "LESSTHANOREQUAL", "<=", "LTE":
+		return fmt.Sprintf("%s <= %v", colExpr, val)
+	case "ISNULL", "BLANK":
+		return fmt.Sprintf("%s IS NULL", colExpr)
+	case "ISNOTNULL", "NOTBLANK":
+		return fmt.Sprintf("%s IS NOT NULL", colExpr)
+	case "IN":
+		if arr, ok := val.([]any); ok {
+			var inItems []string
+			for _, item := range arr {
+				inItems = append(inItems, fmt.Sprintf("'%v'", item))
+			}
+			return fmt.Sprintf("%s IN (%s)", colExpr, strings.Join(inItems, ", "))
+		}
+		return fmt.Sprintf("%s = '%v'", colExpr, val)
+	case "NOTIN", "NOT_IN":
+		if arr, ok := val.([]any); ok {
+			var inItems []string
+			for _, item := range arr {
+				inItems = append(inItems, fmt.Sprintf("'%v'", item))
+			}
+			return fmt.Sprintf("%s NOT IN (%s)", colExpr, strings.Join(inItems, ", "))
+		}
+		return fmt.Sprintf("%s != '%v'", colExpr, val)
+	default:
+		return formatSQLFilterCondition(alias, col, val)
+	}
+}
+
+// projNode represents a node in the field projection tree for pruning unselected fields.
+type projNode struct {
+	includeAll bool
+	children   map[string]*projNode
+	alias      string
+}
+
+func newProjNode() *projNode {
+	return &projNode{
+		children: make(map[string]*projNode),
+	}
+}
+
+// buildProjectionTree constructs an AST of selected field paths from ds.SelectedList.
+func buildProjectionTree(ds *domain.DataSet) *projNode {
+	root := newProjNode()
+	if ds == nil || len(ds.SelectedList) == 0 {
+		return root
+	}
+
+	baseColl := strings.ToLower(ds.BaseCollection.Collection)
+
+	for _, sel := range ds.SelectedList {
+		field := strings.TrimSpace(sel.Field)
+		if field == "" {
+			field = strings.TrimSpace(sel.HeaderName)
+		}
+		if field == "" {
+			continue
+		}
+
+		parts := strings.Split(field, ".")
+		// If path starts with base collection name (e.g. "vehicles.status"),
+		// index both "vehicles.status" and "status" so either flat or nested match succeeds.
+		if len(parts) > 1 && baseColl != "" && strings.EqualFold(parts[0], baseColl) {
+			addPathToTree(root, parts, sel.HeaderName)
+			addPathToTree(root, parts[1:], sel.HeaderName)
+		} else {
+			addPathToTree(root, parts, sel.HeaderName)
+		}
+
+		// Also index by HeaderName if provided
+		if sel.HeaderName != "" && !strings.EqualFold(sel.HeaderName, field) {
+			addPathToTree(root, []string{sel.HeaderName}, sel.HeaderName)
+		}
+	}
+
+	return root
+}
+
+func addPathToTree(root *projNode, parts []string, alias string) {
+	curr := root
+	for i, part := range parts {
+		key := strings.ToLower(part)
+		child, exists := curr.children[key]
+		if !exists {
+			child = newProjNode()
+			curr.children[key] = child
+		}
+		if i == len(parts)-1 {
+			child.includeAll = true
+			if alias != "" {
+				child.alias = alias
+			}
+		}
+		curr = child
+	}
+}
+
+// projectDatasetRows prunes unselected fields from tabular rows according to ds.SelectedList.
+// If a selected field targets a nested object (e.g. "driver.name") or an array of objects
+// (e.g. "childarr.id", "childarr.name"), only the selected fields within the object or array
+// are returned, stripping away unselected fields.
+func projectDatasetRows(rows []map[string]any, ds *domain.DataSet) []map[string]any {
+	if len(rows) == 0 || ds == nil || len(ds.SelectedList) == 0 {
+		return rows
+	}
+
+	tree := buildProjectionTree(ds)
+	if len(tree.children) == 0 {
+		return rows
+	}
+
+	result := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		result[i] = projectMap(row, tree)
+	}
+	return result
+}
+
+func projectMap(m map[string]any, node *projNode) map[string]any {
+	if m == nil {
+		return nil
+	}
+	if node.includeAll && len(node.children) == 0 {
+		return m
+	}
+
+	result := make(map[string]any)
+	for k, v := range m {
+		childNode, ok := node.children[strings.ToLower(k)]
+		if !ok {
+			continue
+		}
+
+		outKey := k
+		if childNode.alias != "" && len(childNode.children) == 0 && !strings.Contains(childNode.alias, ".") {
+			outKey = childNode.alias
+		}
+
+		if childNode.includeAll && len(childNode.children) == 0 {
+			result[outKey] = v
+			continue
+		}
+
+		result[outKey] = projectValue(v, childNode)
+	}
+	return result
+}
+
+func projectValue(val any, node *projNode) any {
+	if val == nil {
+		return nil
+	}
+	switch v := val.(type) {
+	case map[string]any:
+		return projectMap(v, node)
+	case []map[string]any:
+		res := make([]map[string]any, len(v))
+		for i, item := range v {
+			res[i] = projectMap(item, node)
+		}
+		return res
+	case []any:
+		res := make([]any, len(v))
+		for i, item := range v {
+			if itemMap, ok := item.(map[string]any); ok {
+				res[i] = projectMap(itemMap, node)
+			} else {
+				res[i] = item
+			}
+		}
+		return res
+	default:
+		return v
+	}
+}
+

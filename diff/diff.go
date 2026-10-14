@@ -273,28 +273,34 @@ func (e *DiffEngine) Compare(current *schema.Schema, desired *schema.Schema, hin
 func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr schema.SchemaAttribute, newAttr schema.SchemaAttribute, diff *SchemaDiff) {
 	// 1. Data Type change check
 	typeChanged := oldAttr.Type != newAttr.Type
+	// Email and String both map to VARCHAR in relational databases
+	if (oldAttr.Type == model.TypeString && newAttr.Type == model.TypeEmail) ||
+		(oldAttr.Type == model.TypeEmail && newAttr.Type == model.TypeString) {
+		typeChanged = false
+	}
 
 	lengthChanged := false
-	if newAttr.Type == model.TypeString || oldAttr.Type == model.TypeString {
-		oldLen := oldAttr.Length
-		if oldLen == 0 {
-			oldLen = 255
+	if (newAttr.Type == model.TypeString || newAttr.Type == model.TypeEmail) &&
+		(oldAttr.Type == model.TypeString || oldAttr.Type == model.TypeEmail) {
+		// Only consider length changed if explicit non-zero lengths are specified and differ,
+		// or if a new explicit length constraint (>0) is defined when old was unconstrained (oldAttr.Length == 0).
+		// Never alter existing column length if newAttr.Length is 0 (unspecified).
+		if newAttr.Length > 0 && oldAttr.Length > 0 && newAttr.Length != oldAttr.Length {
+			lengthChanged = true
+		} else if newAttr.Length > 0 && oldAttr.Length == 0 {
+			lengthChanged = true
 		}
-		newLen := newAttr.Length
-		if newLen == 0 {
-			newLen = 255
-		}
-		lengthChanged = oldLen != newLen
-	} else if oldAttr.Length != newAttr.Length {
+	} else if oldAttr.Length > 0 && newAttr.Length > 0 && oldAttr.Length != newAttr.Length {
 		lengthChanged = true
 	}
 
 	precScaleChanged := false
-	if newAttr.Type == model.TypeDecimal || oldAttr.Type == model.TypeDecimal {
-		if oldAttr.Precision != newAttr.Precision || oldAttr.Scale != newAttr.Scale {
-			if newAttr.Precision > 0 || oldAttr.Precision > 0 {
-				precScaleChanged = true
-			}
+	if newAttr.Type == model.TypeDecimal && oldAttr.Type == model.TypeDecimal {
+		if newAttr.Precision > 0 && oldAttr.Precision > 0 && newAttr.Precision != oldAttr.Precision {
+			precScaleChanged = true
+		}
+		if newAttr.Scale > 0 && oldAttr.Scale > 0 && newAttr.Scale != oldAttr.Scale {
+			precScaleChanged = true
 		}
 	}
 
@@ -305,12 +311,18 @@ func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr sch
 			diff.HasDestructive = true
 		}
 
+		afterAttr := newAttr
+		// Preserve existing column length if not explicitly changed
+		if !lengthChanged && afterAttr.Length == 0 && oldAttr.Length > 0 {
+			afterAttr.Length = oldAttr.Length
+		}
+
 		diff.Operations = append(diff.Operations, SchemaOperation{
 			Type:        OpAlterColumnType,
 			TargetTable: targetTable,
 			ObjectName:  newAttr.Name,
 			Before:      oldAttr,
-			After:       newAttr,
+			After:       afterAttr,
 			Safety:      safety,
 			Destructive: safety == SafetyDestructive,
 			Description: fmt.Sprintf("Change column '%s' type from %s to %s", newAttr.Name, oldAttr.Type, newAttr.Type),
@@ -318,26 +330,29 @@ func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr sch
 	}
 
 	// 2. Nullability change
-	if oldAttr.Nullable != newAttr.Nullable {
-		safety := SafetySafe
-		if !newAttr.Nullable {
-			safety = SafetyPotentiallyUnsafe
-		}
+	// Primary key columns cannot be nullable in SQL.
+	if !newAttr.PrimaryKey && !oldAttr.PrimaryKey {
+		if oldAttr.Nullable != newAttr.Nullable {
+			safety := SafetySafe
+			if !newAttr.Nullable {
+				safety = SafetyPotentiallyUnsafe
+			}
 
-		diff.Operations = append(diff.Operations, SchemaOperation{
-			Type:        OpAlterColumnNullable,
-			TargetTable: targetTable,
-			ObjectName:  newAttr.Name,
-			Before:      oldAttr.Nullable,
-			After:       newAttr.Nullable,
-			Safety:      safety,
-			Destructive: false,
-			Description: fmt.Sprintf("Change column '%s' nullable to %v", newAttr.Name, newAttr.Nullable),
-		})
+			diff.Operations = append(diff.Operations, SchemaOperation{
+				Type:        OpAlterColumnNullable,
+				TargetTable: targetTable,
+				ObjectName:  newAttr.Name,
+				Before:      oldAttr.Nullable,
+				After:       newAttr.Nullable,
+				Safety:      safety,
+				Destructive: false,
+				Description: fmt.Sprintf("Change column '%s' nullable to %v", newAttr.Name, newAttr.Nullable),
+			})
+		}
 	}
 
 	// 3. Default value change
-	if !reflect.DeepEqual(oldAttr.Default, newAttr.Default) {
+	if !isDefaultEqual(oldAttr, newAttr) {
 		diff.Operations = append(diff.Operations, SchemaOperation{
 			Type:        OpAlterColumnDefault,
 			TargetTable: targetTable,
@@ -349,6 +364,57 @@ func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr sch
 			Description: fmt.Sprintf("Change column '%s' default value to '%v'", newAttr.Name, newAttr.Default),
 		})
 	}
+}
+
+func isDefaultEqual(oldAttr, newAttr schema.SchemaAttribute) bool {
+	if oldAttr.AutoIncrement || newAttr.AutoIncrement {
+		return true
+	}
+	if oldAttr.Default == nil && (newAttr.Default == nil || newAttr.Default == "") {
+		return true
+	}
+	if newAttr.Default == nil {
+		// If DB has a server-generated expression (e.g. now(), nextval, uuid), do not drop it
+		if oldStr, ok := oldAttr.Default.(string); ok {
+			cleanOld := strings.ToLower(strings.TrimSpace(oldStr))
+			if strings.Contains(cleanOld, "nextval(") ||
+				strings.Contains(cleanOld, "now()") ||
+				strings.Contains(cleanOld, "current_timestamp") ||
+				strings.Contains(cleanOld, "gen_random_uuid()") ||
+				strings.Contains(cleanOld, "uuid_generate_") {
+				return true
+			}
+		}
+		return false
+	}
+	cleanOld := cleanDefaultValue(oldAttr.Default)
+	cleanNew := cleanDefaultValue(newAttr.Default)
+	return cleanOld == cleanNew
+}
+
+func cleanDefaultValue(v any) string {
+	if v == nil {
+		return ""
+	}
+	s := strings.TrimSpace(fmt.Sprintf("%v", v))
+	s = strings.ToLower(s)
+	// Strip Postgres type casts, e.g., 'active'::character varying -> 'active'
+	if idx := strings.Index(s, "::"); idx != -1 {
+		s = s[:idx]
+	}
+	// Strip surrounding quotes
+	s = strings.Trim(s, "'\"")
+	s = strings.TrimSpace(s)
+	// Normalize common boolean/timestamp expressions
+	switch s {
+	case "true", "t", "1":
+		return "true"
+	case "false", "f", "0":
+		return "false"
+	case "current_timestamp", "now()", "localtimestamp":
+		return "now()"
+	}
+	return s
 }
 
 // diffPrimaryKeys detects changes in primary key definitions between schemas.
@@ -372,7 +438,8 @@ func (e *DiffEngine) diffPrimaryKeys(targetTable string, currentPK *schema.Schem
 		desiredCols = desiredPK.Columns
 	}
 
-	if !reflect.DeepEqual(currentCols, desiredCols) {
+	// Only alter primary key if desired explicitly specifies primary key columns AND they differ
+	if len(desiredCols) > 0 && !reflect.DeepEqual(currentCols, desiredCols) {
 		if len(currentCols) > 0 {
 			diff.Operations = append(diff.Operations, SchemaOperation{
 				Type:        OpDropPrimaryKey,
@@ -384,17 +451,15 @@ func (e *DiffEngine) diffPrimaryKeys(targetTable string, currentPK *schema.Schem
 				Description: fmt.Sprintf("Drop primary key on (%s)", strings.Join(currentCols, ", ")),
 			})
 		}
-		if len(desiredCols) > 0 {
-			diff.Operations = append(diff.Operations, SchemaOperation{
-				Type:        OpAddPrimaryKey,
-				TargetTable: targetTable,
-				ObjectName:  "PRIMARY",
-				After:       desiredPK,
-				Safety:      SafetyPotentiallyUnsafe,
-				Destructive: false,
-				Description: fmt.Sprintf("Add primary key on (%s)", strings.Join(desiredCols, ", ")),
-			})
-		}
+		diff.Operations = append(diff.Operations, SchemaOperation{
+			Type:        OpAddPrimaryKey,
+			TargetTable: targetTable,
+			ObjectName:  "PRIMARY",
+			After:       desiredPK,
+			Safety:      SafetyPotentiallyUnsafe,
+			Destructive: false,
+			Description: fmt.Sprintf("Add primary key on (%s)", strings.Join(desiredCols, ", ")),
+		})
 	}
 }
 
@@ -410,6 +475,10 @@ func (e *DiffEngine) diffPrimaryKeys(targetTable string, currentPK *schema.Schem
 // When can it be used:
 //   - Internal helper during schema diff calculation.
 func (e *DiffEngine) diffIndexes(targetTable string, currentIndexes []schema.SchemaIndex, desiredIndexes []schema.SchemaIndex, diff *SchemaDiff) {
+	if len(desiredIndexes) == 0 {
+		return
+	}
+
 	currMap := make(map[string]schema.SchemaIndex)
 	for _, idx := range currentIndexes {
 		currMap[idx.Name] = idx
@@ -484,6 +553,10 @@ func (e *DiffEngine) diffIndexes(targetTable string, currentIndexes []schema.Sch
 // When can it be used:
 //   - Internal helper during schema diff calculation.
 func (e *DiffEngine) diffRelations(targetTable string, currentRels []schema.SchemaRelation, desiredRels []schema.SchemaRelation, diff *SchemaDiff) {
+	if len(desiredRels) == 0 {
+		return
+	}
+
 	currMap := make(map[string]schema.SchemaRelation)
 	for _, r := range currentRels {
 		currMap[r.Name] = r

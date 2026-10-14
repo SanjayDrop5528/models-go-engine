@@ -195,8 +195,8 @@ func TestDataSet_MultipleJoinsAndGroupBy(t *testing.T) {
 		FilterParams: []domain.FilterParam{
 			{ParamName: "department_id", ParamDataType: "string", Required: false},
 		},
-		Filter: map[string]any{
-			"employees.department_id": map[string]any{"ParamsName": "department_id", "parmsDataType": "string"},
+		Filter: []any{
+			map[string]any{"employees.department_id": map[string]any{"ParamsName": "department_id", "parmsDataType": "string"}},
 		},
 	}
 
@@ -379,8 +379,8 @@ func TestDataSet_MySQL_Compiler(t *testing.T) {
 		FilterParams: []domain.FilterParam{
 			{ParamName: "min_salary", ParamDataType: "decimal"},
 		},
-		Filter: map[string]any{
-			"employees.salary": map[string]any{"ParamsName": "min_salary", "parmsDataType": "decimal"},
+		Filter: []any{
+			map[string]any{"employees.salary": map[string]any{"ParamsName": "min_salary", "parmsDataType": "decimal"}},
 		},
 	}
 
@@ -803,11 +803,11 @@ func TestDataSet_ExecuteWithOptions_Payload(t *testing.T) {
 	req := &domain.ExecuteRequest{
 		Start: 0,
 		Limit: 2,
-		Filter: map[string]any{
-			"status": "active",
+		Filter: []any{
+			map[string]any{"status": "active"},
 		},
-		Sort: map[string]any{
-			"id": "asc",
+		Sort: []any{
+			map[string]any{"id": "asc"},
 		},
 		FilterParams: []any{
 			map[string]any{
@@ -995,8 +995,8 @@ func TestDataSet_ExecuteWithOptions_AppendFilter_FirstAndLast(t *testing.T) {
 		Driver:        "postgres",
 		SaveMode:      domain.SaveModeQuery,
 		Pipeline:      `SELECT "id", "name", "role", "tenant_id" FROM "accounts"`,
-		Filter: map[string]any{
-			"tenant_id": "100",
+		Filter: []any{
+			map[string]any{"tenant_id": "100"},
 		},
 	}
 
@@ -1006,8 +1006,8 @@ func TestDataSet_ExecuteWithOptions_AppendFilter_FirstAndLast(t *testing.T) {
 
 	// 1. Execute with appendfilter = "first": dynamic "role" filter should be prepended before "tenant_id"
 	reqFirst := &domain.ExecuteRequest{
-		Filter: map[string]any{
-			"role": "admin",
+		Filter: []any{
+			map[string]any{"role": "admin"},
 		},
 		AppendFilter: "first",
 	}
@@ -1023,8 +1023,8 @@ func TestDataSet_ExecuteWithOptions_AppendFilter_FirstAndLast(t *testing.T) {
 
 	// 2. Execute with appendfilter = "last": dynamic "role" filter should be appended after "tenant_id"
 	reqLast := &domain.ExecuteRequest{
-		Filter: map[string]any{
-			"role": "admin",
+		Filter: []any{
+			map[string]any{"role": "admin"},
 		},
 		AppendFilter: "last",
 	}
@@ -1089,8 +1089,8 @@ func TestDataSet_ExecuteWithOptions_MongoDB_AppendFilter(t *testing.T) {
 
 	// 1. appendfilter = "first" -> $match is at index 0
 	reqFirst := &domain.ExecuteRequest{
-		Filter: map[string]any{
-			"status": "active",
+		Filter: []any{
+			map[string]any{"status": "active"},
 		},
 		AppendFilter: "first",
 	}
@@ -1112,8 +1112,8 @@ func TestDataSet_ExecuteWithOptions_MongoDB_AppendFilter(t *testing.T) {
 
 	// 2. appendfilter = "last" -> $match is at the end
 	reqLast := &domain.ExecuteRequest{
-		Filter: map[string]any{
-			"status": "active",
+		Filter: []any{
+			map[string]any{"status": "active"},
 		},
 		AppendFilter: "last",
 	}
@@ -1170,6 +1170,8 @@ func TestPreview_NormalizesRawJSONAndPostgresArrayRows(t *testing.T) {
 		},
 		SelectedList: []domain.SelectedField{
 			{Field: "employees.id", HeaderName: "id", DataType: "uuid"},
+			{Field: "repair_service_name_alias", HeaderName: "repair_service_name_alias"},
+			{Field: "services_id", HeaderName: "services_id"},
 		},
 	}
 

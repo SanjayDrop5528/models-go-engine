@@ -139,7 +139,7 @@ func TestGenerateDataSetMockClient(t *testing.T) {
 	if resp.DataSet.BaseCollection.Collection != "stores" {
 		t.Errorf("expected stores, got %s", resp.DataSet.BaseCollection.Collection)
 	}
-	if resp.DataSet.BaseCollection.Filter["status"] != "active" {
+	if fMap, ok := resp.DataSet.BaseCollection.Filter.(map[string]any); !ok || fMap["status"] != "active" {
 		t.Errorf("expected filter status active, got %v", resp.DataSet.BaseCollection.Filter)
 	}
 	if resp.DataSet.ConversationID != "conv-12345-abcde" {

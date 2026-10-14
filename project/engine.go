@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ type Engine struct {
 	functionRegistry *datasetres.InMemFunctionRegistry
 	dataSetService   *datasetsvc.DataSetService
 	aiService        *ai.AIService
+	decryptionKey    string
 }
 
 // NewEngine creates a new base Engine for a Project.
@@ -95,6 +97,29 @@ func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 	}
 	aiSvc := ai.NewAIService(nil, reg, dsSvc)
 
+	// Resolve project-level decryption/encryption key from project or environment
+	var encKey string
+	if proj != nil {
+		if proj.EncryptionKey != "" {
+			encKey = proj.EncryptionKey
+		} else if proj.AdapterConfig.EncryptionKey != "" {
+			encKey = proj.AdapterConfig.EncryptionKey
+		} else if proj.AdapterConfig.DecryptionKey != "" {
+			encKey = proj.AdapterConfig.DecryptionKey
+		} else if proj.AdapterConfig.EncryptionKeyEnv != "" {
+			encKey = os.Getenv(proj.AdapterConfig.EncryptionKeyEnv)
+		}
+	}
+	if encKey == "" {
+		encKey = os.Getenv("DB_ENCRYPTION_KEY")
+		if encKey == "" {
+			encKey = os.Getenv("DB_CONFIG_ENCRYPTION_KEY")
+		}
+	}
+	if encKey != "" {
+		dsSvc.SetDecryptionKey(encKey)
+	}
+
 	return &Engine{
 		project:          proj,
 		adapter:          adp,
@@ -104,7 +129,53 @@ func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 		functionRegistry: fnReg,
 		dataSetService:   dsSvc,
 		aiService:        aiSvc,
+		decryptionKey:    encKey,
 	}
+}
+
+// DecryptionKey returns the secret key used for decrypting sensitive fields and datasets.
+func (e *Engine) DecryptionKey() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.decryptionKey != "" {
+		return e.decryptionKey
+	}
+	if e.project != nil {
+		if e.project.EncryptionKey != "" {
+			return e.project.EncryptionKey
+		}
+		if e.project.AdapterConfig.EncryptionKey != "" {
+			return e.project.AdapterConfig.EncryptionKey
+		}
+		if e.project.AdapterConfig.DecryptionKey != "" {
+			return e.project.AdapterConfig.DecryptionKey
+		}
+	}
+	if key := os.Getenv("DB_ENCRYPTION_KEY"); key != "" {
+		return key
+	}
+	return os.Getenv("DB_CONFIG_ENCRYPTION_KEY")
+}
+
+// SetDecryptionKey sets the secret decryption key and propagates it to the dataset service.
+func (e *Engine) SetDecryptionKey(key string) *Engine {
+	e.mu.Lock()
+	e.decryptionKey = key
+	e.mu.Unlock()
+	if e.dataSetService != nil {
+		e.dataSetService.SetDecryptionKey(key)
+	}
+	return e
+}
+
+// EncryptionKey returns the secret key configured on this engine.
+func (e *Engine) EncryptionKey() string {
+	return e.DecryptionKey()
+}
+
+// SetEncryptionKey sets the secret key on this engine and propagates to the dataset service.
+func (e *Engine) SetEncryptionKey(key string) *Engine {
+	return e.SetDecryptionKey(key)
 }
 
 // GetAIService returns the AI query planner service.
@@ -1693,11 +1764,9 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 		}
 	}
 
-	// Synchronize and refresh DataModel catalog entries for this model
-	existingFields := e.registry.ListDataModels(modelID)
-	for _, ef := range existingFields {
-		_ = e.DeleteDataModel(ctx, modelID, ef.ID)
-	}
+	// Reload model definitions in memory for this tenant database configuration.
+	// Only reload memory structures without executing DDL/DML against catalog metadata tables.
+	e.registry.ClearDataModels(modelID)
 
 	for _, sa := range liveSchema.Attributes {
 		fieldID := fmt.Sprintf("%s_%s", modelID, sa.Name)
@@ -1712,6 +1781,7 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 			IsRequired:   !sa.Nullable && !isPK,
 			IsPrimaryKey: isPK,
 			IsUnique:     sa.Unique,
+			IsGenerated:  sa.AutoIncrement,
 			DefaultValue: sa.Default,
 			Status:       model.DataModelStatusActive,
 			CreatedAt:    time.Now().UTC(),
@@ -1726,9 +1796,10 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 		if sa.Scale > 0 {
 			dm.Scale = &sa.Scale
 		}
-		_, _ = e.AddDataModel(ctx, dm)
+		_, _ = e.registry.SaveDataModel(dm)
 	}
 
+	_, _ = e.registry.SaveDraft(m)
 	return e.registry.SetActive(modelID, m)
 }
 

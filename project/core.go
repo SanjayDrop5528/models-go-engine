@@ -30,12 +30,15 @@ type QueryContextConfig struct {
 // AdapterConfig holds database adapter configuration at the Project level.
 // Connection string is resolved from environment variables or supplied directly.
 type AdapterConfig struct {
-	AdapterType         string             `json:"adapter_type"`          // "postgres", "mongodb", "mysql", "memory"
-	ConnectionStringEnv string             `json:"connection_string_env"` // ENV variable name e.g. "POSTGRES_DSN"
-	ConnectionString    string             `json:"connection_string"`     // Resolved connection string
-	Database            string             `json:"database"`              // Default database/schema name
-	QueryContext        QueryContextConfig `json:"query_context"`         // Query execution configuration
-	Options             map[string]any     `json:"options,omitempty"`     // Adapter-specific options (pool sizes, ssl, etc.)
+	AdapterType         string             `json:"adapter_type"`                    // "postgres", "mongodb", "mysql", "memory"
+	ConnectionStringEnv string             `json:"connection_string_env,omitempty"` // ENV variable name e.g. "POSTGRES_DSN"
+	ConnectionString    string             `json:"connection_string,omitempty"`     // Resolved connection string
+	Database            string             `json:"database,omitempty"`              // Default database/schema name
+	EncryptionKey       string             `json:"encryption_key,omitempty"`        // Secret key used for dataset field decryption/encryption
+	EncryptionKeyEnv    string             `json:"encryption_key_env,omitempty"`    // ENV variable name holding encryption key
+	DecryptionKey       string             `json:"decryption_key,omitempty"`        // Explicit decryption key override if distinct
+	QueryContext        QueryContextConfig `json:"query_context"`                   // Query execution configuration
+	Options             map[string]any     `json:"options,omitempty"`               // Adapter-specific options (pool sizes, ssl, etc.)
 }
 
 // Project represents a project entity that owns adapter configuration, models, and its engine.
@@ -43,6 +46,7 @@ type Project struct {
 	ID            string        `json:"id"`
 	Name          string        `json:"name"`
 	Description   string        `json:"description,omitempty"`
+	EncryptionKey string        `json:"encryption_key,omitempty"` // Secret key used for dataset / field decryption
 	AdapterConfig AdapterConfig `json:"adapter_config"`
 	Engine        *Engine       `json:"-"`
 	CreatedAt     time.Time     `json:"created_at"`
@@ -56,6 +60,7 @@ type ProjectConfig struct {
 	ID            string
 	Name          string
 	Description   string
+	EncryptionKey string
 	AdapterConfig AdapterConfig
 	CreatedBy     string
 }
@@ -208,6 +213,7 @@ func NewProject(cfg ProjectConfig, adp adapter.Adapter) (*Project, error) {
 		ID:            cfg.ID,
 		Name:          cfg.Name,
 		Description:   cfg.Description,
+		EncryptionKey: cfg.EncryptionKey,
 		AdapterConfig: adapterCfg,
 		CreatedAt:     now,
 		CreatedBy:     cfg.CreatedBy,

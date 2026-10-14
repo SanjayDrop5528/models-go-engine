@@ -17,28 +17,234 @@ type Tx struct {
 	tx *sql.Tx
 }
 
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSelect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (t *Tx) NewSelect() *SelectQuery { return NewSelectQuery(t.db).Conn(t.tx) }
+
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewInsert and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (t *Tx) NewInsert() *InsertQuery { return newInsertQuery(t.db, t.tx) }
+
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewUpdate and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (t *Tx) NewUpdate() *UpdateQuery { return newUpdateQuery(t.db, t.tx) }
+
+// Parameters:
+//   - statement (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*RawQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewRaw and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (t *Tx) NewRaw(statement string, args ...any) *RawQuery {
 	return &RawQuery{conn: t.tx, statement: statement, args: args}
 }
+
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - q (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExecContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (t *Tx) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
 	return t.tx.ExecContext(ctx, q, args...)
 }
+
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - q (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*sql.Rows): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (t *Tx) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
 	return t.tx.QueryContext(ctx, q, args...)
 }
+
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - q (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*sql.Row): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryRowContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (t *Tx) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
 	return t.tx.QueryRowContext(ctx, q, args...)
 }
-func (t *Tx) Commit() error   { return t.tx.Commit() }
+
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Commit and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
+func (t *Tx) Commit() error { return t.tx.Commit() }
+
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Rollback and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (t *Tx) Rollback() error { return t.tx.Rollback() }
 
 // NewInsert starts an engine-owned INSERT query.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewInsert and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) NewInsert() *InsertQuery { return newInsertQuery(db, db.db) }
 
 // NewUpdate starts an engine-owned UPDATE query.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewUpdate and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) NewUpdate() *UpdateQuery { return newUpdateQuery(db, db.db) }
 
 type mutationBase struct {
@@ -71,11 +277,65 @@ type CreateTableQuery struct {
 	ifNotExists bool
 }
 
+// Parameters:
+//   - model (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*CreateTableQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Model and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *CreateTableQuery) Model(model any) *CreateTableQuery {
 	q.modelType = reflect.TypeOf(model)
 	return q
 }
+
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*CreateTableQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IfNotExists and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *CreateTableQuery) IfNotExists() *CreateTableQuery { q.ifNotExists = true; return q }
+
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exec and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *CreateTableQuery) Exec(ctx context.Context) (sql.Result, error) {
 	modelType := q.modelType
 	for modelType != nil && (modelType.Kind() == reflect.Pointer || modelType.Kind() == reflect.Slice) {
@@ -143,11 +403,47 @@ func sqlType(fieldType reflect.Type) string {
 	}
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exec and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *RawQuery) Exec(ctx context.Context) (sql.Result, error) {
 	statement, args := compileRaw(q.statement, q.args)
 	return q.conn.ExecContext(ctx, statement, args...)
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - destinations (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Scan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *RawQuery) Scan(ctx context.Context, destinations ...any) error {
 	statement, args := compileRaw(q.statement, q.args)
 	rows, err := q.conn.QueryContext(ctx, statement, args...)
@@ -199,20 +495,149 @@ type InsertQuery struct {
 func newInsertQuery(db *DB, conn IConn) *InsertQuery {
 	return &InsertQuery{mutationBase: mutationBase{db: db, conn: conn}}
 }
-func (q *InsertQuery) Model(value any) *InsertQuery                 { q.model = value; return q }
-func (q *InsertQuery) Table(name string) *InsertQuery               { q.table = name; return q }
+
+// Parameters:
+//   - value (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Model and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
+func (q *InsertQuery) Model(value any) *InsertQuery { q.model = value; return q }
+
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
+func (q *InsertQuery) Table(name string) *InsertQuery { q.table = name; return q }
+
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - _ (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by TableExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *InsertQuery) TableExpr(name string, _ ...any) *InsertQuery { q.table = name; return q }
+
+// Parameters:
+//   - names (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Column and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *InsertQuery) Column(names ...string) *InsertQuery {
 	q.columns = append(q.columns, names...)
 	return q
 }
+
+// Parameters:
+//   - clause (string): Input value used by the operation.
+//   - _ (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by On and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *InsertQuery) On(clause string, _ ...any) *InsertQuery { q.onClause = clause; return q }
+
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*InsertQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Set and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *InsertQuery) Set(expr string, args ...any) *InsertQuery {
 	q.sets = append(q.sets, expr)
 	q.setArgs = append(q.setArgs, args...)
 	return q
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exec and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *InsertQuery) Exec(ctx context.Context) (sql.Result, error) {
 	if q.conn == nil {
 		return nil, sql.ErrConnDone
@@ -251,23 +676,152 @@ type UpdateQuery struct{ mutationBase }
 func newUpdateQuery(db *DB, conn IConn) *UpdateQuery {
 	return &UpdateQuery{mutationBase: mutationBase{db: db, conn: conn}}
 }
-func (q *UpdateQuery) Model(value any) *UpdateQuery                 { q.model = value; return q }
-func (q *UpdateQuery) Table(name string) *UpdateQuery               { q.table = name; return q }
+
+// Parameters:
+//   - value (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Model and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
+func (q *UpdateQuery) Model(value any) *UpdateQuery { q.model = value; return q }
+
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
+func (q *UpdateQuery) Table(name string) *UpdateQuery { q.table = name; return q }
+
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - _ (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by TableExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *UpdateQuery) TableExpr(name string, _ ...any) *UpdateQuery { q.table = name; return q }
+
+// Parameters:
+//   - names (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Column and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *UpdateQuery) Column(names ...string) *UpdateQuery {
 	q.columns = append(q.columns, names...)
 	return q
 }
+
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Set and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *UpdateQuery) Set(expr string, args ...any) *UpdateQuery {
 	q.sets = append(q.sets, expr)
 	q.setArgs = append(q.setArgs, args...)
 	return q
 }
+
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Where and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *UpdateQuery) Where(expr string, args ...any) *UpdateQuery {
 	q.wheres = append(q.wheres, expr)
 	q.whereArgs = append(q.whereArgs, args...)
 	return q
 }
+
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*UpdateQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WherePK and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *UpdateQuery) WherePK(columns ...string) *UpdateQuery {
 	row, _, err := mutationRow(q.model, q.table, nil)
 	if err != nil {
@@ -282,6 +836,24 @@ func (q *UpdateQuery) WherePK(columns ...string) *UpdateQuery {
 	return q
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exec and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *UpdateQuery) Exec(ctx context.Context) (sql.Result, error) {
 	if q.conn == nil {
 		return nil, sql.ErrConnDone

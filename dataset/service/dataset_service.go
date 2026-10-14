@@ -67,6 +67,28 @@ type DataSetService struct {
 //
 // When can it be used:
 //   - At application startup when assembling the engine and configuring dataset capabilities.
+//
+// Parameters:
+//   - repo (repository.DataSetRepository): Input value used by the operation.
+//   - mr (resolver.ModelResolver): Input value used by the operation.
+//   - fr (resolver.FieldResolver): Input value used by the operation.
+//   - fnr (resolver.FunctionResolver): Input value used by the operation.
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DataSetService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewDataSetService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewDataSetService(
 	repo repository.DataSetRepository,
 	mr resolver.ModelResolver,
@@ -100,6 +122,25 @@ func NewDataSetService(
 //
 // When can it be used:
 //   - Before invoking Preview, Save, or Execute, to ensure compilation support for target database drivers.
+//
+// Parameters:
+//   - driver (string): Input value used by the operation.
+//   - c (compiler.DataSetCompiler): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DataSetService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RegisterCompiler and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompiler) *DataSetService {
 	s.compilers[strings.ToLower(driver)] = c
 	return s
@@ -118,6 +159,24 @@ func (s *DataSetService) RegisterCompiler(driver string, c compiler.DataSetCompi
 //
 // When can it be used:
 //   - Anytime the dataset service needs to be bound to an active database connection.
+//
+// Parameters:
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DataSetService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetAdapter and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *DataSetService) SetAdapter(adp adapter.Adapter) *DataSetService {
 	s.adapter = adp
 	return s
@@ -138,6 +197,26 @@ func (s *DataSetService) SetAdapter(adp adapter.Adapter) *DataSetService {
 // When can it be used:
 //   - During dataset authoring when users configure joins, custom calculations, aggregations,
 //     and filter parameters and want immediate visual feedback without saving.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - ds (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*PreviewResponse): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Preview and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*PreviewResponse, error) {
 	// 1. Validate
 	if err := s.validator.Validate(ctx, ds); err != nil {
@@ -255,6 +334,26 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 //
 // When can it be used:
 //   - When finalizing and publishing a dataset for application consumption or report generation.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - ds (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*domain.DataSet): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Save and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.DataSet, error) {
 	// 1. Validate
 	if err := s.validator.Validate(ctx, ds); err != nil {
@@ -317,6 +416,27 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 //   - When executing datasets that do not depend on session user tokens (KTON) or when default tokens suffice.
 //
 // Execute executes a saved dataset by reference name with runtime parameter bindings.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - referenceName (string): Input value used by the operation.
+//   - runtimeParams (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Execute and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *DataSetService) Execute(ctx context.Context, referenceName string, runtimeParams map[string]any) ([]map[string]any, error) {
 	return s.ExecuteWithOptions(ctx, referenceName, &domain.ExecuteRequest{
 		FilterParams: runtimeParams,
@@ -326,6 +446,28 @@ func (s *DataSetService) Execute(ctx context.Context, referenceName string, runt
 // ExecuteWithUserToken resolves dataset by reference name, binds parameters safely
 // (supporting KTON user tokens, dynamic CD date expressions, and type coercions), and runs
 // the dataset via Procedure, Function, or Direct Query.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - referenceName (string): Input value used by the operation.
+//   - runtimeParams (map[string]any): Input value used by the operation.
+//   - userToken (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExecuteWithUserToken and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName string, runtimeParams map[string]any, userToken any) ([]map[string]any, error) {
 	return s.ExecuteWithOptions(ctx, referenceName, &domain.ExecuteRequest{
 		FilterParams: runtimeParams,
@@ -336,6 +478,27 @@ func (s *DataSetService) ExecuteWithUserToken(ctx context.Context, referenceName
 // ExecuteWithOptions resolves dataset by reference name and executes it using the standardized
 // ExecuteRequest supporting dynamic runtime filters, multi-column sorting, pagination (start, limit),
 // and parameter substitution (filterParams).
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - referenceName (string): Input value used by the operation.
+//   - req (*domain.ExecuteRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExecuteWithOptions and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *DataSetService) ExecuteWithOptions(ctx context.Context, referenceName string, req *domain.ExecuteRequest) ([]map[string]any, error) {
 	if req == nil {
 		req = &domain.ExecuteRequest{}
@@ -691,6 +854,26 @@ func buildWrappedQuery(baseQuery string, ds *domain.DataSet, req *domain.Execute
 // If no existing WHERE clause is present, it adds:
 //
 //	WHERE <new_conditions>
+//
+// Parameters:
+//   - baseSQL (string): Input value used by the operation.
+//   - filter (map[string]any): Input value used by the operation.
+//   - appendFilter (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplyFilterToSQL and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ApplyFilterToSQL(baseSQL string, filter map[string]any, appendFilter string) string {
 	if len(filter) == 0 {
 		return baseSQL

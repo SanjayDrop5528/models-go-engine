@@ -2,8 +2,9 @@
 //
 // File: diff.go
 // Usage:
-//   Implements DiffEngine to inspect tables, columns, indexes, primary keys, and foreign keys,
-//   producing a sequence of safe, ordered SchemaOperations for schema migration.
+//
+//	Implements DiffEngine to inspect tables, columns, indexes, primary keys, and foreign keys,
+//	producing a sequence of safe, ordered SchemaOperations for schema migration.
 package diff
 
 import (
@@ -29,13 +30,32 @@ type DiffEngine struct{}
 // NewDiffEngine creates a new DiffEngine instance.
 //
 // Purpose:
-//   Instantiates the schema difference comparator.
+//
+//	Instantiates the schema difference comparator.
 //
 // Where it is used:
 //   - Used by SchemaService and diff-related tests.
 //
 // When can it be used:
 //   - Call whenever computing structural differences between two database schemas.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*DiffEngine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewDiffEngine and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewDiffEngine() *DiffEngine {
 	return &DiffEngine{}
 }
@@ -43,13 +63,35 @@ func NewDiffEngine() *DiffEngine {
 // Compare computes the delta from current database schema to desired model schema.
 //
 // Purpose:
-//   Evaluates differences across tables, columns, data types, nullability, defaults, primary keys, indexes, and relations.
+//
+//	Evaluates differences across tables, columns, data types, nullability, defaults, primary keys, indexes, and relations.
 //
 // Where it is used:
 //   - Called by SchemaService.GetDiff, Preview, and Apply.
 //
 // When can it be used:
 //   - Call prior to generating schema migration plans or running DDL statements.
+//
+// Parameters:
+//   - current (*schema.Schema): Input value used by the operation.
+//   - desired (*schema.Schema): Input value used by the operation.
+//   - hints (DiffHints): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SchemaDiff): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Compare and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *DiffEngine) Compare(current *schema.Schema, desired *schema.Schema, hints DiffHints) (*SchemaDiff, error) {
 	diffResult := &SchemaDiff{
 		CurrentSchema: current,
@@ -220,7 +262,8 @@ func (e *DiffEngine) Compare(current *schema.Schema, desired *schema.Schema, hin
 // checkAttributeModifications inspects column differences and generates ALTER operations.
 //
 // Purpose:
-//   Compares existing and desired attributes to generate specific ALTER operations and classify their safety.
+//
+//	Compares existing and desired attributes to generate specific ALTER operations and classify their safety.
 //
 // Where it is used:
 //   - Called internally by Compare for matching columns across schemas.
@@ -311,7 +354,8 @@ func (e *DiffEngine) checkAttributeModifications(targetTable string, oldAttr sch
 // diffPrimaryKeys detects changes in primary key definitions between schemas.
 //
 // Purpose:
-//   Emits DROP_PRIMARY_KEY and ADD_PRIMARY_KEY operations if primary key columns have changed.
+//
+//	Emits DROP_PRIMARY_KEY and ADD_PRIMARY_KEY operations if primary key columns have changed.
 //
 // Where it is used:
 //   - Called internally by Compare when diffing schema primary keys.
@@ -357,7 +401,8 @@ func (e *DiffEngine) diffPrimaryKeys(targetTable string, currentPK *schema.Schem
 // diffIndexes computes additions, modifications, and removals of indexes.
 //
 // Purpose:
-//   Generates ADD_INDEX and DROP_INDEX operations to align database indexes with the desired model.
+//
+//	Generates ADD_INDEX and DROP_INDEX operations to align database indexes with the desired model.
 //
 // Where it is used:
 //   - Called internally by Compare when comparing table indexes.
@@ -430,7 +475,8 @@ func (e *DiffEngine) diffIndexes(targetTable string, currentIndexes []schema.Sch
 // diffRelations computes foreign key additions and deletions.
 //
 // Purpose:
-//   Generates ADD_FOREIGN_KEY and DROP_FOREIGN_KEY operations to synchronize relationship constraints.
+//
+//	Generates ADD_FOREIGN_KEY and DROP_FOREIGN_KEY operations to synchronize relationship constraints.
 //
 // Where it is used:
 //   - Called internally by Compare when comparing relational foreign keys.
@@ -482,7 +528,8 @@ func (e *DiffEngine) diffRelations(targetTable string, currentRels []schema.Sche
 // isNarrowingConversion checks if changing from one data type to another may lead to data truncation.
 //
 // Purpose:
-//   Identifies unsafe conversions (e.g., long to int, text to varchar) to flag them as DESTRUCTIVE.
+//
+//	Identifies unsafe conversions (e.g., long to int, text to varchar) to flag them as DESTRUCTIVE.
 //
 // Where it is used:
 //   - Called internally by checkAttributeModifications when evaluating ALTER_COLUMN_TYPE safety.

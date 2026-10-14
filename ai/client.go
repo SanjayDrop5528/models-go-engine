@@ -3,8 +3,9 @@
 //
 // File: client.go
 // Usage:
-//   Defines the Client interface, chat completion payload models, and default HTTP
-//   implementation communicating with the KriyaTec AI completions API endpoint.
+//
+//	Defines the Client interface, chat completion payload models, and default HTTP
+//	implementation communicating with the KriyaTec AI completions API endpoint.
 package ai
 
 import (
@@ -75,14 +76,34 @@ type HTTPClient struct {
 // NewHTTPClient creates an HTTPClient with configurable or environment-based settings.
 //
 // Purpose:
-//   Instantiates an AI HTTP client configured with endpoint URL, default model name,
-//   and timeout settings for calling remote LLM services.
+//
+//	Instantiates an AI HTTP client configured with endpoint URL, default model name,
+//	and timeout settings for calling remote LLM services.
 //
 // Where it is used:
 //   - In models-go-engine/ai/service.go and cmd/server initialization to talk to the AI backend.
 //
 // When can it be used:
 //   - When bootstrapping an AIService or running standalone natural language completions.
+//
+// Parameters:
+//   - apiURL (string): Input value used by the operation.
+//   - model (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*HTTPClient): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewHTTPClient and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewHTTPClient(apiURL, model string) *HTTPClient {
 	if apiURL == "" {
 		if envURL := os.Getenv("AI_API_URL"); envURL != "" {
@@ -110,13 +131,34 @@ func NewHTTPClient(apiURL, model string) *HTTPClient {
 // Chat sends a completion request to the KriyaTec AI endpoint.
 //
 // Purpose:
-//   Serializes a chat request, submits an HTTP POST to the AI API endpoint, and decodes the LLM response.
+//
+//	Serializes a chat request, submits an HTTP POST to the AI API endpoint, and decodes the LLM response.
 //
 // Where it is used:
 //   - Called by AIService.GenerateDataSet to retrieve query plans and natural language explanations.
 //
 // When can it be used:
 //   - Whenever an application needs to send conversational prompts to the AI completion service.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - req (*ChatRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ChatResponse): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Chat and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (c *HTTPClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
 	if req.Model == "" {
 		req.Model = c.model

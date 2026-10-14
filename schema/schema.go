@@ -78,6 +78,24 @@ type Schema struct {
 //
 // When can it be used:
 //   - Call whenever inspecting whether a specific attribute exists and checking its datatype or constraints.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SchemaAttribute): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetAttribute and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *Schema) GetAttribute(name string) *SchemaAttribute {
 	for i := range s.Attributes {
 		if s.Attributes[i].Name == name {
@@ -98,6 +116,24 @@ func (s *Schema) GetAttribute(name string) *SchemaAttribute {
 //
 // When can it be used:
 //   - Call when verifying if a database index exists on a table or collection.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SchemaIndex): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *Schema) GetIndex(name string) *SchemaIndex {
 	for i := range s.Indexes {
 		if s.Indexes[i].Name == name {
@@ -118,6 +154,24 @@ func (s *Schema) GetIndex(name string) *SchemaIndex {
 //
 // When can it be used:
 //   - Call when preparing a model definition to compare against a live introspected database schema.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Schema): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FromModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func FromModel(m *model.Model) *Schema {
 	if m == nil {
 		return nil

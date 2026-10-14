@@ -39,6 +39,24 @@ type MockAdapter struct {
 //
 // When can it be used:
 //   - Call when testing engine workflows without spinning up live database instances.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*MockAdapter): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewMockAdapter and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewMockAdapter() *MockAdapter {
 	return &MockAdapter{
 		schemas: make(map[string]*schema.Schema),
@@ -58,6 +76,24 @@ func NewMockAdapter() *MockAdapter {
 //
 // When can it be used:
 //   - Call when checking adapter identity.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Name and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (a *MockAdapter) Name() string { return "mock" }
 
 // DatabaseName returns the logical mock database name.
@@ -71,6 +107,24 @@ func (a *MockAdapter) Name() string { return "mock" }
 //
 // When can it be used:
 //   - Call when inspecting the active mock database name.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DatabaseName and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (a *MockAdapter) DatabaseName() string { return "mock" }
 
 // NativeClient returns the underlying mock instance.
@@ -84,6 +138,24 @@ func (a *MockAdapter) DatabaseName() string { return "mock" }
 //
 // When can it be used:
 //   - Call when inspecting mock state directly.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NativeClient and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (a *MockAdapter) NativeClient() any { return a }
 
 // Connect simulates database connection initialization.
@@ -97,6 +169,24 @@ func (a *MockAdapter) NativeClient() any { return a }
 //
 // When can it be used:
 //   - Call during adapter lifecycle startup.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Connect and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Connect(ctx context.Context) error { return nil }
 
 // Ping simulates checking database connectivity.
@@ -110,6 +200,24 @@ func (a *MockAdapter) Connect(ctx context.Context) error { return nil }
 //
 // When can it be used:
 //   - Call to check connection vitality.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Ping and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Ping(ctx context.Context) error { return nil }
 
 // Close simulates closing the mock connection.
@@ -123,6 +231,24 @@ func (a *MockAdapter) Ping(ctx context.Context) error { return nil }
 //
 // When can it be used:
 //   - Call during shutdown.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Close and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Close(ctx context.Context) error { return nil }
 
 // EnsureMetadataTables simulates metadata schema initialization.
@@ -136,6 +262,24 @@ func (a *MockAdapter) Close(ctx context.Context) error { return nil }
 //
 // When can it be used:
 //   - Call to bootstrap metadata tables.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by EnsureMetadataTables and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) EnsureMetadataTables(ctx context.Context) error {
 	return nil
 }
@@ -151,6 +295,26 @@ func (a *MockAdapter) EnsureMetadataTables(ctx context.Context) error {
 //
 // When can it be used:
 //   - Call when synchronizing models from live storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.ModelConfig): Returned value.
+//   - result2 ([]*model.DataModel): Returned value.
+//   - result3 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ImportLiveMetadata and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) ImportLiveMetadata(ctx context.Context) ([]*model.ModelConfig, []*model.DataModel, error) {
 	return nil, nil, nil
 }
@@ -166,6 +330,26 @@ func (a *MockAdapter) ImportLiveMetadata(ctx context.Context) ([]*model.ModelCon
 //
 // When can it be used:
 //   - Call when inspecting schema in mock tests.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*schema.Schema): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetSchema and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) GetSchema(ctx context.Context, m model.ModelRef) (*schema.Schema, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -187,6 +371,25 @@ func (a *MockAdapter) GetSchema(ctx context.Context, m model.ModelRef) (*schema.
 //
 // When can it be used:
 //   - Call to check plan validity.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - p (*plan.SchemaPlan): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateSchemaPlan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) ValidateSchemaPlan(ctx context.Context, p *plan.SchemaPlan) error {
 	return nil
 }
@@ -202,6 +405,26 @@ func (a *MockAdapter) ValidateSchemaPlan(ctx context.Context, p *plan.SchemaPlan
 //
 // When can it be used:
 //   - Call when testing migration preview output.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - p (*plan.SchemaPlan): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*plan.SchemaPreview): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by PreviewSchemaChange and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) PreviewSchemaChange(ctx context.Context, p *plan.SchemaPlan) (*plan.SchemaPreview, error) {
 	var actions []plan.NativeAction
 	for _, op := range p.Operations {
@@ -233,6 +456,25 @@ func (a *MockAdapter) PreviewSchemaChange(ctx context.Context, p *plan.SchemaPla
 //
 // When can it be used:
 //   - Call when executing schema migration tests.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - p (*plan.SchemaPlan): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplySchemaChange and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) ApplySchemaChange(ctx context.Context, p *plan.SchemaPlan) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -282,6 +524,27 @@ func (a *MockAdapter) ApplySchemaChange(ctx context.Context, p *plan.SchemaPlan)
 //
 // When can it be used:
 //   - Call when inserting dynamic records in mock mode.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Create and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Create(ctx context.Context, m model.ModelRef, data map[string]any) (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -311,6 +574,28 @@ func (a *MockAdapter) Create(ctx context.Context, m model.ModelRef, data map[str
 //
 // When can it be used:
 //   - Call when querying mock records.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (int64): Returned value.
+//   - result3 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Find and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Find(ctx context.Context, m model.ModelRef, q query.Query) ([]map[string]any, int64, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -395,6 +680,27 @@ func mockFilterMatches(actual any, filter query.Filter) bool {
 //
 // When can it be used:
 //   - Call when fetching an individual mock record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOne and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) FindOne(ctx context.Context, m model.ModelRef, id any) (map[string]any, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -415,6 +721,27 @@ func (a *MockAdapter) FindOne(ctx context.Context, m model.ModelRef, id any) (ma
 	return nil, fmt.Errorf("record not found")
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOneWithQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) FindOneWithQuery(ctx context.Context, m model.ModelRef, id any, q query.Query) (map[string]any, error) {
 	primaryKey := m.PrimaryKey
 	if primaryKey == "" {
@@ -442,6 +769,28 @@ func (a *MockAdapter) FindOneWithQuery(ctx context.Context, m model.ModelRef, id
 //
 // When can it be used:
 //   - Call when modifying existing records in mock storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Update and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Update(ctx context.Context, m model.ModelRef, id any, data map[string]any) (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -467,6 +816,28 @@ func (a *MockAdapter) Update(ctx context.Context, m model.ModelRef, id any, data
 //
 // When can it be used:
 //   - Call when patching attributes in mock storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Patch and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Patch(ctx context.Context, m model.ModelRef, id any, data map[string]any) (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -493,6 +864,26 @@ func (a *MockAdapter) Patch(ctx context.Context, m model.ModelRef, id any, data 
 //
 // When can it be used:
 //   - Call when deleting a mock record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Delete(ctx context.Context, m model.ModelRef, id any) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -517,6 +908,26 @@ func (a *MockAdapter) Delete(ctx context.Context, m model.ModelRef, id any) erro
 //
 // When can it be used:
 //   - Call when testing dynamic command execution.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - req (execution.ExecutionRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*execution.ExecutionResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Execute and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Execute(ctx context.Context, req execution.ExecutionRequest) (*execution.ExecutionResult, error) {
 	return &execution.ExecutionResult{
 		Data: map[string]any{
@@ -541,6 +952,25 @@ func (a *MockAdapter) Execute(ctx context.Context, req execution.ExecutionReques
 //
 // When can it be used:
 //   - Call when simulating transactional boundaries.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Transaction): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Begin and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (a *MockAdapter) Begin(ctx context.Context) (Transaction, error) {
 	return &MockTransaction{adapter: a}, nil
 }
@@ -563,6 +993,27 @@ type MockTransaction struct {
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Create and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Create(ctx context.Context, m model.ModelRef, data map[string]any) (map[string]any, error) {
 	return tx.adapter.Create(ctx, m, data)
 }
@@ -578,6 +1029,28 @@ func (tx *MockTransaction) Create(ctx context.Context, m model.ModelRef, data ma
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (int64): Returned value.
+//   - result3 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Find and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Find(ctx context.Context, m model.ModelRef, q query.Query) ([]map[string]any, int64, error) {
 	return tx.adapter.Find(ctx, m, q)
 }
@@ -593,10 +1066,52 @@ func (tx *MockTransaction) Find(ctx context.Context, m model.ModelRef, q query.Q
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOne and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) FindOne(ctx context.Context, m model.ModelRef, id any) (map[string]any, error) {
 	return tx.adapter.FindOne(ctx, m, id)
 }
 
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOneWithQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) FindOneWithQuery(ctx context.Context, m model.ModelRef, id any, q query.Query) (map[string]any, error) {
 	return tx.adapter.FindOneWithQuery(ctx, m, id, q)
 }
@@ -612,6 +1127,28 @@ func (tx *MockTransaction) FindOneWithQuery(ctx context.Context, m model.ModelRe
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Update and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Update(ctx context.Context, m model.ModelRef, id any, data map[string]any) (map[string]any, error) {
 	return tx.adapter.Update(ctx, m, id, data)
 }
@@ -627,6 +1164,28 @@ func (tx *MockTransaction) Update(ctx context.Context, m model.ModelRef, id any,
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Patch and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Patch(ctx context.Context, m model.ModelRef, id any, data map[string]any) (map[string]any, error) {
 	return tx.adapter.Patch(ctx, m, id, data)
 }
@@ -642,6 +1201,26 @@ func (tx *MockTransaction) Patch(ctx context.Context, m model.ModelRef, id any, 
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (model.ModelRef): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Delete(ctx context.Context, m model.ModelRef, id any) error {
 	return tx.adapter.Delete(ctx, m, id)
 }
@@ -657,6 +1236,26 @@ func (tx *MockTransaction) Delete(ctx context.Context, m model.ModelRef, id any)
 //
 // When can it be used:
 //   - Call within a mock transaction.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - req (execution.ExecutionRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*execution.ExecutionResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Execute and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Execute(ctx context.Context, req execution.ExecutionRequest) (*execution.ExecutionResult, error) {
 	return tx.adapter.Execute(ctx, req)
 }
@@ -672,6 +1271,24 @@ func (tx *MockTransaction) Execute(ctx context.Context, req execution.ExecutionR
 //
 // When can it be used:
 //   - Call to finalize a transaction in tests.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Commit and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Commit(ctx context.Context) error {
 	tx.committed = true
 	return nil
@@ -688,6 +1305,24 @@ func (tx *MockTransaction) Commit(ctx context.Context) error {
 //
 // When can it be used:
 //   - Call to abort a transaction in tests.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Rollback and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (tx *MockTransaction) Rollback(ctx context.Context) error {
 	tx.rolledBack = true
 	return nil

@@ -3,8 +3,9 @@
 //
 // File: dialect.go
 // Usage:
-//   Defines the Dialect interface and dialect instances (NewPostgreSQL, NewMySQL,
-//   NewSQLite, NewMSSQL) that specialize SQL statement rendering for relational engines.
+//
+//	Defines the Dialect interface and dialect instances (NewPostgreSQL, NewMySQL,
+//	NewSQLite, NewMSSQL) that specialize SQL statement rendering for relational engines.
 package dialect
 
 import (
@@ -42,13 +43,32 @@ type baseDialect struct {
 // Name returns the dialect Name identifier.
 //
 // Purpose:
-//   Identifies the target database dialect (pg, mysql, sqlite, mssql).
+//
+//	Identifies the target database dialect (pg, mysql, sqlite, mssql).
 //
 // Where it is used:
 //   - In query builders and driver matching logic.
 //
 // When can it be used:
 //   - When checking the name of the active SQL dialect.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Name): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Name and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *baseDialect) Name() Name {
 	return d.name
 }
@@ -56,13 +76,32 @@ func (d *baseDialect) Name() Name {
 // HasFeature returns whether the dialect supports a specific feature flag.
 //
 // Purpose:
-//   Checks the bitmask for supported syntax features like CTEs, Returning, or Lock statements.
+//
+//	Checks the bitmask for supported syntax features like CTEs, Returning, or Lock statements.
 //
 // Where it is used:
 //   - In query compilation when choosing whether to emit RETURNING or separate SELECT queries.
 //
 // When can it be used:
 //   - Before emitting syntax that requires specific engine capabilities.
+//
+// Parameters:
+//   - f (feature.Feature): Input value used by the operation.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by HasFeature and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *baseDialect) HasFeature(f feature.Feature) bool {
 	return d.features&f != 0
 }
@@ -70,13 +109,33 @@ func (d *baseDialect) HasFeature(f feature.Feature) bool {
 // AppendString escapes and appends a single-quoted string literal to the buffer.
 //
 // Purpose:
-//   Appends SQL string literals with standard single-quote escaping (' -> '').
+//
+//	Appends SQL string literals with standard single-quote escaping (' -> '').
 //
 // Where it is used:
 //   - In dialect query generation for raw literal string formatting.
 //
 // When can it be used:
 //   - When appending string literals directly into SQL buffers.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - s (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendString and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *baseDialect) AppendString(b []byte, s string) []byte {
 	b = append(b, '\'')
 	for i := 0; i < len(s); i++ {
@@ -99,13 +158,32 @@ type pgDialect struct {
 // NewPostgreSQL creates a Dialect instance configured for PostgreSQL.
 //
 // Purpose:
-//   Initializes the PostgreSQL dialect with double-quote identifier quoting and $1 positional parameters.
+//
+//	Initializes the PostgreSQL dialect with double-quote identifier quoting and $1 positional parameters.
 //
 // Where it is used:
 //   - In models-go-postgres adapter initialization.
 //
 // When can it be used:
 //   - When targeting PostgreSQL database instances.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewPostgreSQL and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewPostgreSQL() Dialect {
 	return &pgDialect{
 		baseDialect: baseDialect{
@@ -123,13 +201,33 @@ func NewPostgreSQL() Dialect {
 // AppendIdent quotes an identifier using PostgreSQL double quotes.
 //
 // Purpose:
-//   Escapes identifiers and dots in table/column names using double quotes ("schema"."table").
+//
+//	Escapes identifiers and dots in table/column names using double quotes ("schema"."table").
 //
 // Where it is used:
 //   - In query generation when rendering column, table, and schema references.
 //
 // When can it be used:
 //   - Whenever formatting PostgreSQL identifiers safely.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - ident (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendIdent and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *pgDialect) AppendIdent(b []byte, ident string) []byte {
 	if strings.Contains(ident, ".") {
 		parts := strings.Split(ident, ".")
@@ -147,7 +245,8 @@ func (d *pgDialect) AppendIdent(b []byte, ident string) []byte {
 // appendQuote quotes a single string token in double quotes.
 //
 // Purpose:
-//   Surrounds a token in double quotes, escaping embedded quotes.
+//
+//	Surrounds a token in double quotes, escaping embedded quotes.
 //
 // Where it is used:
 //   - Internally in AppendIdent.
@@ -170,13 +269,33 @@ func (d *pgDialect) appendQuote(b []byte, s string) []byte {
 // AppendParam formats a 1-based parameter placeholder ($1, $2, ...).
 //
 // Purpose:
-//   Emits PostgreSQL positional parameter placeholders.
+//
+//	Emits PostgreSQL positional parameter placeholders.
 //
 // Where it is used:
 //   - In QueryGen when binding arguments into SQL statements.
 //
 // When can it be used:
 //   - When generating parameterized PostgreSQL queries.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - idx (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendParam and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *pgDialect) AppendParam(b []byte, idx int) []byte {
 	b = append(b, '$')
 	return strconv.AppendInt(b, int64(idx), 10)
@@ -190,13 +309,32 @@ type mySQLDialect struct {
 // NewMySQL creates a Dialect instance configured for MySQL.
 //
 // Purpose:
-//   Initializes the MySQL dialect with backtick identifier quoting and ? positional parameters.
+//
+//	Initializes the MySQL dialect with backtick identifier quoting and ? positional parameters.
 //
 // Where it is used:
 //   - In models-go-mysql adapter initialization.
 //
 // When can it be used:
 //   - When targeting MySQL or MariaDB database instances.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewMySQL and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewMySQL() Dialect {
 	return &mySQLDialect{
 		baseDialect: baseDialect{
@@ -213,13 +351,33 @@ func NewMySQL() Dialect {
 // AppendIdent quotes an identifier using MySQL backticks.
 //
 // Purpose:
-//   Quotes table and column identifiers with backticks (`schema`.`table`).
+//
+//	Quotes table and column identifiers with backticks (`schema`.`table`).
 //
 // Where it is used:
 //   - In query compilation for MySQL targets.
 //
 // When can it be used:
 //   - When formatting MySQL identifiers.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - ident (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendIdent and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *mySQLDialect) AppendIdent(b []byte, ident string) []byte {
 	if strings.Contains(ident, ".") {
 		parts := strings.Split(ident, ".")
@@ -237,7 +395,8 @@ func (d *mySQLDialect) AppendIdent(b []byte, ident string) []byte {
 // appendQuote quotes a token with backticks.
 //
 // Purpose:
-//   Encloses a token in backticks and escapes interior backticks.
+//
+//	Encloses a token in backticks and escapes interior backticks.
 //
 // Where it is used:
 //   - Internally in MySQL AppendIdent.
@@ -260,13 +419,33 @@ func (d *mySQLDialect) appendQuote(b []byte, s string) []byte {
 // AppendParam appends a ? positional placeholder.
 //
 // Purpose:
-//   Emits MySQL question-mark parameter placeholders.
+//
+//	Emits MySQL question-mark parameter placeholders.
 //
 // Where it is used:
 //   - In QueryGen when binding arguments for MySQL.
 //
 // When can it be used:
 //   - When generating parameterized MySQL queries.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - _ (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendParam and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *mySQLDialect) AppendParam(b []byte, _ int) []byte {
 	return append(b, '?')
 }
@@ -279,13 +458,32 @@ type sqliteDialect struct {
 // NewSQLite creates a Dialect instance configured for SQLite.
 //
 // Purpose:
-//   Initializes SQLite dialect with standard SQL quoting and ? parameter placeholders.
+//
+//	Initializes SQLite dialect with standard SQL quoting and ? parameter placeholders.
 //
 // Where it is used:
 //   - In embedded SQLite test fixtures and adapters.
 //
 // When can it be used:
 //   - When targeting SQLite database files or in-memory SQLite instances.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSQLite and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewSQLite() Dialect {
 	return &sqliteDialect{
 		baseDialect: baseDialect{
@@ -301,13 +499,33 @@ func NewSQLite() Dialect {
 // AppendIdent quotes an identifier using SQLite standard quotes.
 //
 // Purpose:
-//   Quotes SQLite identifiers using standard double quotes.
+//
+//	Quotes SQLite identifiers using standard double quotes.
 //
 // Where it is used:
 //   - In query compilation for SQLite targets.
 //
 // When can it be used:
 //   - When formatting SQLite identifiers.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - ident (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendIdent and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *sqliteDialect) AppendIdent(b []byte, ident string) []byte {
 	return (&pgDialect{}).AppendIdent(b, ident)
 }
@@ -315,13 +533,33 @@ func (d *sqliteDialect) AppendIdent(b []byte, ident string) []byte {
 // AppendParam appends a ? positional placeholder for SQLite.
 //
 // Purpose:
-//   Emits SQLite parameter placeholders.
+//
+//	Emits SQLite parameter placeholders.
 //
 // Where it is used:
 //   - In QueryGen when binding arguments for SQLite.
 //
 // When can it be used:
 //   - When generating parameterized SQLite queries.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - _ (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendParam and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *sqliteDialect) AppendParam(b []byte, _ int) []byte {
 	return append(b, '?')
 }
@@ -334,13 +572,32 @@ type mssqlDialect struct {
 // NewMSSQL creates a Dialect instance configured for Microsoft SQL Server.
 //
 // Purpose:
-//   Initializes MSSQL dialect with square bracket identifier quoting and @p parameter placeholders.
+//
+//	Initializes MSSQL dialect with square bracket identifier quoting and @p parameter placeholders.
 //
 // Where it is used:
 //   - When configuring Microsoft SQL Server connections.
 //
 // When can it be used:
 //   - When generating SQL queries targeting Microsoft SQL Server.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewMSSQL and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewMSSQL() Dialect {
 	return &mssqlDialect{
 		baseDialect: baseDialect{
@@ -355,13 +612,33 @@ func NewMSSQL() Dialect {
 // AppendIdent quotes an identifier using MSSQL square brackets ([schema].[table]).
 //
 // Purpose:
-//   Quotes table and column identifiers with brackets for SQL Server.
+//
+//	Quotes table and column identifiers with brackets for SQL Server.
 //
 // Where it is used:
 //   - In query compilation for MSSQL targets.
 //
 // When can it be used:
 //   - When formatting SQL Server identifiers.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - ident (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendIdent and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *mssqlDialect) AppendIdent(b []byte, ident string) []byte {
 	if strings.Contains(ident, ".") {
 		parts := strings.Split(ident, ".")
@@ -379,13 +656,33 @@ func (d *mssqlDialect) AppendIdent(b []byte, ident string) []byte {
 // AppendParam appends a 1-based parameter placeholder (@p1, @p2, ...).
 //
 // Purpose:
-//   Emits MSSQL named parameter placeholders.
+//
+//	Emits MSSQL named parameter placeholders.
 //
 // Where it is used:
 //   - In QueryGen when binding arguments for MSSQL.
 //
 // When can it be used:
 //   - When generating parameterized SQL Server queries.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - idx (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendParam and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (d *mssqlDialect) AppendParam(b []byte, idx int) []byte {
 	b = append(b, "@p"...)
 	return strconv.AppendInt(b, int64(idx), 10)

@@ -41,6 +41,24 @@ type (
 )
 
 // In expands a slice in an IN (?) expression.
+//
+// Parameters:
+//   - values (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (InValues): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by In and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func In(values any) InValues { return query.In(values) }
 
 const (
@@ -61,6 +79,25 @@ const (
 //
 // When can it be used:
 //   - Whenever connecting a SQL database handle to the RDBMS query engine.
+//
+// Parameters:
+//   - db (*sql.DB): Input value used by the operation.
+//   - d (dialect.Dialect): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DB): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewDB and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 	return query.NewDB(db, d)
 }
@@ -76,6 +113,24 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 //
 // When can it be used:
 //   - When beginning programmatic construction of a SELECT statement.
+//
+// Parameters:
+//   - db (*DB): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSelectQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewSelectQuery(db *DB) *SelectQuery {
 	return query.NewSelectQuery(db)
 }
@@ -91,6 +146,25 @@ func NewSelectQuery(db *DB) *SelectQuery {
 //
 // When can it be used:
 //   - When bridging engine Query ASTs directly into executable SQL SELECT queries.
+//
+// Parameters:
+//   - db (*DB): Input value used by the operation.
+//   - uq (coreQuery.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSelectFromQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewSelectFromQuery(db *DB, uq coreQuery.Query) *SelectQuery {
 	return query.NewSelectQuery(db).ApplyUnifiedQuery(uq)
 }

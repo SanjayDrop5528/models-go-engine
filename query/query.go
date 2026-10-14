@@ -180,6 +180,23 @@ type Query struct {
 	CommentText string        `json:"comment,omitempty"`
 }
 
+// Parameters:
+//   - args ([]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DebugArguments and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) DebugArguments(args []any) any {
 	if q.DebugIncludeArgs {
 		return args
@@ -187,6 +204,24 @@ func (q Query) DebugArguments(args []any) any {
 	return fmt.Sprintf("<redacted:%d argument(s)>", len(args))
 }
 
+// Parameters:
+//   - value (any): Input value used by the operation.
+//   - valueCount (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DebugValue and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) DebugValue(value any, valueCount int) any {
 	if q.DebugIncludeArgs {
 		return value
@@ -194,6 +229,23 @@ func (q Query) DebugValue(value any, valueCount int) any {
 	return fmt.Sprintf("<redacted:%d value(s)>", valueCount)
 }
 
+// Parameters:
+//   - filters ([]Filter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DebugFilters and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) DebugFilters(filters []Filter) any {
 	if q.DebugIncludeArgs {
 		return filters
@@ -205,6 +257,23 @@ func (q Query) DebugFilters(filters []Filter) any {
 	return shape
 }
 
+// Parameters:
+//   - specs ([]RelationSpec): Input value used by the operation.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DebugRelationSpecs and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) DebugRelationSpecs(specs []RelationSpec) any {
 	if q.DebugIncludeArgs {
 		return specs
@@ -223,12 +292,47 @@ func (q Query) DebugRelationSpecs(specs []RelationSpec) any {
 	return redacted
 }
 
+// Parameters:
+//   - duration (time.Duration): Input value used by the operation.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IsSlow and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) IsSlow(duration time.Duration) bool {
 	return q.SlowQueryThresholdMS > 0 && duration >= time.Duration(q.SlowQueryThresholdMS)*time.Millisecond
 }
 
 // EnsureDebugTrace assigns a process-local correlation ID when debug logging
 // is enabled. The ID is internal and is never serialized into API responses.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by EnsureDebugTrace and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) EnsureDebugTrace() Query {
 	if (q.Debug || q.SlowQueryThresholdMS > 0) && q.DebugTraceID == "" {
 		q.DebugTraceID = fmt.Sprintf("query-%06d", atomic.AddUint64(&debugTraceSequence, 1))
@@ -247,6 +351,24 @@ func (q Query) EnsureDebugTrace() Query {
 //
 // When can it be used:
 //   - Whenever initializing a query builder.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by New and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func New() Query {
 	return NewQuery()
 }
@@ -263,6 +385,24 @@ func New() Query {
 //
 // When can it be used:
 //   - Any time records need to be retrieved or filtered from a database adapter.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewQuery() Query {
 	return Query{
 		LogicalOp:        OpAnd,
@@ -275,48 +415,194 @@ func NewQuery() Query {
 }
 
 // Table specifies target table(s) or collections to query.
+//
+// Parameters:
+//   - tables (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Table(tables ...string) Query {
 	q.Tables = append(q.Tables, tables...)
 	return q
 }
 
 // Model sets the destination model object or struct for reflection.
+//
+// Parameters:
+//   - m (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Model and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Model(m any) Query {
 	q.ModelTarget = m
 	return q
 }
 
 // Column sets the projected columns or fields.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Column and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Column(columns ...string) Query {
 	q.Fields = append(q.Fields, columns...)
 	return q
 }
 
 // ColumnExpr adds a computed column expression with optional arguments.
+//
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ColumnExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) ColumnExpr(expr string, args ...any) Query {
 	q.ColumnExprs = append(q.ColumnExprs, RawExpr{Query: expr, Args: args})
 	return q
 }
 
 // ExcludeColumn excludes specific columns from being retrieved.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExcludeColumn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) ExcludeColumn(columns ...string) Query {
 	q.ExcludedColumns = append(q.ExcludedColumns, columns...)
 	return q
 }
 
 // Distinct adds a DISTINCT constraint to eliminate duplicates.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Distinct and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Distinct() Query {
 	q.IsDistinct = true
 	return q
 }
 
 // DistinctOn adds a DISTINCT ON clause.
+//
+// Parameters:
+//   - fields (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DistinctOn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) DistinctOn(fields ...string) Query {
 	q.DistinctFields = append(q.DistinctFields, fields...)
 	return q
 }
 
 // Where adds a filter condition. Supports both legacy: Where(field, op, val) and raw: Where("status = ?", "active").
+//
+// Parameters:
+//   - exprOrField (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Where and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Where(exprOrField string, args ...any) Query {
 	if len(args) == 2 {
 		if op, ok := args[0].(FilterOp); ok {
@@ -332,6 +618,26 @@ func (q Query) Where(exprOrField string, args ...any) Query {
 }
 
 // WhereFilter adds a structured Filter criterion.
+//
+// Parameters:
+//   - field (string): Input value used by the operation.
+//   - op (FilterOp): Input value used by the operation.
+//   - val (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereFilter and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WhereFilter(field string, op FilterOp, val any) Query {
 	q.Filters = append(q.Filters, Filter{
 		Field: field,
@@ -342,6 +648,25 @@ func (q Query) WhereFilter(field string, op FilterOp, val any) Query {
 }
 
 // WhereOr adds an OR condition to the query.
+//
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereOr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WhereOr(expr string, args ...any) Query {
 	q.LogicalOp = OpOr
 	q.RawWheres = append(q.RawWheres, RawExpr{Query: expr, Args: args})
@@ -349,6 +674,25 @@ func (q Query) WhereOr(expr string, args ...any) Query {
 }
 
 // WhereGroup nests a group of filters joined by the given separator (" AND " or " OR ").
+//
+// Parameters:
+//   - sep (string): Input value used by the operation.
+//   - fn (func(Query) Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereGroup and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WhereGroup(sep string, fn func(Query) Query) Query {
 	subInit := NewQuery()
 	if strings.Contains(strings.ToUpper(sep), "OR") {
@@ -363,6 +707,24 @@ func (q Query) WhereGroup(sep string, fn func(Query) Query) Query {
 }
 
 // WherePK adds primary key filter conditions.
+//
+// Parameters:
+//   - cols (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WherePK and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WherePK(cols ...string) Query {
 	for _, col := range cols {
 		q.RawWheres = append(q.RawWheres, RawExpr{Query: col + " = ?"})
@@ -371,29 +733,120 @@ func (q Query) WherePK(cols ...string) Query {
 }
 
 // WhereDeleted adds a soft-delete filter criterion.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereDeleted and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WhereDeleted() Query {
 	q.RawWheres = append(q.RawWheres, RawExpr{Query: "deleted_at IS NOT NULL"})
 	return q
 }
 
 // WhereAllWithDeleted includes both active and soft-deleted rows.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereAllWithDeleted and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WhereAllWithDeleted() Query {
 	return q
 }
 
 // Group adds columns to the GROUP BY clause.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Group and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Group(columns ...string) Query {
 	q.Groups = append(q.Groups, columns...)
 	return q
 }
 
 // Having adds a HAVING clause condition.
+//
+// Parameters:
+//   - expr (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Having and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Having(expr string, args ...any) Query {
 	q.Havings = append(q.Havings, RawExpr{Query: expr, Args: args})
 	return q
 }
 
 // Order adds raw order expressions.
+//
+// Parameters:
+//   - orders (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Order and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Order(orders ...string) Query {
 	for _, o := range orders {
 		parts := strings.Fields(o)
@@ -407,6 +860,25 @@ func (q Query) Order(orders ...string) Query {
 }
 
 // OrderBy adds a sort spec.
+//
+// Parameters:
+//   - field (string): Input value used by the operation.
+//   - order (SortOrder): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by OrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) OrderBy(field string, order SortOrder) Query {
 	q.Sorts = append(q.Sorts, Sort{
 		Field: field,
@@ -416,18 +888,73 @@ func (q Query) OrderBy(field string, order SortOrder) Query {
 }
 
 // Limit sets the maximum number of records to return.
+//
+// Parameters:
+//   - n (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Limit and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Limit(n int) Query {
 	q.Pagination.Limit = n
 	return q
 }
 
 // Offset sets the number of records to skip.
+//
+// Parameters:
+//   - n (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Offset and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Offset(n int) Query {
 	q.Pagination.Offset = n
 	return q
 }
 
 // LimitOffset sets both the limit and offset.
+//
+// Parameters:
+//   - limit (int): Input value used by the operation.
+//   - offset (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by LimitOffset and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) LimitOffset(limit, offset int) Query {
 	q.Pagination.Limit = limit
 	q.Pagination.Offset = offset
@@ -435,6 +962,25 @@ func (q Query) LimitOffset(limit, offset int) Query {
 }
 
 // Join adds a JOIN clause across tables or collections.
+//
+// Parameters:
+//   - joinTypeAndTable (string): Input value used by the operation.
+//   - onConditions (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Join and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Join(joinTypeAndTable string, onConditions ...string) Query {
 	on := strings.Join(onConditions, " AND ")
 	q.Joins = append(q.Joins, JoinSpec{
@@ -446,6 +992,25 @@ func (q Query) Join(joinTypeAndTable string, onConditions ...string) Query {
 }
 
 // JoinOn adds an ON condition to the latest join.
+//
+// Parameters:
+//   - cond (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by JoinOn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) JoinOn(cond string, args ...any) Query {
 	if len(q.Joins) > 0 {
 		idx := len(q.Joins) - 1
@@ -460,6 +1025,25 @@ func (q Query) JoinOn(cond string, args ...any) Query {
 }
 
 // JoinOnOr adds an OR ON condition to the latest join.
+//
+// Parameters:
+//   - cond (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by JoinOnOr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) JoinOnOr(cond string, args ...any) Query {
 	if len(q.Joins) > 0 {
 		idx := len(q.Joins) - 1
@@ -474,6 +1058,25 @@ func (q Query) JoinOnOr(cond string, args ...any) Query {
 }
 
 // Relation registers a relation to join or populate eagerly.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - apply (...func(Query) Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Relation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Relation(name string, apply ...func(Query) Query) Query {
 	spec := RelationSpec{
 		Name:             name,
@@ -511,6 +1114,25 @@ func (q Query) Relation(name string, apply ...func(Query) Query) Query {
 }
 
 // RelationWithOpts configures a relation with explicit options.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - opts (RelationOpts): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RelationWithOpts and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) RelationWithOpts(name string, opts RelationOpts) Query {
 	spec := RelationSpec{
 		Name:             name,
@@ -539,18 +1161,72 @@ func (q Query) RelationWithOpts(name string, opts RelationOpts) Query {
 }
 
 // WithChildren sets whether related children models should be loaded.
+//
+// Parameters:
+//   - load (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithChildren and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WithChildren(load bool) Query {
 	q.LoadWithChildren = load
 	return q
 }
 
 // WithRelations adds relations to load.
+//
+// Parameters:
+//   - relations (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithRelations and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) WithRelations(relations ...string) Query {
 	q.Relations = append(q.Relations, relations...)
 	return q
 }
 
 // Union combines this query with another using UNION.
+//
+// Parameters:
+//   - other (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Union and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Union(other Query) Query {
 	cp := other
 	q.Unions = append(q.Unions, UnionSpec{
@@ -561,6 +1237,24 @@ func (q Query) Union(other Query) Query {
 }
 
 // UnionAll combines this query with another using UNION ALL.
+//
+// Parameters:
+//   - other (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UnionAll and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) UnionAll(other Query) Query {
 	cp := other
 	q.Unions = append(q.Unions, UnionSpec{
@@ -571,6 +1265,24 @@ func (q Query) UnionAll(other Query) Query {
 }
 
 // Intersect combines this query with another using INTERSECT.
+//
+// Parameters:
+//   - other (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Intersect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Intersect(other Query) Query {
 	cp := other
 	q.Unions = append(q.Unions, UnionSpec{
@@ -581,6 +1293,24 @@ func (q Query) Intersect(other Query) Query {
 }
 
 // Except combines this query with another using EXCEPT.
+//
+// Parameters:
+//   - other (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Except and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Except(other Query) Query {
 	cp := other
 	q.Unions = append(q.Unions, UnionSpec{
@@ -591,42 +1321,168 @@ func (q Query) Except(other Query) Query {
 }
 
 // UseIndex adds a USE INDEX hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) UseIndex(indexes ...string) Query {
 	q.IndexHints.Use = append(q.IndexHints.Use, indexes...)
 	return q
 }
 
 // UseIndexForJoin adds a USE INDEX FOR JOIN hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) UseIndexForJoin(indexes ...string) Query {
 	q.IndexHints.UseForJoin = append(q.IndexHints.UseForJoin, indexes...)
 	return q
 }
 
 // UseIndexForOrderBy adds a USE INDEX FOR ORDER BY hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForOrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) UseIndexForOrderBy(indexes ...string) Query {
 	q.IndexHints.UseForOrderBy = append(q.IndexHints.UseForOrderBy, indexes...)
 	return q
 }
 
 // UseIndexForGroupBy adds a USE INDEX FOR GROUP BY hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForGroupBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) UseIndexForGroupBy(indexes ...string) Query {
 	q.IndexHints.UseForGroupBy = append(q.IndexHints.UseForGroupBy, indexes...)
 	return q
 }
 
 // IgnoreIndex adds an IGNORE INDEX hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IgnoreIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) IgnoreIndex(indexes ...string) Query {
 	q.IndexHints.Ignore = append(q.IndexHints.Ignore, indexes...)
 	return q
 }
 
 // ForceIndex adds a FORCE INDEX hint.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ForceIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) ForceIndex(indexes ...string) Query {
 	q.IndexHints.Force = append(q.IndexHints.Force, indexes...)
 	return q
 }
 
 // Comment sets a comment tag on the query.
+//
+// Parameters:
+//   - comment (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Comment and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q Query) Comment(comment string) Query {
 	q.CommentText = comment
 	return q

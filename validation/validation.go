@@ -50,6 +50,24 @@ type ValidationError struct {
 //
 // When can it be used:
 //   - Anywhere an error message is required.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Error and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *ValidationError) Error() string {
 	return e.Message
 }
@@ -71,6 +89,24 @@ type MultiValidationError struct {
 //
 // When can it be used:
 //   - When presenting all field failures simultaneously to the user.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Error and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (m *MultiValidationError) Error() string {
 	if len(m.Errors) == 0 {
 		return "validation failed"
@@ -96,6 +132,25 @@ func (m *MultiValidationError) Error() string {
 //
 // When can it be used:
 //   - When a specific field violates a required, format, or range rule.
+//
+// Parameters:
+//   - field (string): Input value used by the operation.
+//   - message (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ValidationError): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewValidationError and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewValidationError(field, message string) *ValidationError {
 	return &ValidationError{
 		Code:    "VALIDATION_ERROR",
@@ -115,6 +170,26 @@ func NewValidationError(field, message string) *ValidationError {
 //
 // When can it be used:
 //   - When a foreign key/orbital reference value does not exist in the target table.
+//
+// Parameters:
+//   - field (string): Input value used by the operation.
+//   - refModel (string): Input value used by the operation.
+//   - refVal (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ValidationError): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewReferenceNotFoundError and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewReferenceNotFoundError(field, refModel string, refVal any) *ValidationError {
 	return &ValidationError{
 		Code:           "REFERENCE_NOT_FOUND",
@@ -136,6 +211,24 @@ func NewReferenceNotFoundError(field, refModel string, refVal any) *ValidationEr
 //
 // When can it be used:
 //   - After collecting all field validation results across a record.
+//
+// Parameters:
+//   - errs ([]*ValidationError): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewMultiValidationError and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewMultiValidationError(errs []*ValidationError) error {
 	if len(errs) == 0 {
 		return nil
@@ -161,6 +254,24 @@ func NewMultiValidationError(errs []*ValidationError) error {
 //
 // When can it be used:
 //   - Before saving or updating an entity schema definition.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidateModel(m *model.Model) error {
 	if m == nil {
 		return errors.New("model cannot be nil")
@@ -262,6 +373,25 @@ func isSequenceOrAutoAttr(attr *model.Attribute) bool {
 //
 // When can it be used:
 //   - When inserting a new record into a table or document collection.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateData and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidateData(m *model.Model, data map[string]any) error {
 	if m == nil {
 		return errors.New("model cannot be nil")
@@ -323,6 +453,25 @@ func ValidateData(m *model.Model, data map[string]any) error {
 //
 // When can it be used:
 //   - When executing partial updates, PATCH requests, or updating individual columns.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidatePartialData and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidatePartialData(m *model.Model, data map[string]any) error {
 	if m == nil {
 		return errors.New("model cannot be nil")
@@ -712,6 +861,25 @@ func toFloat64(val any) (float64, bool) {
 //
 // When can it be used:
 //   - When verifying a generated schema difference/migration plan before executing DDL against a live database.
+//
+// Parameters:
+//   - p (*plan.SchemaPlan): Input value used by the operation.
+//   - allowDestructive (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidatePlan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidatePlan(p *plan.SchemaPlan, allowDestructive bool) error {
 	if p == nil {
 		return errors.New("plan is nil")
@@ -735,6 +903,24 @@ func ValidatePlan(p *plan.SchemaPlan, allowDestructive bool) error {
 //
 // When can it be used:
 //   - Prior to persisting model metadata records to catalog tables.
+//
+// Parameters:
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateModelConfig and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidateModelConfig(cfg *model.ModelConfig) error {
 	if cfg == nil {
 		return errors.New("model_config cannot be nil")
@@ -766,6 +952,24 @@ func ValidateModelConfig(cfg *model.ModelConfig) error {
 //
 // When can it be used:
 //   - When validating column additions or alterations before generating migrations.
+//
+// Parameters:
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateDataModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidateDataModel(dm *model.DataModel) error {
 	if dm == nil {
 		return errors.New("data_model cannot be nil")
@@ -813,6 +1017,25 @@ func ValidateDataModel(dm *model.DataModel) error {
 //
 // When can it be used:
 //   - Before assigning a custom_type_id to an entity attribute.
+//
+// Parameters:
+//   - getRefModel (func(idOrName string) (*model.ModelConfig, error)): Input value used by the operation.
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateCustomType and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ValidateCustomType(getRefModel func(idOrName string) (*model.ModelConfig, error), dm *model.DataModel) error {
 	if dm == nil || dm.CustomTypeID == nil || *dm.CustomTypeID == "" {
 		return nil

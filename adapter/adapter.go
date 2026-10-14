@@ -99,6 +99,24 @@ type Registry struct {
 //
 // When can it be used:
 //   - Whenever the application coordinates access across multiple storage drivers.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*Registry): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewRegistry and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewRegistry() *Registry {
 	return &Registry{
 		adapters: make(map[string]Adapter),
@@ -116,6 +134,25 @@ func NewRegistry() *Registry {
 //
 // When can it be used:
 //   - When making a database adapter globally discoverable by name.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - a (Adapter): Input value used by the operation.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by Register and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *Registry) Register(name string, a Adapter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -133,6 +170,25 @@ func (r *Registry) Register(name string, a Adapter) {
 //
 // When can it be used:
 //   - When dispatching a query or dataset execution to a specific driver.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Adapter): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Get and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *Registry) Get(name string) (Adapter, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

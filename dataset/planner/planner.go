@@ -36,6 +36,24 @@ type DataSetPlanner struct {
 //
 // When can it be used:
 //   - Can be used whenever dataset definitions need to be compiled into executable query plans.
+//
+// Parameters:
+//   - fnr (resolver.FunctionResolver): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DataSetPlanner): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewPlanner and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewPlanner(fnr resolver.FunctionResolver) *DataSetPlanner {
 	return &DataSetPlanner{
 		functionResolver: fnr,
@@ -56,6 +74,26 @@ func NewPlanner(fnr resolver.FunctionResolver) *DataSetPlanner {
 //
 // When can it be used:
 //   - Can be used after a DataSet definition has passed validator.Validate.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - ds (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*QueryAST): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BuildAST and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*QueryAST, error) {
 	ast := &QueryAST{
 		BaseTable: ASTBaseTable{

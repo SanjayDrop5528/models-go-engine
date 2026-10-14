@@ -58,6 +58,24 @@ var _ Query = (*SelectQuery)(nil)
 //
 // When can it be used:
 //   - Whenever constructing a SQL SELECT query programmatically.
+//
+// Parameters:
+//   - db (*DB): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSelectQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewSelectQuery(db *DB) *SelectQuery {
 	return &SelectQuery{
 		whereBaseQuery: whereBaseQuery{
@@ -80,6 +98,24 @@ func NewSelectQuery(db *DB) *SelectQuery {
 //
 // When can it be used:
 //   - When overriding the default DB connection with a transaction.
+//
+// Parameters:
+//   - db (IConn): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Conn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Conn(db IConn) *SelectQuery {
 	q.setConn(db)
 	return q
@@ -96,6 +132,24 @@ func (q *SelectQuery) Conn(db IConn) *SelectQuery {
 //
 // When can it be used:
 //   - When querying structured model entities.
+//
+// Parameters:
+//   - model (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Model and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Model(model any) *SelectQuery {
 	q.setModel(model)
 	return q
@@ -112,6 +166,24 @@ func (q *SelectQuery) Model(model any) *SelectQuery {
 //
 // When can it be used:
 //   - When an invalid option or query parameter is encountered during assembly.
+//
+// Parameters:
+//   - err (error): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Err and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Err(err error) *SelectQuery {
 	q.setErr(err)
 	return q
@@ -128,6 +200,24 @@ func (q *SelectQuery) Err(err error) *SelectQuery {
 //
 // When can it be used:
 //   - When composing reusable query transformation logic.
+//
+// Parameters:
+//   - fns (...func(*SelectQuery) *SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Apply and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Apply(fns ...func(*SelectQuery) *SelectQuery) *SelectQuery {
 	for _, fn := range fns {
 		if fn != nil {
@@ -148,6 +238,24 @@ func (q *SelectQuery) Apply(fns ...func(*SelectQuery) *SelectQuery) *SelectQuery
 //
 // When can it be used:
 //   - When selectively disabling eager loading of relations to optimize performance.
+//
+// Parameters:
+//   - load (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by LoadWithChildren and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) LoadWithChildren(load bool) *SelectQuery {
 	q.loadWithChildren = load
 	return q
@@ -165,6 +273,24 @@ func (q *SelectQuery) LoadWithChildren(load bool) *SelectQuery {
 //
 // When can it be used:
 //   - When executing an engine-level unified Query through relational SQL dialects.
+//
+// Parameters:
+//   - uq (coreQuery.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplyUnifiedQuery and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ApplyUnifiedQuery(uq coreQuery.Query) *SelectQuery {
 	for _, t := range uq.Tables {
 		q.Table(t)
@@ -296,30 +422,123 @@ func (q *SelectQuery) ApplyUnifiedQuery(uq coreQuery.Query) *SelectQuery {
 }
 
 // With adds a WITH clause (Common Table Expression) to the query.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - query (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by With and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) With(name string, query Query) *SelectQuery {
 	q.addWith(NewWithQuery(name, query))
 	return q
 }
 
 // WithRecursive adds a WITH RECURSIVE clause to the query.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - query (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithRecursive and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WithRecursive(name string, query Query) *SelectQuery {
 	q.addWith(NewWithQuery(name, query).Recursive())
 	return q
 }
 
 // WithQuery adds a pre-configured WITH clause to the query.
+//
+// Parameters:
+//   - query (*WithQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithQuery and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WithQuery(query *WithQuery) *SelectQuery {
 	q.addWith(query)
 	return q
 }
 
 // Distinct adds a DISTINCT clause to eliminate duplicate rows.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Distinct and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Distinct() *SelectQuery {
 	q.distinctOn = make([]schema.QueryWithArgs, 0)
 	return q
 }
 
 // DistinctOn adds a DISTINCT ON clause for PostgreSQL-specific distinct behavior.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DistinctOn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) DistinctOn(query string, args ...any) *SelectQuery {
 	q.distinctOn = append(q.distinctOn, schema.SafeQuery(query, args))
 	return q
@@ -328,6 +547,24 @@ func (q *SelectQuery) DistinctOn(query string, args ...any) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Table specifies the table(s) to select from.
+//
+// Parameters:
+//   - tables (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Table(tables ...string) *SelectQuery {
 	for _, table := range tables {
 		q.addTable(schema.UnsafeIdent(table))
@@ -336,12 +573,50 @@ func (q *SelectQuery) Table(tables ...string) *SelectQuery {
 }
 
 // TableExpr adds a table expression to the FROM clause with arguments.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by TableExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) TableExpr(query string, args ...any) *SelectQuery {
 	q.addTable(schema.SafeQuery(query, args))
 	return q
 }
 
 // ModelTableExpr overrides the table name derived from the model.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ModelTableExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ModelTableExpr(query string, args ...any) *SelectQuery {
 	q.modelTableName = schema.SafeQuery(query, args)
 	return q
@@ -350,6 +625,24 @@ func (q *SelectQuery) ModelTableExpr(query string, args ...any) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Column adds columns to the SELECT clause.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Column and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Column(columns ...string) *SelectQuery {
 	for _, column := range columns {
 		q.addColumn(schema.UnsafeIdent(column))
@@ -358,12 +651,49 @@ func (q *SelectQuery) Column(columns ...string) *SelectQuery {
 }
 
 // ColumnExpr adds a column expression to the SELECT clause with arguments.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ColumnExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ColumnExpr(query string, args ...any) *SelectQuery {
 	q.addColumn(schema.SafeQuery(query, args))
 	return q
 }
 
 // ExcludeColumn excludes specific columns from being selected.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExcludeColumn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ExcludeColumn(columns ...string) *SelectQuery {
 	q.excludeColumn(columns)
 	return q
@@ -372,24 +702,99 @@ func (q *SelectQuery) ExcludeColumn(columns ...string) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // WherePK adds a WHERE condition on the model's primary key columns.
+//
+// Parameters:
+//   - cols (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WherePK and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WherePK(cols ...string) *SelectQuery {
 	q.addWhereCols(cols)
 	return q
 }
 
 // Where adds a WHERE condition combined with AND.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Where and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Where(query string, args ...any) *SelectQuery {
 	q.addWhere(schema.SafeQueryWithSep(query, args, " AND "))
 	return q
 }
 
 // WhereOr adds a WHERE condition combined with OR.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereOr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WhereOr(query string, args ...any) *SelectQuery {
 	q.addWhere(schema.SafeQueryWithSep(query, args, " OR "))
 	return q
 }
 
 // WhereGroup groups WHERE conditions with the given separator (AND/OR).
+//
+// Parameters:
+//   - sep (string): Input value used by the operation.
+//   - fn (func(*SelectQuery) *SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereGroup and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WhereGroup(sep string, fn func(*SelectQuery) *SelectQuery) *SelectQuery {
 	saved := q.where
 	q.where = nil
@@ -405,12 +810,48 @@ func (q *SelectQuery) WhereGroup(sep string, fn func(*SelectQuery) *SelectQuery)
 }
 
 // WhereDeleted adds a WHERE condition to select soft-deleted rows only.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereDeleted and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WhereDeleted() *SelectQuery {
 	q.whereDeleted()
 	return q
 }
 
 // WhereAllWithDeleted includes both active and soft-deleted rows.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WhereAllWithDeleted and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) WhereAllWithDeleted() *SelectQuery {
 	q.whereAllWithDeleted()
 	return q
@@ -433,6 +874,24 @@ func (q *SelectQuery) hasFeature(f feature.Feature) bool {
 }
 
 // UseIndex adds a USE INDEX hint for MySQL to suggest index usage.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) UseIndex(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addUseIndex(indexes...)
@@ -441,6 +900,24 @@ func (q *SelectQuery) UseIndex(indexes ...string) *SelectQuery {
 }
 
 // UseIndexForJoin adds a USE INDEX FOR JOIN hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) UseIndexForJoin(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addUseIndexForJoin(indexes...)
@@ -449,6 +926,24 @@ func (q *SelectQuery) UseIndexForJoin(indexes ...string) *SelectQuery {
 }
 
 // UseIndexForOrderBy adds a USE INDEX FOR ORDER BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForOrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) UseIndexForOrderBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addUseIndexForOrderBy(indexes...)
@@ -457,6 +952,24 @@ func (q *SelectQuery) UseIndexForOrderBy(indexes ...string) *SelectQuery {
 }
 
 // UseIndexForGroupBy adds a USE INDEX FOR GROUP BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UseIndexForGroupBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) UseIndexForGroupBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addUseIndexForGroupBy(indexes...)
@@ -465,6 +978,24 @@ func (q *SelectQuery) UseIndexForGroupBy(indexes ...string) *SelectQuery {
 }
 
 // IgnoreIndex adds an IGNORE INDEX hint for MySQL to prevent index usage.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IgnoreIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) IgnoreIndex(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addIgnoreIndex(indexes...)
@@ -473,6 +1004,24 @@ func (q *SelectQuery) IgnoreIndex(indexes ...string) *SelectQuery {
 }
 
 // IgnoreIndexForJoin adds an IGNORE INDEX FOR JOIN hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IgnoreIndexForJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) IgnoreIndexForJoin(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addIgnoreIndexForJoin(indexes...)
@@ -481,6 +1030,24 @@ func (q *SelectQuery) IgnoreIndexForJoin(indexes ...string) *SelectQuery {
 }
 
 // IgnoreIndexForOrderBy adds an IGNORE INDEX FOR ORDER BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IgnoreIndexForOrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) IgnoreIndexForOrderBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addIgnoreIndexForOrderBy(indexes...)
@@ -489,6 +1056,24 @@ func (q *SelectQuery) IgnoreIndexForOrderBy(indexes ...string) *SelectQuery {
 }
 
 // IgnoreIndexForGroupBy adds an IGNORE INDEX FOR GROUP BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IgnoreIndexForGroupBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) IgnoreIndexForGroupBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addIgnoreIndexForGroupBy(indexes...)
@@ -497,6 +1082,24 @@ func (q *SelectQuery) IgnoreIndexForGroupBy(indexes ...string) *SelectQuery {
 }
 
 // ForceIndex adds a FORCE INDEX hint for MySQL to require index usage.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ForceIndex and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ForceIndex(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addForceIndex(indexes...)
@@ -505,6 +1108,24 @@ func (q *SelectQuery) ForceIndex(indexes ...string) *SelectQuery {
 }
 
 // ForceIndexForJoin adds a FORCE INDEX FOR JOIN hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ForceIndexForJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ForceIndexForJoin(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addForceIndexForJoin(indexes...)
@@ -513,6 +1134,24 @@ func (q *SelectQuery) ForceIndexForJoin(indexes ...string) *SelectQuery {
 }
 
 // ForceIndexForOrderBy adds a FORCE INDEX FOR ORDER BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ForceIndexForOrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ForceIndexForOrderBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addForceIndexForOrderBy(indexes...)
@@ -521,6 +1160,24 @@ func (q *SelectQuery) ForceIndexForOrderBy(indexes ...string) *SelectQuery {
 }
 
 // ForceIndexForGroupBy adds a FORCE INDEX FOR GROUP BY hint for MySQL.
+//
+// Parameters:
+//   - indexes (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ForceIndexForGroupBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ForceIndexForGroupBy(indexes ...string) *SelectQuery {
 	if q.dialectName() == dialect.MySQL {
 		q.addForceIndexForGroupBy(indexes...)
@@ -531,6 +1188,24 @@ func (q *SelectQuery) ForceIndexForGroupBy(indexes ...string) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Group adds columns to the GROUP BY clause.
+//
+// Parameters:
+//   - columns (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Group and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Group(columns ...string) *SelectQuery {
 	for _, column := range columns {
 		q.group = append(q.group, schema.UnsafeIdent(column))
@@ -539,48 +1214,197 @@ func (q *SelectQuery) Group(columns ...string) *SelectQuery {
 }
 
 // GroupExpr adds a GROUP BY expression with optional arguments.
+//
+// Parameters:
+//   - group (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GroupExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) GroupExpr(group string, args ...any) *SelectQuery {
 	q.group = append(q.group, schema.SafeQuery(group, args))
 	return q
 }
 
 // Having adds a HAVING clause condition to filter grouped results.
+//
+// Parameters:
+//   - having (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Having and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Having(having string, args ...any) *SelectQuery {
 	q.having = append(q.having, schema.SafeQuery(having, args))
 	return q
 }
 
 // Order adds columns to the ORDER BY clause.
+//
+// Parameters:
+//   - orders (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Order and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Order(orders ...string) *SelectQuery {
 	q.addOrder(orders...)
 	return q
 }
 
 // OrderBy adds an ORDER BY clause with explicit sort direction.
+//
+// Parameters:
+//   - colName (string): Input value used by the operation.
+//   - sortDir (Order): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by OrderBy and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) OrderBy(colName string, sortDir Order) *SelectQuery {
 	q.addOrderBy(colName, sortDir)
 	return q
 }
 
 // OrderExpr adds an ORDER BY expression with optional arguments.
+//
+// Parameters:
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by OrderExpr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) OrderExpr(query string, args ...any) *SelectQuery {
 	q.addOrderExpr(query, args...)
 	return q
 }
 
 // Limit sets the maximum number of rows to return.
+//
+// Parameters:
+//   - n (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Limit and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Limit(n int) *SelectQuery {
 	q.setLimit(n)
 	return q
 }
 
 // Offset sets the number of rows to skip before returning results.
+//
+// Parameters:
+//   - n (int): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Offset and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Offset(n int) *SelectQuery {
 	q.setOffset(n)
 	return q
 }
 
 // For adds a FOR clause for row locking (e.g., "UPDATE", "SHARE").
+//
+// Parameters:
+//   - s (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by For and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) For(s string, args ...any) *SelectQuery {
 	q.selFor = schema.SafeQuery(s, args)
 	return q
@@ -589,31 +1413,139 @@ func (q *SelectQuery) For(s string, args ...any) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Union combines this query with another using UNION (removes duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Union and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Union(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" UNION ", other)
 }
 
 // UnionAll combines this query with another using UNION ALL (keeps duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UnionAll and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) UnionAll(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" UNION ALL ", other)
 }
 
 // Intersect returns rows that appear in both this query and another (removes duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Intersect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Intersect(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" INTERSECT ", other)
 }
 
 // IntersectAll returns rows that appear in both this query and another (keeps duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IntersectAll and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) IntersectAll(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" INTERSECT ALL ", other)
 }
 
 // Except returns rows in this query that are not in another (removes duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Except and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Except(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" EXCEPT ", other)
 }
 
 // ExceptAll returns rows in this query that are not in another (keeps duplicates).
+//
+// Parameters:
+//   - other (*SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExceptAll and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ExceptAll(other *SelectQuery) *SelectQuery {
 	return q.addUnion(" EXCEPT ALL ", other)
 }
@@ -629,6 +1561,25 @@ func (q *SelectQuery) addUnion(expr string, other *SelectQuery) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Join adds a JOIN clause with the specified join expression.
+//
+// Parameters:
+//   - join (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Join and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Join(join string, args ...any) *SelectQuery {
 	q.joins = append(q.joins, joinQuery{
 		join: schema.SafeQuery(join, args),
@@ -637,11 +1588,49 @@ func (q *SelectQuery) Join(join string, args ...any) *SelectQuery {
 }
 
 // JoinOn adds an ON condition to the most recent JOIN, combined with AND.
+//
+// Parameters:
+//   - cond (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by JoinOn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) JoinOn(cond string, args ...any) *SelectQuery {
 	return q.joinOn(cond, args, " AND ")
 }
 
 // JoinOnOr adds an ON condition to the most recent JOIN, combined with OR.
+//
+// Parameters:
+//   - cond (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by JoinOnOr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) JoinOnOr(cond string, args ...any) *SelectQuery {
 	return q.joinOn(cond, args, " OR ")
 }
@@ -659,6 +1648,25 @@ func (q *SelectQuery) joinOn(cond string, args []any, sep string) *SelectQuery {
 //------------------------------------------------------------------------------
 
 // Relation adds a relation to the query.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - apply (...func(*SelectQuery) *SelectQuery): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Relation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Relation(name string, apply ...func(*SelectQuery) *SelectQuery) *SelectQuery {
 	if len(apply) > 1 {
 		panic("only one apply function is supported")
@@ -685,6 +1693,25 @@ func (q *SelectQuery) Relation(name string, apply ...func(*SelectQuery) *SelectQ
 }
 
 // RelationWithOpts adds a relation to the query with additional options.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - opts (RelationOpts): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RelationWithOpts and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) RelationWithOpts(name string, opts RelationOpts) *SelectQuery {
 	if q.tableModel == nil {
 		q.setErr(errNilModel)
@@ -811,16 +1838,71 @@ func (q *SelectQuery) selectJoins(ctx context.Context, joins []*schema.RelationJ
 //------------------------------------------------------------------------------
 
 // Comment adds a comment to the query, wrapped by /* ... */.
+//
+// Parameters:
+//   - comment (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Comment and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Comment(comment string) *SelectQuery {
 	q.comment = comment
 	return q
 }
 
 // Operation returns the query operation name ("SELECT").
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Operation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Operation() string {
 	return "SELECT"
 }
 
+// Parameters:
+//   - gen (schema.QueryGen): Input value used by the operation.
+//   - b ([]byte): Input value used by the operation.
+//
+// Returns:
+//   - _ ([]byte): Input value used by the operation.
+//   - err (error): Input value used by the operation.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) AppendQuery(gen schema.QueryGen, b []byte) (_ []byte, err error) {
 	b = appendComment(b, q.comment)
 	return q.appendQuery(gen, b, false)
@@ -1334,6 +2416,25 @@ func (q *SelectQuery) resolveConn(ctx context.Context, sq *SelectQuery) IConn {
 }
 
 // Rows executes the query and returns the result rows for manual scanning.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*sql.Rows): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Rows and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) Rows(ctx context.Context) (*sql.Rows, error) {
 	if q.err != nil {
 		return nil, q.err
@@ -1363,6 +2464,26 @@ func (q *SelectQuery) Rows(ctx context.Context) (*sql.Rows, error) {
 }
 
 // Exec executes the query and optionally scans results into dest.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dest (...any): Input value used by the operation.
+//
+// Returns:
+//   - res (sql.Result): Input value used by the operation.
+//   - err (error): Input value used by the operation.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exec and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) Exec(ctx context.Context, dest ...any) (res sql.Result, err error) {
 	if q.err != nil {
 		return nil, q.err
@@ -1388,6 +2509,25 @@ func (q *SelectQuery) Exec(ctx context.Context, dest ...any) (res sql.Result, er
 }
 
 // Scan executes the query and scans the results into dest.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dest (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Scan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) Scan(ctx context.Context, dest ...any) error {
 	_, err := q.scanResult(ctx, dest...)
 	return err
@@ -1453,6 +2593,25 @@ func (q *SelectQuery) afterSelectHook(ctx context.Context) error {
 }
 
 // Count executes the query and returns the number of rows that match.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (int): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Count and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) Count(ctx context.Context) (int, error) {
 	if q.err != nil {
 		return 0, q.err
@@ -1482,6 +2641,26 @@ func (q *SelectQuery) Count(ctx context.Context) (int, error) {
 }
 
 // ScanAndCount executes the query, scans results into dest, and returns the total count.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dest (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (int): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ScanAndCount and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) ScanAndCount(ctx context.Context, dest ...any) (int, error) {
 	if q.offset == 0 && q.limit == 0 {
 		if res, err := q.scanResult(ctx, dest...); err != nil {
@@ -1556,6 +2735,25 @@ func (q *SelectQuery) scanAndCountSeq(ctx context.Context, dest ...any) (int, er
 }
 
 // Exists checks whether any rows match the query.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Exists and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (q *SelectQuery) Exists(ctx context.Context) (bool, error) {
 	if q.err != nil {
 		return false, q.err
@@ -1620,6 +2818,24 @@ func (q *SelectQuery) whereExists(ctx context.Context) (bool, error) {
 }
 
 // String returns the generated SQL query string.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by String and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) String() string {
 	gen := q.db.QueryGen()
 	buf, err := q.AppendQuery(gen, nil)
@@ -1630,6 +2846,24 @@ func (q *SelectQuery) String() string {
 }
 
 // Clone creates a deep copy of the SelectQuery.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Clone and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) Clone() *SelectQuery {
 	if q == nil {
 		return nil
@@ -1750,11 +2984,47 @@ func (q *SelectQuery) Clone() *SelectQuery {
 }
 
 // QueryBuilder wraps the SelectQuery in a generic QueryBuilder interface.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (QueryBuilder): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryBuilder and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) QueryBuilder() QueryBuilder {
 	return &selectQueryBuilder{q}
 }
 
 // ApplyQueryBuilder applies a function to a generic QueryBuilder and returns the modified SelectQuery.
+//
+// Parameters:
+//   - fn (func(QueryBuilder) QueryBuilder): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplyQueryBuilder and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *SelectQuery) ApplyQueryBuilder(fn func(QueryBuilder) QueryBuilder) *SelectQuery {
 	return fn(q.QueryBuilder()).Unwrap().(*SelectQuery)
 }

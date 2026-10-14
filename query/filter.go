@@ -71,6 +71,24 @@ type PaginationRequest struct {
 //
 // When can it be used:
 //   - Call to check if total row count calculation should be executed for a paginated request.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WantsTotal and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r PaginationRequest) WantsTotal() bool {
 	return r.IncludeTotal == nil || *r.IncludeTotal
 }
@@ -86,6 +104,24 @@ func (r PaginationRequest) WantsTotal() bool {
 //
 // When can it be used:
 //   - Call when receiving incoming grid filter/pagination JSON to produce an executable Query.
+//
+// Parameters:
+//   - req (PaginationRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (Query): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ParsePaginationRequest and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ParsePaginationRequest(req PaginationRequest) Query {
 	q := NewQuery()
 	q.Debug = req.Debug

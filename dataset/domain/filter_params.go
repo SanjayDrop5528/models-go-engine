@@ -34,6 +34,25 @@ import (
 // When can it be used:
 //   - Can be used whenever an arbitrary object needs to be accessed dynamically by string key,
 //     such as extracting session variables ("org_id", "timezone", "user_id").
+//
+// Parameters:
+//   - obj (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by StructToMap and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func StructToMap(obj any) (map[string]any, error) {
 	if obj == nil {
 		return nil, nil
@@ -75,6 +94,26 @@ func StructToMap(obj any) (map[string]any, error) {
 //   - When compiling a parameterized reference pipeline into an executable pipeline.
 //   - Whenever dynamic runtime values, user token claims (KTON), or current date macros (CD) need
 //     to be stamped into a query string.
+//
+// Parameters:
+//   - filterParams ([]FilterParam): Input value used by the operation.
+//   - pipeline (string): Input value used by the operation.
+//   - userToken (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CreateFilterParams and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken any) string {
 	filterPipeline := pipeline
 	var user map[string]any
@@ -137,6 +176,26 @@ func CreateFilterParams(filterParams []FilterParam, pipeline string, userToken a
 //     "CD|+0|ST"       -> Resolves to Start of Day (00:00:00) in user timezone
 //     "CD|+0|ED"       -> Resolves to End of Day (23:59:59) in user timezone
 //   - When converting numeric, boolean, or temporal primitive types into string representations.
+//
+// Parameters:
+//   - datatype (string): Input value used by the operation.
+//   - defaultValue (any): Input value used by the operation.
+//   - user (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ConvertValueToDataType and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func ConvertValueToDataType(datatype string, defaultValue any, user any) string {
 	var replaceValue string
 
@@ -281,6 +340,26 @@ var routineSQLParameter = regexp.MustCompile(`\bp_[a-zA-Z_][a-zA-Z0-9_]*\b`)
 
 // RenderSQLFilterParams replaces saved dataset tokens with escaped SQL literals.
 // It also accepts older :name templates already stored in the catalog.
+//
+// Parameters:
+//   - params ([]FilterParam): Input value used by the operation.
+//   - pipeline (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RenderSQLFilterParams and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func RenderSQLFilterParams(params []FilterParam, pipeline string) (string, error) {
 	literals := make(map[string]string, len(params))
 	for _, param := range params {
@@ -303,6 +382,26 @@ func RenderSQLFilterParams(params []FilterParam, pipeline string) (string, error
 }
 
 // RenderSQLRoutineParams makes a saved routine body executable as a direct-query fallback.
+//
+// Parameters:
+//   - params ([]FilterParam): Input value used by the operation.
+//   - pipeline (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RenderSQLRoutineParams and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func RenderSQLRoutineParams(params []FilterParam, pipeline string) (string, error) {
 	literals := make(map[string]string, len(params))
 	for _, param := range params {
@@ -340,6 +439,26 @@ func replaceSQLParameters(pipeline string, matcher *regexp.Regexp, literals map[
 }
 
 // SQLParameterLiteral formats a typed dataset value for a SQL query template.
+//
+// Parameters:
+//   - value (any): Input value used by the operation.
+//   - dataType (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SQLParameterLiteral and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func SQLParameterLiteral(value any, dataType string) (string, error) {
 	if value == nil {
 		return "NULL", nil

@@ -2,8 +2,9 @@
 //
 // File: schema_service.go
 // Usage:
-//   Provides SchemaService for comparing model definitions with live database schemas,
-//   computing diffs, generating preview scripts, applying safe migrations, and reverse-syncing schema metadata.
+//
+//	Provides SchemaService for comparing model definitions with live database schemas,
+//	computing diffs, generating preview scripts, applying safe migrations, and reverse-syncing schema metadata.
 package service
 
 import (
@@ -45,13 +46,33 @@ type SchemaService struct {
 // NewSchemaService creates a new SchemaService.
 //
 // Purpose:
-//   Instantiates the schema migration coordinator with access to model registry and database adapters.
+//
+//	Instantiates the schema migration coordinator with access to model registry and database adapters.
 //
 // Where it is used:
 //   - Initialized in API routers, server bootstrap, and integration test suites.
 //
 // When can it be used:
 //   - Call when setting up application services requiring schema diffing and migration operations.
+//
+// Parameters:
+//   - reg (*registry.ModelRegistry): Input value used by the operation.
+//   - adapters (*adapter.Registry): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SchemaService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSchemaService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewSchemaService(reg *registry.ModelRegistry, adapters *adapter.Registry) *SchemaService {
 	return &SchemaService{
 		registry:   reg,
@@ -63,13 +84,34 @@ func NewSchemaService(reg *registry.ModelRegistry, adapters *adapter.Registry) *
 // GetCurrentSchema fetches the live database schema from the target database adapter.
 //
 // Purpose:
-//   Introspects the target database storage entity (table/collection) to retrieve live schema state.
+//
+//	Introspects the target database storage entity (table/collection) to retrieve live schema state.
 //
 // Where it is used:
 //   - Called by schema inspector endpoints and diagnostic tools.
 //
 // When can it be used:
 //   - Call when checking current live columns, types, indexes, and primary keys for a model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*schema.Schema): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetCurrentSchema and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *SchemaService) GetCurrentSchema(ctx context.Context, modelID string) (*schema.Schema, error) {
 	m, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -87,13 +129,35 @@ func (s *SchemaService) GetCurrentSchema(ctx context.Context, modelID string) (*
 // GetDiff computes the difference between current live database schema and desired model schema.
 //
 // Purpose:
-//   Compares current live database structure against desired model definition using the diff engine.
+//
+//	Compares current live database structure against desired model definition using the diff engine.
 //
 // Where it is used:
 //   - Called during schema migration planning, model editing, and preview endpoints.
 //
 // When can it be used:
 //   - Call to detect added, altered, or dropped columns/indexes before applying changes.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - hints (diff.DiffHints): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*diff.SchemaDiff): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDiff and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *SchemaService) GetDiff(ctx context.Context, modelID string, hints diff.DiffHints) (*diff.SchemaDiff, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -117,13 +181,35 @@ func (s *SchemaService) GetDiff(ctx context.Context, modelID string, hints diff.
 // Preview computes the diff and generates native preview statements from the adapter.
 //
 // Purpose:
-//   Computes schema diff, builds a migration plan, and asks the database adapter to generate native SQL or commands.
+//
+//	Computes schema diff, builds a migration plan, and asks the database adapter to generate native SQL or commands.
 //
 // Where it is used:
 //   - Called by migration preview endpoints and CLI preview commands.
 //
 // When can it be used:
 //   - Call to review exact SQL DDL or MongoDB commands prior to applying schema modifications.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - hints (diff.DiffHints): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*plan.SchemaPreview): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Preview and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *SchemaService) Preview(ctx context.Context, modelID string, hints diff.DiffHints) (*plan.SchemaPreview, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -148,13 +234,35 @@ func (s *SchemaService) Preview(ctx context.Context, modelID string, hints diff.
 // Apply executes the complete safe migration flow.
 //
 // Purpose:
-//   Executes end-to-end safe migration: introspects, diffs, validates safety flags, runs adapter DDL, verifies, and updates registry.
+//
+//	Executes end-to-end safe migration: introspects, diffs, validates safety flags, runs adapter DDL, verifies, and updates registry.
 //
 // Where it is used:
 //   - Called by schema migration endpoints, CLI migration commands, and automated deployment pipelines.
 //
 // When can it be used:
 //   - Call when applying validated model schema changes to a live database.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - req (ApplyRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ApplyResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Apply and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *SchemaService) Apply(ctx context.Context, modelID string, req ApplyRequest) (*ApplyResult, error) {
 	desiredModel, err := s.registry.GetDraft(modelID)
 	if err != nil {
@@ -240,13 +348,34 @@ func (s *SchemaService) Apply(ctx context.Context, modelID string, req ApplyRequ
 // Sync introspects live database and populates or aligns model definition.
 //
 // Purpose:
-//   Performs reverse schema introspection to synchronize model attribute metadata with the actual live database structure.
+//
+//	Performs reverse schema introspection to synchronize model attribute metadata with the actual live database structure.
 //
 // Where it is used:
 //   - Called by reverse engineering endpoints, schema sync CLI commands, and database import workflows.
 //
 // When can it be used:
 //   - Call when importing existing database tables or collections into the data model registry.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Sync and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *SchemaService) Sync(ctx context.Context, modelID string) (*model.Model, error) {
 	m, err := s.registry.GetDraft(modelID)
 	if err != nil {

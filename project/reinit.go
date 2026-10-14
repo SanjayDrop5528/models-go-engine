@@ -2,8 +2,9 @@
 //
 // File: reinit.go
 // Usage:
-//   Defines ReinitOptions and functional options (WithModels, WithModelConfigs, WithDataModels, WithAutoMigrate)
-//   allowing dynamic reloading, schema rebuilds, and live database sync without restarting the engine.
+//
+//	Defines ReinitOptions and functional options (WithModels, WithModelConfigs, WithDataModels, WithAutoMigrate)
+//	allowing dynamic reloading, schema rebuilds, and live database sync without restarting the engine.
 package project
 
 import (
@@ -31,13 +32,32 @@ type ReinitOption func(*ReinitOptions)
 // WithModels limits re-initialization to specific model IDs.
 //
 // Purpose:
-//   Configures the reinit runner to process only the specified model identifiers.
+//
+//	Configures the reinit runner to process only the specified model identifiers.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when targeting specific models.
 //
 // When can it be used:
 //   - Call when updating a single model or a subset of models.
+//
+// Parameters:
+//   - ids (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithModels and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithModels(ids ...string) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.ModelIDs = append(o.ModelIDs, ids...)
@@ -47,13 +67,32 @@ func WithModels(ids ...string) ReinitOption {
 // WithModelConfigs provides additional or updated ModelConfigs to load before re-initialization.
 //
 // Purpose:
-//   Injects model configs dynamically during the reinit cycle.
+//
+//	Injects model configs dynamically during the reinit cycle.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when loading new models into the engine.
 //
 // When can it be used:
 //   - Call when introducing new models during runtime reload.
+//
+// Parameters:
+//   - cfgs (...*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithModelConfigs and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithModelConfigs(cfgs ...*model.ModelConfig) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.ModelConfigs = append(o.ModelConfigs, cfgs...)
@@ -63,13 +102,32 @@ func WithModelConfigs(cfgs ...*model.ModelConfig) ReinitOption {
 // WithDataModels provides additional or updated DataModels to load before re-initialization.
 //
 // Purpose:
-//   Injects field attribute definitions dynamically during the reinit cycle.
+//
+//	Injects field attribute definitions dynamically during the reinit cycle.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when updating column schemas.
 //
 // When can it be used:
 //   - Call when altering fields on models during runtime reload.
+//
+// Parameters:
+//   - dms (...*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithDataModels and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithDataModels(dms ...*model.DataModel) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.DataModels = append(o.DataModels, dms...)
@@ -79,13 +137,32 @@ func WithDataModels(dms ...*model.DataModel) ReinitOption {
 // WithAutoMigrate enables applying diff-based schema changes to the live database during reinit.
 //
 // Purpose:
-//   Instructs the reinit runner to automatically execute live database DDL migrations for updated models.
+//
+//	Instructs the reinit runner to automatically execute live database DDL migrations for updated models.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when schema updates must be synced to the database.
 //
 // When can it be used:
 //   - Call when you want model changes to automatically update database tables.
+//
+// Parameters:
+//   - autoMigrate (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithAutoMigrate and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithAutoMigrate(autoMigrate bool) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.AutoMigrate = autoMigrate
@@ -95,13 +172,32 @@ func WithAutoMigrate(autoMigrate bool) ReinitOption {
 // WithSyncFromDB enables live database schema introspection to synchronize model definitions.
 //
 // Purpose:
-//   Instructs the reinit process to introspect live database tables and update model definitions accordingly.
+//
+//	Instructs the reinit process to introspect live database tables and update model definitions accordingly.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when importing or refreshing database tables.
 //
 // When can it be used:
 //   - Call when syncing engine models with external schema changes.
+//
+// Parameters:
+//   - syncFromDB (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithSyncFromDB and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithSyncFromDB(syncFromDB bool) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.SyncFromDB = syncFromDB
@@ -111,13 +207,32 @@ func WithSyncFromDB(syncFromDB bool) ReinitOption {
 // WithClearCache clears existing compiled execution models before rebuilding.
 //
 // Purpose:
-//   Flushes cached query plans and compiled model artifacts prior to rebuilding.
+//
+//	Flushes cached query plans and compiled model artifacts prior to rebuilding.
 //
 // Where it is used:
 //   - Passed as an option to Reinit when performing a clean rebuild.
 //
 // When can it be used:
 //   - Call when forcing full recompilation of all engine models.
+//
+// Parameters:
+//   - clearCache (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ReinitOption): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithClearCache and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func WithClearCache(clearCache bool) ReinitOption {
 	return func(o *ReinitOptions) {
 		o.ClearCache = clearCache
@@ -139,13 +254,34 @@ type ReinitResult struct {
 // LoadModels loads initial ModelConfigs and DataModels into the engine at startup.
 //
 // Purpose:
-//   Validates, registers, persists to metadata tables, and compiles models into memory.
+//
+//	Validates, registers, persists to metadata tables, and compiles models into memory.
 //
 // Where it is used:
 //   - Called by NewWithModels during server startup and project bootstrapping.
 //
 // When can it be used:
 //   - Call when loading seed models or declarative configs into an engine.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - configs ([]*model.ModelConfig): Input value used by the operation.
+//   - dataModels ([]*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by LoadModels and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) LoadModels(ctx context.Context, configs []*model.ModelConfig, dataModels []*model.DataModel) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -201,13 +337,34 @@ func (e *Engine) LoadModels(ctx context.Context, configs []*model.ModelConfig, d
 // If called with no options, it completely reconstructs all registered models from their metadata.
 //
 // Purpose:
-//   Reconstructs and recompiles models, with options for auto-migration and live database sync.
+//
+//	Reconstructs and recompiles models, with options for auto-migration and live database sync.
 //
 // Where it is used:
 //   - Called by POST /api/project/reinit endpoints, admin tools, and integration tests.
 //
 // When can it be used:
 //   - Call whenever model definitions change and the engine must rebuild runtime structures.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - opts (...ReinitOption): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ReinitResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Reinit and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Reinit(ctx context.Context, opts ...ReinitOption) (*ReinitResult, error) {
 	options := &ReinitOptions{}
 	for _, opt := range opts {
@@ -220,13 +377,34 @@ func (e *Engine) Reinit(ctx context.Context, opts ...ReinitOption) (*ReinitResul
 // ReinitWithOptions executes re-initialization using an options struct.
 //
 // Purpose:
-//   Executes the full re-initialization pipeline with fine-grained configuration.
+//
+//	Executes the full re-initialization pipeline with fine-grained configuration.
 //
 // Where it is used:
 //   - Called by Reinit and internal workflow managers.
 //
 // When can it be used:
 //   - Call when running re-initialization with pre-constructed ReinitOptions.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - options (ReinitOptions): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ReinitResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ReinitWithOptions and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ReinitWithOptions(ctx context.Context, options ReinitOptions) (*ReinitResult, error) {
 	// 1. Ingest any newly supplied ModelConfigs
 	for _, cfg := range options.ModelConfigs {
@@ -323,7 +501,8 @@ func (e *Engine) ReinitWithOptions(ctx context.Context, options ReinitOptions) (
 // rebuildAllCompiledModelsLocked rebuilds compiled execution models while holding the engine lock.
 //
 // Purpose:
-//   Compiles ModelConfig and DataModel field definitions into runnable Model instances.
+//
+//	Compiles ModelConfig and DataModel field definitions into runnable Model instances.
 //
 // Where it is used:
 //   - Called internally by LoadModels and RestoreFromDB.

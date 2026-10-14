@@ -3,12 +3,13 @@
 //
 // File: engine.go
 // Usage:
-//   This file defines the standalone Validation Engine (validation.Engine).
-//   It can be used in two primary modes:
-//     1. Pure Standalone Mode (Zero DB dependencies): Validates Go structs, maps, schema models,
-//        data types, required fields, formats (email, uuid, regex), and schema change plans in-memory.
-//     2. Combined Mode (With Database Adapter & Model Resolver): Additionally performs live referential
-//        integrity lookups and soft-active record status checks on orbital references.
+//
+//	This file defines the standalone Validation Engine (validation.Engine).
+//	It can be used in two primary modes:
+//	  1. Pure Standalone Mode (Zero DB dependencies): Validates Go structs, maps, schema models,
+//	     data types, required fields, formats (email, uuid, regex), and schema change plans in-memory.
+//	  2. Combined Mode (With Database Adapter & Model Resolver): Additionally performs live referential
+//	     integrity lookups and soft-active record status checks on orbital references.
 package validation
 
 import (
@@ -38,7 +39,8 @@ type Engine struct {
 // NewValidationEngine creates a new dedicated validation engine instance.
 //
 // Purpose:
-//   Initializes the validation engine in standalone mode without any database or resolver requirements.
+//
+//	Initializes the validation engine in standalone mode without any database or resolver requirements.
 //
 // Where it is used:
 //   - Used directly in microservices or modules wanting only validation logic.
@@ -47,6 +49,24 @@ type Engine struct {
 //
 // When can it be used:
 //   - Can be instantiated anytime for in-memory schema, data, query, or migration validation.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewValidationEngine and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewValidationEngine() *Engine {
 	return &Engine{}
 }
@@ -54,13 +74,32 @@ func NewValidationEngine() *Engine {
 // WithModelResolver configures model resolution for reference validation.
 //
 // Purpose:
-//   Attaches a model resolver so foreign keys and orbital reference targets can be dynamically looked up.
+//
+//	Attaches a model resolver so foreign keys and orbital reference targets can be dynamically looked up.
 //
 // Where it is used:
 //   - Called during engine initialization or when configuring cross-model validation.
 //
 // When can it be used:
 //   - When relational validation across multiple models is required.
+//
+// Parameters:
+//   - r (ModelResolver): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithModelResolver and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) WithModelResolver(r ModelResolver) *Engine {
 	e.resolver = r
 	return e
@@ -69,14 +108,33 @@ func (e *Engine) WithModelResolver(r ModelResolver) *Engine {
 // WithAdapter configures database adapter for live constraint/reference lookups.
 //
 // Purpose:
-//   Attaches a live database adapter to allow the validation engine to verify that referenced
-//   foreign keys exist and meet active status constraints in the database.
+//
+//	Attaches a live database adapter to allow the validation engine to verify that referenced
+//	foreign keys exist and meet active status constraints in the database.
 //
 // Where it is used:
 //   - Combined architecture where the validation engine performs live referential checks before writes.
 //
 // When can it be used:
 //   - When live database validation of orbital references is needed.
+//
+// Parameters:
+//   - a (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by WithAdapter and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) WithAdapter(a adapter.Adapter) *Engine {
 	e.adapter = a
 	return e
@@ -85,7 +143,8 @@ func (e *Engine) WithAdapter(a adapter.Adapter) *Engine {
 // ValidateModel validates a model's schema definitions and constraints.
 //
 // Purpose:
-//   Ensures a model's name, primary key, attribute names, data types, and constraints are valid.
+//
+//	Ensures a model's name, primary key, attribute names, data types, and constraints are valid.
 //
 // Where it is used:
 //   - Called before registering models into runtime catalogs or executing DDL migrations.
@@ -93,6 +152,24 @@ func (e *Engine) WithAdapter(a adapter.Adapter) *Engine {
 //
 // When can it be used:
 //   - During schema design, model creation, or dynamic ModelConfig initialization.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ValidateModel(m *model.Model) error {
 	return ValidateModel(m)
 }
@@ -100,8 +177,9 @@ func (e *Engine) ValidateModel(m *model.Model) error {
 // ValidateData validates a record creation payload against model attributes.
 //
 // Purpose:
-//   Performs full record validation for CREATE operations: verifies required fields, checks types,
-//   validates regex/email/uuid formats, and ensures no unknown fields exist if strict mode is on.
+//
+//	Performs full record validation for CREATE operations: verifies required fields, checks types,
+//	validates regex/email/uuid formats, and ensures no unknown fields exist if strict mode is on.
 //
 // Where it is used:
 //   - Called before database inserts in CRUD pipelines.
@@ -109,6 +187,25 @@ func (e *Engine) ValidateModel(m *model.Model) error {
 //
 // When can it be used:
 //   - Whenever a client submits a new record payload to be inserted.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateData and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ValidateData(m *model.Model, data map[string]any) error {
 	return ValidateData(m, data)
 }
@@ -116,8 +213,9 @@ func (e *Engine) ValidateData(m *model.Model, data map[string]any) error {
 // ValidateUpdateData validates an update/patch payload against model attributes.
 //
 // Purpose:
-//   Performs partial record validation for UPDATE/PATCH operations: checks data types and formats
-//   only for the fields included in the update payload without requiring all mandatory creation fields.
+//
+//	Performs partial record validation for UPDATE/PATCH operations: checks data types and formats
+//	only for the fields included in the update payload without requiring all mandatory creation fields.
 //
 // Where it is used:
 //   - Called before database updates or patches in CRUD pipelines.
@@ -125,6 +223,25 @@ func (e *Engine) ValidateData(m *model.Model, data map[string]any) error {
 //
 // When can it be used:
 //   - Whenever a client submits a partial record payload (PATCH).
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateUpdateData and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ValidateUpdateData(m *model.Model, data map[string]any) error {
 	return ValidatePartialData(m, data)
 }
@@ -132,8 +249,9 @@ func (e *Engine) ValidateUpdateData(m *model.Model, data map[string]any) error {
 // ValidateSchemaPlan checks a schema change plan for safety and completeness.
 //
 // Purpose:
-//   Analyzes schema migration operations (add column, drop table, alter type) to detect destructive
-//   changes (dropping columns, data truncating type changes) and blocks them unless explicitly permitted.
+//
+//	Analyzes schema migration operations (add column, drop table, alter type) to detect destructive
+//	changes (dropping columns, data truncating type changes) and blocks them unless explicitly permitted.
 //
 // Where it is used:
 //   - Called during DDL migration planning and before applying schema diffs to databases.
@@ -141,6 +259,25 @@ func (e *Engine) ValidateUpdateData(m *model.Model, data map[string]any) error {
 //
 // When can it be used:
 //   - In CI/CD pipelines, runtime schema migrations, or admin panels executing database changes.
+//
+// Parameters:
+//   - p (*plan.SchemaPlan): Input value used by the operation.
+//   - allowDestructive (bool): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateSchemaPlan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ValidateSchemaPlan(p *plan.SchemaPlan, allowDestructive bool) error {
 	return ValidatePlan(p, allowDestructive)
 }
@@ -148,8 +285,9 @@ func (e *Engine) ValidateSchemaPlan(p *plan.SchemaPlan, allowDestructive bool) e
 // ValidateQuery validates query filters and sorts against the model schema.
 //
 // Purpose:
-//   Inspects query fields, filter conditions, and sort clauses to ensure they correspond to real,
-//   valid attributes defined in the target model schema.
+//
+//	Inspects query fields, filter conditions, and sort clauses to ensure they correspond to real,
+//	valid attributes defined in the target model schema.
 //
 // Where it is used:
 //   - Called by query execution engines before compiling SQL or MongoDB queries.
@@ -157,6 +295,25 @@ func (e *Engine) ValidateSchemaPlan(p *plan.SchemaPlan, allowDestructive bool) e
 //
 // When can it be used:
 //   - Whenever dynamic queries are constructed from client requests.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ValidateQuery(m *model.Model, q query.Query) error {
 	if m == nil {
 		return errors.New("cannot validate query against nil model")
@@ -196,8 +353,9 @@ func (e *Engine) ValidateQuery(m *model.Model, q query.Query) error {
 // ValidateOrbitalReferences checks foreign keys and orbital references against target models.
 //
 // Purpose:
-//   Verifies referential integrity by performing live database lookups via the adapter
-//   to confirm that target records exist and satisfy active status rules (e.g. status='active').
+//
+//	Verifies referential integrity by performing live database lookups via the adapter
+//	to confirm that target records exist and satisfy active status rules (e.g. status='active').
 //
 // Where it is used:
 //   - Called during record insertion or update when orbital reference validation is enabled.
@@ -205,6 +363,26 @@ func (e *Engine) ValidateQuery(m *model.Model, q query.Query) error {
 //
 // When can it be used:
 //   - When database adapter is connected and referential integrity needs enforcement.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateOrbitalReferences and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ValidateOrbitalReferences(ctx context.Context, m *model.Model, data map[string]any) error {
 	if m == nil || e.adapter == nil {
 		return nil

@@ -30,6 +30,24 @@ import (
 //
 // When can it be used:
 //   - Call whenever generating a unique primary key identifier for new records.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GenerateUUID and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func GenerateUUID() string {
 	var uuid [16]byte
 	_, _ = rand.Read(uuid[:])
@@ -54,6 +72,26 @@ func GenerateUUID() string {
 //
 // When can it be used:
 //   - Call whenever converting untyped JSON or form input to match an attribute's required DataType.
+//
+// Parameters:
+//   - val (any): Input value used by the operation.
+//   - targetType (model.DataType): Input value used by the operation.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CoerceValue and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func CoerceValue(val any, targetType model.DataType) (any, error) {
 	if val == nil {
 		return nil, nil
@@ -256,6 +294,26 @@ func isSequenceOrAuto(attr *model.Attribute) bool {
 //
 // When can it be used:
 //   - Call prior to persisting a new entity record to the database.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SanitizeInput and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func SanitizeInput(m *model.Model, data map[string]any) (map[string]any, error) {
 	sanitized := make(map[string]any)
 
@@ -351,6 +409,26 @@ func isDatabaseDefaultExpression(value any) bool {
 //
 // When can it be used:
 //   - Call prior to executing partial record updates (PATCH/PUT) on existing database records.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SanitizePartialInput and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func SanitizePartialInput(m *model.Model, data map[string]any) (map[string]any, error) {
 	if m == nil || data == nil {
 		return data, nil

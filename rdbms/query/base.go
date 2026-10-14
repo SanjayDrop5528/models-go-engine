@@ -48,6 +48,24 @@ type Query interface {
 type InValues struct{ Values any }
 
 // In marks a slice for expansion by the relational query generator.
+//
+// Parameters:
+//   - values (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (InValues): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by In and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func In(values any) InValues { return InValues{Values: values} }
 
 // QueryBuilder wraps a query in a fluent conditional builder.
@@ -79,6 +97,25 @@ type DB struct {
 //
 // When can it be used:
 //   - When wrapping database connections for dialect-driven query execution.
+//
+// Parameters:
+//   - db (*sql.DB): Input value used by the operation.
+//   - d (dialect.Dialect): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DB): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewDB and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 	if d == nil {
 		d = dialect.NewPostgreSQL()
@@ -101,6 +138,24 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 //
 // When can it be used:
 //   - Whenever inspecting target SQL dialect capabilities.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (dialect.Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Dialect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) Dialect() dialect.Dialect {
 	return db.dialect
 }
@@ -116,6 +171,24 @@ func (db *DB) Dialect() dialect.Dialect {
 //
 // When can it be used:
 //   - When serializing SQL query fragments.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (schema.QueryGen): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryGen and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) QueryGen() schema.QueryGen {
 	return db.gen
 }
@@ -131,6 +204,24 @@ func (db *DB) QueryGen() schema.QueryGen {
 //
 // When can it be used:
 //   - When direct access to sql.DB connection methods is needed.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*sql.DB): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DB and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) DB() *sql.DB {
 	return db.db
 }
@@ -146,11 +237,50 @@ func (db *DB) DB() *sql.DB {
 //
 // When can it be used:
 //   - When building a SELECT statement fluently.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*SelectQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewSelect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) NewSelect() *SelectQuery {
 	return NewSelectQuery(db)
 }
 
 // ExecContext executes a statement through the adapter-owned connection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - statement (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (sql.Result): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExecContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) ExecContext(ctx context.Context, statement string, args ...any) (sql.Result, error) {
 	if db == nil || db.db == nil {
 		return nil, sql.ErrConnDone
@@ -159,6 +289,27 @@ func (db *DB) ExecContext(ctx context.Context, statement string, args ...any) (s
 }
 
 // QueryContext executes a query through the adapter-owned connection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - statement (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*sql.Rows): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) QueryContext(ctx context.Context, statement string, args ...any) (*sql.Rows, error) {
 	if db == nil || db.db == nil {
 		return nil, sql.ErrConnDone
@@ -167,11 +318,49 @@ func (db *DB) QueryContext(ctx context.Context, statement string, args ...any) (
 }
 
 // QueryRowContext executes a single-row query through the adapter-owned connection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - statement (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*sql.Row): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by QueryRowContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) QueryRowContext(ctx context.Context, statement string, args ...any) *sql.Row {
 	return db.db.QueryRowContext(ctx, statement, args...)
 }
 
 // PingContext verifies the adapter-owned connection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by PingContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) PingContext(ctx context.Context) error {
 	if db == nil || db.db == nil {
 		return sql.ErrConnDone
@@ -180,21 +369,96 @@ func (db *DB) PingContext(ctx context.Context) error {
 }
 
 // NewRaw creates a parameterized raw query attached to this engine handle.
+//
+// Parameters:
+//   - statement (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*RawQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewRaw and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) NewRaw(statement string, args ...any) *RawQuery {
 	return &RawQuery{conn: db.db, statement: statement, args: args}
 }
 
 // Table resolves the relational table name for a Go model type.
+//
+// Parameters:
+//   - modelType (reflect.Type): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*TableInfo): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) Table(modelType reflect.Type) *TableInfo {
 	return &TableInfo{SQLName: inferTable(modelType, "")}
 }
 
 // NewCreateTable starts a schema creation query owned by the engine.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*CreateTableQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewCreateTable and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (db *DB) NewCreateTable() *CreateTableQuery {
 	return &CreateTableQuery{conn: db.db}
 }
 
 // BeginTx starts a transaction while keeping query construction in the engine.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - opts (*sql.TxOptions): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Tx): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BeginTx and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	if db == nil || db.db == nil {
 		return nil, sql.ErrConnDone
@@ -207,6 +471,26 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 }
 
 // RunInTx executes fn atomically and rolls back whenever fn returns an error.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - opts (*sql.TxOptions): Input value used by the operation.
+//   - fn (func(context.Context, *Tx) error): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RunInTx and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (db *DB) RunInTx(ctx context.Context, opts *sql.TxOptions, fn func(context.Context, *Tx) error) error {
 	tx, err := db.BeginTx(ctx, opts)
 	if err != nil {
@@ -245,6 +529,24 @@ type defaultQueryGen struct {
 //
 // When can it be used:
 //   - Whenever querying the dialect instance.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (dialect.Dialect): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Dialect and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (g *defaultQueryGen) Dialect() dialect.Dialect {
 	return g.dialect
 }
@@ -260,6 +562,24 @@ func (g *defaultQueryGen) Dialect() dialect.Dialect {
 //
 // When can it be used:
 //   - When checking generator active state.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IsNop and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (g *defaultQueryGen) IsNop() bool {
 	return false
 }
@@ -275,6 +595,27 @@ func (g *defaultQueryGen) IsNop() bool {
 //
 // When can it be used:
 //   - When serializing queries with arguments into a byte buffer.
+//
+// Parameters:
+//   - b ([]byte): Input value used by the operation.
+//   - query (string): Input value used by the operation.
+//   - args (...any): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (g *defaultQueryGen) AppendQuery(b []byte, query string, args ...any) ([]byte, error) {
 	if len(args) == 0 {
 		return append(b, query...), nil
@@ -362,6 +703,25 @@ type WithQuery struct {
 //
 // When can it be used:
 //   - When declaring CTEs for WITH clauses.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//   - query (Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*WithQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewWithQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewWithQuery(name string, query Query) *WithQuery {
 	return &WithQuery{
 		name:  name,
@@ -380,6 +740,24 @@ func NewWithQuery(name string, query Query) *WithQuery {
 //
 // When can it be used:
 //   - When executing recursive SQL queries.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*WithQuery): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Recursive and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (w *WithQuery) Recursive() *WithQuery {
 	w.recursive = true
 	return w
@@ -396,6 +774,26 @@ func (w *WithQuery) Recursive() *WithQuery {
 //
 // When can it be used:
 //   - When formatting CTE headers.
+//
+// Parameters:
+//   - gen (schema.QueryGen): Input value used by the operation.
+//   - b ([]byte): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (w *WithQuery) AppendQuery(gen schema.QueryGen, b []byte) ([]byte, error) {
 	if gen != nil {
 		b = gen.Dialect().AppendIdent(b, w.name)
@@ -609,6 +1007,24 @@ func (q *baseQuery) setErr(err error) {
 }
 
 // GetErr returns any error registered on the query.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetErr and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (q *baseQuery) GetErr() error {
 	return q.err
 }

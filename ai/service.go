@@ -3,8 +3,9 @@
 //
 // File: service.go
 // Usage:
-//   Orchestrates schema discovery, multi-turn conversational prompt compilation,
-//   AI completions, and conversion of LLM query plans into executable Dataset models.
+//
+//	Orchestrates schema discovery, multi-turn conversational prompt compilation,
+//	AI completions, and conversion of LLM query plans into executable Dataset models.
 package ai
 
 import (
@@ -86,14 +87,35 @@ type AIService struct {
 // NewAIService creates a new AIService.
 //
 // Purpose:
-//   Initializes the AI generation service with an AI Client, ModelRegistry for schema metadata,
-//   and DataSetService for query compilation.
+//
+//	Initializes the AI generation service with an AI Client, ModelRegistry for schema metadata,
+//	and DataSetService for query compilation.
 //
 // Where it is used:
 //   - In models-go-example/api/router.go and server bootstrap to wire the natural language query assistant.
 //
 // When can it be used:
 //   - When setting up AI query synthesis and interactive chat endpoints.
+//
+// Parameters:
+//   - client (Client): Input value used by the operation.
+//   - reg (*registry.ModelRegistry): Input value used by the operation.
+//   - dsSvc (*datasetsvc.DataSetService): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*AIService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewAIService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewAIService(client Client, reg *registry.ModelRegistry, dsSvc *datasetsvc.DataSetService) *AIService {
 	if client == nil {
 		client = NewHTTPClient("", "")
@@ -108,13 +130,32 @@ func NewAIService(client Client, reg *registry.ModelRegistry, dsSvc *datasetsvc.
 // GetActiveConversationID returns the active conversation ID tracked by the engine.
 //
 // Purpose:
-//   Retrieves the currently retained conversation session ID under thread-safe read lock.
+//
+//	Retrieves the currently retained conversation session ID under thread-safe read lock.
 //
 // Where it is used:
 //   - In AI service handler to chain sequential multi-turn user requests.
 //
 // When can it be used:
 //   - Whenever checking the active conversational thread status.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetActiveConversationID and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *AIService) GetActiveConversationID() string {
 	s.activeConvMu.RLock()
 	defer s.activeConvMu.RUnlock()
@@ -124,13 +165,32 @@ func (s *AIService) GetActiveConversationID() string {
 // SetActiveConversationID stores the active conversation ID in the engine.
 //
 // Purpose:
-//   Sets or updates the current conversation ID for stateful chat sessions.
+//
+//	Sets or updates the current conversation ID for stateful chat sessions.
 //
 // Where it is used:
 //   - In AI generation endpoint when starting or continuing a chat thread.
 //
 // When can it be used:
 //   - When associating incoming user requests with an ongoing AI thread.
+//
+// Parameters:
+//   - id (string): Input value used by the operation.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetActiveConversationID and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *AIService) SetActiveConversationID(id string) {
 	s.activeConvMu.Lock()
 	defer s.activeConvMu.Unlock()
@@ -140,13 +200,32 @@ func (s *AIService) SetActiveConversationID(id string) {
 // ResetConversation clears the conversation ID memory in the engine.
 //
 // Purpose:
-//   Flushes active conversation state to start a clean conversational context.
+//
+//	Flushes active conversation state to start a clean conversational context.
 //
 // Where it is used:
 //   - Called when a user clicks "New Chat" or resets session context.
 //
 // When can it be used:
 //   - Whenever starting a fresh chat turn without previous conversational history.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by ResetConversation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *AIService) ResetConversation() {
 	s.activeConvMu.Lock()
 	defer s.activeConvMu.Unlock()
@@ -156,14 +235,35 @@ func (s *AIService) ResetConversation() {
 // GenerateDataSet converts a natural language prompt into an executable DataSet, preserving conversation memory.
 //
 // Purpose:
-//   Discovers relevant schema tables, constructs system prompts with schema metadata,
-//   invokes the AI backend, extracts query plans, and converts them to executable DataSets.
+//
+//	Discovers relevant schema tables, constructs system prompts with schema metadata,
+//	invokes the AI backend, extracts query plans, and converts them to executable DataSets.
 //
 // Where it is used:
 //   - In api/router.go under /api/ai/generate to satisfy natural language query queries.
 //
 // When can it be used:
 //   - When transforming conversational natural language into structured database query configurations.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - req (*GenerateRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*GenerateResponse): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GenerateDataSet and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (*GenerateResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return nil, fmt.Errorf("prompt cannot be empty")
@@ -340,14 +440,35 @@ func (s *AIService) GenerateDataSet(ctx context.Context, req *GenerateRequest) (
 // PlanToDataSet transforms an AIQueryPlan into an executable domain.DataSet.
 //
 // Purpose:
-//   Maps high-level AST constructs (selects, joins, filters, grouping, aggregations, params)
-//   from the LLM into a complete domain.DataSet with resolved schema types, column aliases, and join mappings.
+//
+//	Maps high-level AST constructs (selects, joins, filters, grouping, aggregations, params)
+//	from the LLM into a complete domain.DataSet with resolved schema types, column aliases, and join mappings.
 //
 // Where it is used:
 //   - In AIService.GenerateDataSet to convert LLM output into an engine-managed DataSet.
 //
 // When can it be used:
 //   - Whenever an AIQueryPlan needs to be converted into a queryable domain.DataSet.
+//
+// Parameters:
+//   - plan (*AIQueryPlan): Input value used by the operation.
+//   - driver (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*domain.DataSet): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by PlanToDataSet and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.DataSet, error) {
 	if plan == nil {
 		return nil, fmt.Errorf("query plan is nil")
@@ -644,14 +765,35 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 // and traverses relational links (FKs, Orbital References, abbreviations) to gather all connected meta-tables.
 //
 // Purpose:
-//   Discovers tables and relationship paths relevant to user prompt keywords,
-//   leveraging FK links, orbital references, and semantic keyword scoring.
+//
+//	Discovers tables and relationship paths relevant to user prompt keywords,
+//	leveraging FK links, orbital references, and semantic keyword scoring.
 //
 // Where it is used:
 //   - In AIService.GenerateDataSet to construct enriched prompt contexts for the LLM.
 //
 // When can it be used:
 //   - When analyzing natural language prompts against registered schemas to find target entities.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - prompt (string): Input value used by the operation.
+//   - currentDS (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*DiscoveredTableMeta): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DiscoverRelatedTables and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *AIService) DiscoverRelatedTables(ctx context.Context, prompt string, currentDS *domain.DataSet) []*DiscoveredTableMeta {
 	if s.registry == nil {
 		return nil
@@ -1008,14 +1150,34 @@ Return strictly a JSON object:
 // types, keys, and explicit join relationships for the AI prompt.
 //
 // Purpose:
-//   Serializes discovered table definitions, column types, primary/foreign keys, and relational
-//   links into an informative prompt context block for the LLM.
+//
+//	Serializes discovered table definitions, column types, primary/foreign keys, and relational
+//	links into an informative prompt context block for the LLM.
 //
 // Where it is used:
 //   - In AIService.GenerateDataSet to provide schema ground-truth to the AI model.
 //
 // When can it be used:
 //   - When assembling context for prompt engineering in database query synthesis.
+//
+// Parameters:
+//   - discovered ([]*DiscoveredTableMeta): Input value used by the operation.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//   - result2 ([]string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BuildEnrichedSchemaContext and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *AIService) BuildEnrichedSchemaContext(discovered []*DiscoveredTableMeta) (string, []string) {
 	if len(discovered) == 0 {
 		return "No relevant database tables identified.", nil
@@ -1084,8 +1246,9 @@ var commonStopWords = map[string]bool{
 // extractPromptKeywords parses a natural language prompt into significant keywords.
 //
 // Purpose:
-//   Tokenizes user prompts, strips non-alphanumeric punctuation and standard stop words,
-//   returning unique candidate keyword tokens for table matching.
+//
+//	Tokenizes user prompts, strips non-alphanumeric punctuation and standard stop words,
+//	returning unique candidate keyword tokens for table matching.
 //
 // Where it is used:
 //   - In AIService.DiscoverRelatedTables for scoring table relevance.
@@ -1112,8 +1275,9 @@ func extractPromptKeywords(prompt string) []string {
 // singularize converts plural English nouns to their singular form.
 //
 // Purpose:
-//   Applies standard English singularization heuristics ("ies" -> "y", "es" -> "", "s" -> "")
-//   to match plural query tokens against singular table/model names.
+//
+//	Applies standard English singularization heuristics ("ies" -> "y", "es" -> "", "s" -> "")
+//	to match plural query tokens against singular table/model names.
 //
 // Where it is used:
 //   - In AIService.DiscoverRelatedTables and resolveJoinPath when cross-matching entity stems.
@@ -1137,8 +1301,9 @@ func singularize(w string) string {
 // pluralize converts singular English nouns to their plural form.
 //
 // Purpose:
-//   Applies pluralization rules ("y" -> "ies", otherwise appends "s") to match singular tokens
-//   to plural table identifiers.
+//
+//	Applies pluralization rules ("y" -> "ies", otherwise appends "s") to match singular tokens
+//	to plural table identifiers.
 //
 // Where it is used:
 //   - In AIService.DiscoverRelatedTables and resolveJoinPath when checking plural table mappings.
@@ -1159,7 +1324,8 @@ func pluralize(w string) string {
 // buildSystemPrompt constructs the LLM system instruction including database schema and formatting rules.
 //
 // Purpose:
-//   Prepares the comprehensive instruction set and JSON output format schema for the AI completion model.
+//
+//	Prepares the comprehensive instruction set and JSON output format schema for the AI completion model.
 //
 // Where it is used:
 //   - In AIService.GenerateDataSet when constructing the ChatRequest payload.
@@ -1228,7 +1394,8 @@ RULES:
 // cleanJSONBlock strips markdown code fence formatting from LLM response text.
 //
 // Purpose:
-//   Cleans surrounding ```json and ``` markdown fences to leave valid parseable JSON.
+//
+//	Cleans surrounding ```json and ``` markdown fences to leave valid parseable JSON.
 //
 // Where it is used:
 //   - In extractAIQueryPlan prior to JSON unmarshaling.
@@ -1254,7 +1421,8 @@ func cleanJSONBlock(content string) string {
 // extractAIQueryPlan decodes the JSON payload returned by the AI into an AIQueryPlan struct.
 //
 // Purpose:
-//   Strips markdown wraps, unmarshals the response text into AIQueryPlan, and returns validation errors if malformed.
+//
+//	Strips markdown wraps, unmarshals the response text into AIQueryPlan, and returns validation errors if malformed.
 //
 // Where it is used:
 //   - In AIService.GenerateDataSet when processing model response choices.
@@ -1273,8 +1441,9 @@ func extractAIQueryPlan(content string) (*AIQueryPlan, error) {
 // normalizeFilterValue checks if the filter value is an interval expression and normalizes it to C[...] macro syntax.
 //
 // Purpose:
-//   Converts raw interval string representations (e.g. now() - interval '7 days') into standardized
-//   dynamic offset macros like C[-7d] supported across all adapter query engines.
+//
+//	Converts raw interval string representations (e.g. now() - interval '7 days') into standardized
+//	dynamic offset macros like C[-7d] supported across all adapter query engines.
 //
 // Where it is used:
 //   - In PlanToDataSet when processing filter values from AI output.
@@ -1315,8 +1484,9 @@ func normalizeFilterValue(val any) any {
 // getFieldsForTable returns all DataModel fields for a given table name or model ID, resolving aliases and configs.
 //
 // Purpose:
-//   Searches the ModelRegistry for a table or model ID, resolving schemas and aliases to retrieve
-//   all declared columns and references.
+//
+//	Searches the ModelRegistry for a table or model ID, resolving schemas and aliases to retrieve
+//	all declared columns and references.
 //
 // Where it is used:
 //   - In DiscoverRelatedTables and resolveJoinPath.
@@ -1357,8 +1527,9 @@ func (s *AIService) getFieldsForTable(tbl string) []*model.DataModel {
 // orbital references, and naming conventions.
 //
 // Purpose:
-//   Inspects model relationships in both directions to discover the corresponding join keys
-//   (e.g., store_id -> id or employee_id -> id) for automatic join construction.
+//
+//	Inspects model relationships in both directions to discover the corresponding join keys
+//	(e.g., store_id -> id or employee_id -> id) for automatic join construction.
 //
 // Where it is used:
 //   - In PlanToDataSet when LLM joins omit explicit foreign key join attributes.

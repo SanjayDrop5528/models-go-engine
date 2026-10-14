@@ -37,6 +37,24 @@ type ModelService struct {
 //
 // When can it be used:
 //   - When managing model drafts, configurations, and schema metadata.
+//
+// Parameters:
+//   - reg (*registry.ModelRegistry): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ModelService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewModelService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewModelService(reg *registry.ModelRegistry) *ModelService {
 	return &ModelService{
 		registry: reg,
@@ -54,6 +72,26 @@ func NewModelService(reg *registry.ModelRegistry) *ModelService {
 //
 // When can it be used:
 //   - When creating a new unpublished entity definition.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CreateDraft and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) CreateDraft(ctx context.Context, m *model.Model) (*model.Model, error) {
 	if m != nil && m.ID == "" {
 		m.ID = mapping.GenerateUUID()
@@ -75,6 +113,27 @@ func (s *ModelService) CreateDraft(ctx context.Context, m *model.Model) (*model.
 //
 // When can it be used:
 //   - When editing attributes or settings on a draft model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UpdateDraft and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) UpdateDraft(ctx context.Context, id string, m *model.Model) (*model.Model, error) {
 	m.ID = id
 	if err := validation.ValidateModel(m); err != nil {
@@ -94,6 +153,26 @@ func (s *ModelService) UpdateDraft(ctx context.Context, id string, m *model.Mode
 //
 // When can it be used:
 //   - When loading an entity model for editing or inspection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDraft and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) GetDraft(ctx context.Context, id string) (*model.Model, error) {
 	return s.registry.GetDraft(id)
 }
@@ -109,6 +188,26 @@ func (s *ModelService) GetDraft(ctx context.Context, id string) (*model.Model, e
 //
 // When can it be used:
 //   - When resolving model metadata for live database operations.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetActive and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) GetActive(ctx context.Context, id string) (*model.Model, error) {
 	active, err := s.registry.GetActive(id)
 	if err != nil {
@@ -198,6 +297,24 @@ func pluralModelName(name string) string {
 //
 // When can it be used:
 //   - When displaying all models in the user interface.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.Model): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by List and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) List(ctx context.Context) []*model.Model {
 	return s.registry.List()
 }
@@ -213,6 +330,25 @@ func (s *ModelService) List(ctx context.Context) []*model.Model {
 //
 // When can it be used:
 //   - When decommissioning or deleting an entity model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) Delete(ctx context.Context, id string) error {
 	return s.registry.Delete(id)
 }
@@ -228,6 +364,26 @@ func (s *ModelService) Delete(ctx context.Context, id string) error {
 //
 // When can it be used:
 //   - When defining an entity before declaring its individual columns.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CreateModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) CreateModelConfig(ctx context.Context, cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	if cfg != nil && cfg.ID == "" {
 		cfg.ID = mapping.GenerateUUID()
@@ -249,6 +405,26 @@ func (s *ModelService) CreateModelConfig(ctx context.Context, cfg *model.ModelCo
 //
 // When can it be used:
 //   - When viewing entity settings or verifying model presence.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetModelConfig and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) GetModelConfig(ctx context.Context, idOrName string) (*model.ModelConfig, error) {
 	return s.registry.GetModelConfig(idOrName)
 }
@@ -264,6 +440,24 @@ func (s *ModelService) GetModelConfig(ctx context.Context, idOrName string) (*mo
 //
 // When can it be used:
 //   - When displaying all available entities or synchronizing full database schemas.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.ModelConfig): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListModelConfigs and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 	return s.registry.ListModelConfigs()
 }
@@ -279,6 +473,27 @@ func (s *ModelService) ListModelConfigs(ctx context.Context) []*model.ModelConfi
 //
 // When can it be used:
 //   - When modifying table name, schema, description, or status on a model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UpdateModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) UpdateModelConfig(ctx context.Context, id string, cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	cfg.ID = id
 	if err := validation.ValidateModelConfig(cfg); err != nil {
@@ -298,6 +513,26 @@ func (s *ModelService) UpdateModelConfig(ctx context.Context, id string, cfg *mo
 //
 // When can it be used:
 //   - When defining an attribute, data type, or orbital reference on an entity.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AddDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) AddDataModel(ctx context.Context, dm *model.DataModel) (*model.DataModel, error) {
 	if dm != nil && dm.ID == "" {
 		dm.ID = mapping.GenerateUUID()
@@ -324,6 +559,27 @@ func (s *ModelService) AddDataModel(ctx context.Context, dm *model.DataModel) (*
 //
 // When can it be used:
 //   - When retrieving column settings or validation rules for an attribute.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDataModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) GetDataModel(ctx context.Context, modelID, fieldID string) (*model.DataModel, error) {
 	return s.registry.GetDataModel(modelID, fieldID)
 }
@@ -339,6 +595,25 @@ func (s *ModelService) GetDataModel(ctx context.Context, modelID, fieldID string
 //
 // When can it be used:
 //   - When listing the attributes of a table.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.DataModel): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListDataModels and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) ListDataModels(ctx context.Context, modelID string) []*model.DataModel {
 	return s.registry.ListDataModels(modelID)
 }
@@ -354,6 +629,26 @@ func (s *ModelService) ListDataModels(ctx context.Context, modelID string) []*mo
 //
 // When can it be used:
 //   - When modifying model schemas to remove fields.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DeleteDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) DeleteDataModel(ctx context.Context, modelID, fieldID string) error {
 	return s.registry.DeleteDataModel(modelID, fieldID)
 }
@@ -370,6 +665,26 @@ func (s *ModelService) DeleteDataModel(ctx context.Context, modelID, fieldID str
 //
 // When can it be used:
 //   - Whenever metadata catalog records have been imported or modified and runtime models must be rebuilt.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelIDs (...string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]string): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Reinit and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (s *ModelService) Reinit(ctx context.Context, modelIDs ...string) ([]string, error) {
 	configs := s.registry.ListModelConfigs()
 	targetMap := make(map[string]bool)

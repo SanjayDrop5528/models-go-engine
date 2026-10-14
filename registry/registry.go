@@ -41,6 +41,24 @@ type ModelRegistry struct {
 //
 // When can it be used:
 //   - Call when initializing the engine runtime or isolated test suites.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*ModelRegistry): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewModelRegistry and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewModelRegistry() *ModelRegistry {
 	return &ModelRegistry{
 		active:           make(map[string]*model.Model),
@@ -63,6 +81,25 @@ func NewModelRegistry() *ModelRegistry {
 //
 // When can it be used:
 //   - Call whenever defining or modifying an executable operation.
+//
+// Parameters:
+//   - op (*operation.OperationConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*operation.OperationConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SaveOperationConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SaveOperationConfig(op *operation.OperationConfig) (*operation.OperationConfig, error) {
 	if op == nil {
 		return nil, errors.New("operation_config cannot be nil")
@@ -95,6 +132,25 @@ func (r *ModelRegistry) SaveOperationConfig(op *operation.OperationConfig) (*ope
 //
 // When can it be used:
 //   - Call before executing a custom procedure or function.
+//
+// Parameters:
+//   - nameOrID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*operation.OperationConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetOperationConfig and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) GetOperationConfig(nameOrID string) (*operation.OperationConfig, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -118,6 +174,24 @@ func (r *ModelRegistry) GetOperationConfig(nameOrID string) (*operation.Operatio
 //
 // When can it be used:
 //   - Call when cataloging available operations.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 ([]*operation.OperationConfig): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListOperationConfigs and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) ListOperationConfigs() []*operation.OperationConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -146,6 +220,25 @@ func (r *ModelRegistry) ListOperationConfigs() []*operation.OperationConfig {
 //
 // When can it be used:
 //   - Call when creating or updating model configuration entities.
+//
+// Parameters:
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SaveModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SaveModelConfig(cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	if cfg == nil {
 		return nil, errors.New("model_config cannot be nil")
@@ -188,6 +281,25 @@ func (r *ModelRegistry) SaveModelConfig(cfg *model.ModelConfig) (*model.ModelCon
 //
 // When can it be used:
 //   - Call when fetching model metadata.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetModelConfig and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) GetModelConfig(idOrName string) (*model.ModelConfig, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -212,6 +324,24 @@ func (r *ModelRegistry) GetModelConfig(idOrName string) (*model.ModelConfig, err
 //
 // When can it be used:
 //   - Call when listing configured models.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 ([]*model.ModelConfig): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListModelConfigs and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) ListModelConfigs() []*model.ModelConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -235,6 +365,25 @@ func (r *ModelRegistry) ListModelConfigs() []*model.ModelConfig {
 //
 // When can it be used:
 //   - Call when adding or editing a model column or field.
+//
+// Parameters:
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SaveDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, error) {
 	if dm == nil {
 		return nil, errors.New("data_model cannot be nil")
@@ -305,6 +454,26 @@ func (r *ModelRegistry) SaveDataModel(dm *model.DataModel) (*model.DataModel, er
 //
 // When can it be used:
 //   - Call when fetching metadata for a specific column or field.
+//
+// Parameters:
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDataModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -337,6 +506,24 @@ func (r *ModelRegistry) GetDataModel(modelID, fieldID string) (*model.DataModel,
 //
 // When can it be used:
 //   - Call when viewing all columns of a model.
+//
+// Parameters:
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.DataModel): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListDataModels and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -367,6 +554,25 @@ func (r *ModelRegistry) ListDataModels(modelID string) []*model.DataModel {
 //
 // When can it be used:
 //   - Call when dropping a field definition.
+//
+// Parameters:
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DeleteDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -397,6 +603,25 @@ func (r *ModelRegistry) DeleteDataModel(modelID, fieldID string) error {
 //
 // When can it be used:
 //   - Call prior to previewing or applying schema migrations.
+//
+// Parameters:
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SaveDraft and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SaveDraft(m *model.Model) (*model.Model, error) {
 	if m == nil {
 		return nil, errors.New("model cannot be nil")
@@ -435,6 +660,25 @@ func (r *ModelRegistry) SaveDraft(m *model.Model) (*model.Model, error) {
 //
 // When can it be used:
 //   - Call when reading the desired state of a model before migration.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDraft and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) GetDraft(idOrName string) (*model.Model, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -463,6 +707,25 @@ func (r *ModelRegistry) GetDraft(idOrName string) (*model.Model, error) {
 //
 // When can it be used:
 //   - Call when executing data queries against active tables or collections.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetActive and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) GetActive(idOrName string) (*model.Model, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -486,6 +749,25 @@ func (r *ModelRegistry) GetActive(idOrName string) (*model.Model, error) {
 //
 // When can it be used:
 //   - Call during migration progress tracking.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//   - status (model.ModelStatus): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetStatus and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SetStatus(idOrName string, status model.ModelStatus) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -513,6 +795,26 @@ func (r *ModelRegistry) SetStatus(idOrName string, status model.ModelStatus) err
 //
 // When can it be used:
 //   - Call when schema modifications are verified in the database.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetActive and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) SetActive(idOrName string, m *model.Model) (*model.Model, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -551,6 +853,24 @@ func (r *ModelRegistry) SetActive(idOrName string, m *model.Model) (*model.Model
 //
 // When can it be used:
 //   - Call when listing all data models.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 ([]*model.Model): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by List and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) List() []*model.Model {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -583,6 +903,24 @@ func (r *ModelRegistry) List() []*model.Model {
 //
 // When can it be used:
 //   - Call when purging a model metadata definition.
+//
+// Parameters:
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ModelRegistry) Delete(idOrName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

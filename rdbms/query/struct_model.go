@@ -26,16 +26,70 @@ type StructTableModel struct {
 var _ schema.TableModel = (*StructTableModel)(nil)
 
 // Table returns the underlying schema.Table descriptor.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*schema.Table): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Table and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) Table() *schema.Table {
 	return s.table
 }
 
 // IsStructModel returns true if this table model was constructed from a Go struct.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IsStructModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) IsStructModel() bool {
 	return s.isStruct
 }
 
 // Clone creates an isolated copy of the StructTableModel for query execution.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (schema.TableModel): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Clone and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) Clone() schema.TableModel {
 	joinsCopy := make([]*schema.RelationJoin, len(s.joins))
 	copy(joinsCopy, s.joins)
@@ -65,11 +119,47 @@ func (s *StructTableModel) Clone() schema.TableModel {
 }
 
 // GetJoins returns only relation joins that were explicitly requested.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 ([]*schema.RelationJoin): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetJoins and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) GetJoins() []*schema.RelationJoin {
 	return s.activeJoins
 }
 
 // HasActiveJoins reports whether any relations were explicitly activated on this table model.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by HasActiveJoins and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) HasActiveJoins() bool {
 	return len(s.activeJoins) > 0
 }
@@ -89,6 +179,24 @@ func (s *StructTableModel) activateJoin(j *schema.RelationJoin) {
 }
 
 // Join returns a relation join by name, supporting dot-delimited paths (e.g. "AllocatedVehicle.Model").
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*schema.RelationJoin): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Join and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (s *StructTableModel) Join(name string) *schema.RelationJoin {
 	if strings.Contains(name, ".") {
 		parts := strings.Split(name, ".")
@@ -121,6 +229,24 @@ func (s *StructTableModel) Join(name string) *schema.RelationJoin {
 
 // BuildTableModelFromStruct introspects a Go struct, pointer to struct, or slice of structs
 // and builds a schema.TableModel with its fields and relationships.
+//
+// Parameters:
+//   - m (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (schema.TableModel): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BuildTableModelFromStruct and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func BuildTableModelFromStruct(m any) schema.TableModel {
 	if m == nil {
 		return nil

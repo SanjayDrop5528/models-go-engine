@@ -2,8 +2,9 @@
 //
 // File: types.go
 // Usage:
-//   Enumerates standardized DataType, StorageType, ModelStatus, and IndexType definitions,
-//   and provides NormalizeDataType to map dialect-specific SQL/NoSQL type names into canonical types.
+//
+//	Enumerates standardized DataType, StorageType, ModelStatus, and IndexType definitions,
+//	and provides NormalizeDataType to map dialect-specific SQL/NoSQL type names into canonical types.
 package model
 
 import "strings"
@@ -35,13 +36,32 @@ const (
 // NormalizeDataType normalizes arbitrary casing and common aliases into canonical DataType.
 //
 // Purpose:
-//   Resolves dialect-specific types (e.g. "VARCHAR", "INT4", "BIGINT", "JSONB") into uniform engine DataTypes.
+//
+//	Resolves dialect-specific types (e.g. "VARCHAR", "INT4", "BIGINT", "JSONB") into uniform engine DataTypes.
 //
 // Where it is used:
 //   - Used during database introspection, model parsing, schema validation, and SQL generation.
 //
 // When can it be used:
 //   - Call whenever mapping raw SQL column type strings or user inputs to internal model DataTypes.
+//
+// Parameters:
+//   - t (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (DataType): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NormalizeDataType and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NormalizeDataType(t string) DataType {
 	switch strings.ToUpper(strings.TrimSpace(t)) {
 	case "STRING", "VARCHAR", "CHAR":
@@ -143,4 +163,3 @@ const (
 	IndexUnique   IndexType = "UNIQUE"
 	IndexFullText IndexType = "FULLTEXT"
 )
-

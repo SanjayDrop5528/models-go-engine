@@ -166,6 +166,24 @@ type ExecuteRequest struct {
 }
 
 // GetAppendFilter returns normalized "first" or "last" (defaulting to "last").
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetAppendFilter and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ExecuteRequest) GetAppendFilter() string {
 	if r == nil {
 		return "last"
@@ -179,6 +197,24 @@ func (r *ExecuteRequest) GetAppendFilter() string {
 // UnmarshalJSON unmarshals ExecuteRequest supporting multiple casing variants for appendfilter:
 // "appendfilter", "appendFilter", "append_filter", "AppendFilter".
 // Any value other than "first" (case-insensitive) defaults to "last".
+//
+// Parameters:
+//   - data ([]byte): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UnmarshalJSON and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ExecuteRequest) UnmarshalJSON(data []byte) error {
 	type Alias ExecuteRequest
 	aux := struct {
@@ -214,6 +250,24 @@ func (r *ExecuteRequest) UnmarshalJSON(data []byte) error {
 
 // NormalizeRuntimeParams converts filterParams (whether []FilterParam, []map[string]any, or map[string]any)
 // into a standardized string-to-any map for parameter substitution and binding.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NormalizeRuntimeParams and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (r *ExecuteRequest) NormalizeRuntimeParams() map[string]any {
 	params := make(map[string]any)
 	if r == nil || r.FilterParams == nil {

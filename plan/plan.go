@@ -2,8 +2,9 @@
 //
 // File: plan.go
 // Usage:
-//   Constructs SchemaPlan instances from schema diffs, establishing prioritized execution ordering
-//   (e.g., table creation before column additions, drops last) and computing risk warnings.
+//
+//	Constructs SchemaPlan instances from schema diffs, establishing prioritized execution ordering
+//	(e.g., table creation before column additions, drops last) and computing risk warnings.
 package plan
 
 import (
@@ -15,18 +16,18 @@ import (
 
 // SchemaPlan defines an ordered execution plan for applying schema mutations.
 type SchemaPlan struct {
-	ModelID        string                 `json:"model_id"`
-	StorageName    string                 `json:"storage_name"`
-	Database       string                 `json:"database"`
-	Operations     []diff.SchemaOperation `json:"operations"`
-	Destructive    bool                   `json:"destructive"`
-	Warnings       []string               `json:"warnings,omitempty"`
-	GeneratedAt    time.Time              `json:"generated_at"`
+	ModelID     string                 `json:"model_id"`
+	StorageName string                 `json:"storage_name"`
+	Database    string                 `json:"database"`
+	Operations  []diff.SchemaOperation `json:"operations"`
+	Destructive bool                   `json:"destructive"`
+	Warnings    []string               `json:"warnings,omitempty"`
+	GeneratedAt time.Time              `json:"generated_at"`
 }
 
 // NativeAction describes an adapter-specific command (e.g., SQL DDL, Mongo command).
 type NativeAction struct {
-	Type        string `json:"type"`        // SQL, BSON, COMMAND
+	Type        string `json:"type"` // SQL, BSON, COMMAND
 	Description string `json:"description"`
 	Statement   string `json:"statement"`
 	Destructive bool   `json:"destructive"`
@@ -48,13 +49,35 @@ type SchemaPreview struct {
 // BuildPlan takes a diff and orders operations for safe, dependency-aware execution.
 //
 // Purpose:
-//   Orders atomic schema operations according to dependency rules and compiles warnings for destructive or unsafe steps.
+//
+//	Orders atomic schema operations according to dependency rules and compiles warnings for destructive or unsafe steps.
 //
 // Where it is used:
 //   - Called by SchemaService.Preview and SchemaService.Apply.
 //
 // When can it be used:
 //   - Call after computing a SchemaDiff to produce a structured plan for adapter execution or previewing.
+//
+// Parameters:
+//   - modelID (string): Input value used by the operation.
+//   - storageName (string): Input value used by the operation.
+//   - database (string): Input value used by the operation.
+//   - d (*diff.SchemaDiff): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*SchemaPlan): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BuildPlan and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func BuildPlan(modelID, storageName, database string, d *diff.SchemaDiff) *SchemaPlan {
 	if d == nil || len(d.Operations) == 0 {
 		return &SchemaPlan{
@@ -109,7 +132,8 @@ func BuildPlan(modelID, storageName, database string, d *diff.SchemaDiff) *Schem
 // getOperationPriority returns the topological ordering weight for a schema operation type.
 //
 // Purpose:
-//   Assigns numeric priority rank ensuring dependencies (like table creation) precede modifications (like column additions), and drops run last.
+//
+//	Assigns numeric priority rank ensuring dependencies (like table creation) precede modifications (like column additions), and drops run last.
 //
 // Where it is used:
 //   - Used internally by BuildPlan when sorting operations via sort.SliceStable.

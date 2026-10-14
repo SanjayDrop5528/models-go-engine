@@ -26,6 +26,56 @@
 - Preview, persistence, and runtime execution orchestration.
 - Common adapter, execution, operation, and schema-plan contracts.
 
+## Using the Validation Engine Alone
+
+The validation package is independent of PostgreSQL, MySQL, MongoDB, and the dataset service. Use it directly when an application only needs model, payload, partial-update, query, or schema-plan validation.
+
+```go
+package main
+
+import (
+    "fmt"
+
+    "github.com/SanjayDrop5528/models-go-engine/model"
+    "github.com/SanjayDrop5528/models-go-engine/validation"
+)
+
+func main() {
+    employee := &model.Model{
+        Name:        "employees",
+        StorageName: "employees",
+        StorageType: model.StorageRelational,
+        PrimaryKey:  &model.PrimaryKey{Columns: []string{"id"}},
+        Attributes: []model.Attribute{
+            {Name: "id", Type: model.TypeUUID, IsPrimaryKey: true},
+            {
+                Name: "email",
+                Type: model.TypeEmail,
+                Validation: &model.RuleSet{Required: true},
+            },
+        },
+    }
+
+    validator := validation.NewValidationEngine()
+    if err := validator.ValidateModel(employee); err != nil {
+        panic(err)
+    }
+
+    payload := map[string]any{
+        "id":    "123e4567-e89b-12d3-a456-426614174000",
+        "email": "employee@example.com",
+    }
+    if err := validator.ValidateData(employee, payload); err != nil {
+        fmt.Println("invalid payload:", err)
+        return
+    }
+
+    fmt.Println("payload is valid")
+}
+```
+
+For partial updates, call `ValidateUpdateData`. The stateless helpers `validation.ValidateModel`, `validation.ValidateData`, `validation.ValidatePartialData`, and `validation.ValidatePlan` can also be called without constructing an engine. An adapter is only needed for `ValidateOrbitalReferences`, where the validator must check that referenced records exist.
+
 ---
 
 ## 🏛️ Core Package Architecture

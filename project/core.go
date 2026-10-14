@@ -71,6 +71,24 @@ type ProjectConfig struct {
 //
 // When can it be used:
 //   - Call when instantiating an engine without explicit multi-project configuration.
+//
+// Parameters:
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by New and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func New(adp adapter.Adapter) *Engine {
 	if adp == nil {
 		panic("adapter cannot be nil")
@@ -98,6 +116,27 @@ func New(adp adapter.Adapter) *Engine {
 //
 // When can it be used:
 //   - Call when initializing an engine with known static or pre-defined models.
+//
+// Parameters:
+//   - adp (adapter.Adapter): Input value used by the operation.
+//   - configs ([]*model.ModelConfig): Input value used by the operation.
+//   - dataModels ([]*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewWithModels and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewWithModels(adp adapter.Adapter, configs []*model.ModelConfig, dataModels []*model.DataModel) (*Engine, error) {
 	engine := New(adp)
 	if err := engine.LoadModels(context.Background(), configs, dataModels); err != nil {
@@ -118,6 +157,26 @@ func NewWithModels(adp adapter.Adapter, configs []*model.ModelConfig, dataModels
 //
 // When can it be used:
 //   - Call when provisioning a new project workspace.
+//
+// Parameters:
+//   - cfg (ProjectConfig): Input value used by the operation.
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Project): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewProject and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewProject(cfg ProjectConfig, adp adapter.Adapter) (*Project, error) {
 	if adp == nil {
 		return nil, errors.New("adapter cannot be nil")

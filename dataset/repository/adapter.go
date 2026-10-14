@@ -2,10 +2,11 @@
 //
 // File: adapter.go
 // Usage:
-//   This file implements the AdapterDataSetRepository, which persists dataset definitions
-//   directly to the database table 'metadata_catalog.dataset' via the storage adapter.
-//   It maintains an in-memory cache fallback to ensure resilient operation even during
-//   database transitions or test environments without live database connections.
+//
+//	This file implements the AdapterDataSetRepository, which persists dataset definitions
+//	directly to the database table 'metadata_catalog.dataset' via the storage adapter.
+//	It maintains an in-memory cache fallback to ensure resilient operation even during
+//	database transitions or test environments without live database connections.
 package repository
 
 import (
@@ -32,13 +33,32 @@ type AdapterDataSetRepository struct {
 // NewAdapterDataSetRepository creates a new adapter-backed dataset repository.
 //
 // Purpose:
-//   Initializes an AdapterDataSetRepository bound to a database adapter and an internal InMemDataSetRepository.
+//
+//	Initializes an AdapterDataSetRepository bound to a database adapter and an internal InMemDataSetRepository.
 //
 // Where it is used:
 //   - Instantiated when connecting DataSetService to a database adapter (PostgreSQL, MySQL, MongoDB).
 //
 // When can it be used:
 //   - Whenever dataset metadata should be persistently saved to and loaded from a metadata table.
+//
+// Parameters:
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*AdapterDataSetRepository): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewAdapterDataSetRepository and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewAdapterDataSetRepository(adp adapter.Adapter) *AdapterDataSetRepository {
 	return &AdapterDataSetRepository{
 		adp:   adp,
@@ -53,14 +73,34 @@ func NewAdapterDataSetRepository(adp adapter.Adapter) *AdapterDataSetRepository 
 // Save persists dataset metadata to the database table 'metadata_catalog.dataset'.
 //
 // Purpose:
-//   Serializes complex dataset JSON fields (base collection, joins, custom columns, filters)
-//   and performs an upsert into the metadata_catalog.dataset table, while keeping in-memory cache updated.
+//
+//	Serializes complex dataset JSON fields (base collection, joins, custom columns, filters)
+//	and performs an upsert into the metadata_catalog.dataset table, while keeping in-memory cache updated.
 //
 // Where it is used:
 //   - Called by DataSetService.Save when publishing or updating a dataset.
 //
 // When can it be used:
 //   - When persisting a designed dataset to permanent database storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - ds (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Save and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet) error {
 	if ds == nil || ds.ReferenceName == "" {
 		return domain.NewError(domain.ErrDataSetNotFound, "invalid dataset: reference_name is required")
@@ -136,13 +176,34 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 // FindByID retrieves a dataset from DB or fallback in-memory store.
 //
 // Purpose:
-//   Queries the database adapter for a dataset by primary ID, falling back to in-memory store on failure.
+//
+//	Queries the database adapter for a dataset by primary ID, falling back to in-memory store on failure.
 //
 // Where it is used:
 //   - Called by DataSetService.Get / Execute when retrieving a dataset by ID.
 //
 // When can it be used:
 //   - When looking up a dataset using its primary identifier.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*domain.DataSet): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindByID and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *AdapterDataSetRepository) FindByID(ctx context.Context, id string) (*domain.DataSet, error) {
 	if r.adp != nil {
 		rec, err := r.adp.FindOne(ctx, r.dsRef, id)
@@ -156,13 +217,34 @@ func (r *AdapterDataSetRepository) FindByID(ctx context.Context, id string) (*do
 // FindByReferenceName retrieves a dataset by its unique reference_name.
 //
 // Purpose:
-//   Queries the database adapter for a dataset matching reference_name, falling back to in-memory store.
+//
+//	Queries the database adapter for a dataset matching reference_name, falling back to in-memory store.
 //
 // Where it is used:
 //   - Called by DataSetService.GetByReferenceName and preview/execution endpoints.
 //
 // When can it be used:
 //   - When executing or inspecting a dataset by reference slug (e.g. "active_users").
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - refName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*domain.DataSet): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindByReferenceName and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *AdapterDataSetRepository) FindByReferenceName(ctx context.Context, refName string) (*domain.DataSet, error) {
 	if r.adp != nil {
 		q := query.NewQuery().Where("reference_name", query.OpEq, refName).LimitOffset(1, 0)
@@ -177,13 +259,34 @@ func (r *AdapterDataSetRepository) FindByReferenceName(ctx context.Context, refN
 // List returns all datasets matching status.
 //
 // Purpose:
-//   Retrieves all datasets matching an optional status filter from the database or in-memory fallback.
+//
+//	Retrieves all datasets matching an optional status filter from the database or in-memory fallback.
 //
 // Where it is used:
 //   - Called by dataset catalog and administrative listing APIs.
 //
 // When can it be used:
 //   - When displaying a list of active datasets in Dataset Studio UI.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - status (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*domain.DataSet): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by List and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *AdapterDataSetRepository) List(ctx context.Context, status string) ([]*domain.DataSet, error) {
 	if r.adp != nil {
 		q := query.NewQuery()
@@ -205,13 +308,33 @@ func (r *AdapterDataSetRepository) List(ctx context.Context, status string) ([]*
 // Delete removes a dataset by ID.
 //
 // Purpose:
-//   Deletes a dataset row from the database table and evicts it from the in-memory fallback cache.
+//
+//	Deletes a dataset row from the database table and evicts it from the in-memory fallback cache.
 //
 // Where it is used:
 //   - Called by DataSetService.Delete.
 //
 // When can it be used:
 //   - When removing an unwanted or deprecated dataset.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - idOrRef (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *AdapterDataSetRepository) Delete(ctx context.Context, idOrRef string) error {
 	targetID := idOrRef
 	if existing, err := r.FindByReferenceName(ctx, idOrRef); err == nil && existing != nil && existing.ID != "" {
@@ -228,7 +351,8 @@ func (r *AdapterDataSetRepository) Delete(ctx context.Context, idOrRef string) e
 // mapToDataSet deserializes a database record map into a domain.DataSet struct.
 //
 // Purpose:
-//   Translates raw SQL column values and JSON string fields back into typed DataSet structs.
+//
+//	Translates raw SQL column values and JSON string fields back into typed DataSet structs.
 //
 // Where it is used:
 //   - Internal helper for FindByID, FindByReferenceName, and List.

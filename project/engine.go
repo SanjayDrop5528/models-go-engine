@@ -61,6 +61,25 @@ type Engine struct {
 //
 // When can it be used:
 //   - Call when instantiating a project workspace engine.
+//
+// Parameters:
+//   - proj (*Project): Input value used by the operation.
+//   - adp (adapter.Adapter): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewEngine and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 	reg := registry.NewModelRegistry()
 	dsRepo := datasetrepo.NewAdapterDataSetRepository(adp)
@@ -99,6 +118,24 @@ func NewEngine(proj *Project, adp adapter.Adapter) *Engine {
 //
 // When can it be used:
 //   - Call when interacting with AI assistance or natural language dataset builders.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*ai.AIService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetAIService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetAIService() *ai.AIService {
 	return e.aiService
 }
@@ -114,6 +151,26 @@ func (e *Engine) GetAIService() *ai.AIService {
 //
 // When can it be used:
 //   - Call when generating or refining datasets through conversational prompts.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - req (*ai.GenerateRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*ai.GenerateResponse): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GenerateDataSetFromPrompt and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GenerateDataSetFromPrompt(ctx context.Context, req *ai.GenerateRequest) (*ai.GenerateResponse, error) {
 	if e.aiService == nil {
 		return nil, fmt.Errorf("AI service not initialized")
@@ -135,6 +192,24 @@ func (e *Engine) GenerateDataSetFromPrompt(ctx context.Context, req *ai.Generate
 //
 // When can it be used:
 //   - Call when checking or resuming an ongoing AI prompt session.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetActiveAIConversationID and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetActiveAIConversationID() string {
 	if e.aiService != nil {
 		return e.aiService.GetActiveConversationID()
@@ -153,6 +228,24 @@ func (e *Engine) GetActiveAIConversationID() string {
 //
 // When can it be used:
 //   - Call to start a fresh conversational context.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by ResetAIConversation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) ResetAIConversation() {
 	if e.aiService != nil {
 		e.aiService.ResetConversation()
@@ -170,6 +263,24 @@ func (e *Engine) ResetAIConversation() {
 //
 // When can it be used:
 //   - Call when managing or executing dataset pipelines.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*datasetsvc.DataSetService): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDataSetService and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetDataSetService() *datasetsvc.DataSetService {
 	return e.dataSetService
 }
@@ -185,6 +296,24 @@ func (e *Engine) GetDataSetService() *datasetsvc.DataSetService {
 //
 // When can it be used:
 //   - Call when saving or loading dataset metadata.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (datasetrepo.DataSetRepository): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDataSetRepository and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetDataSetRepository() datasetrepo.DataSetRepository {
 	return e.dataSetRepo
 }
@@ -200,6 +329,24 @@ func (e *Engine) GetDataSetRepository() datasetrepo.DataSetRepository {
 //
 // When can it be used:
 //   - Call when registering or inspecting custom dataset functions.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*datasetres.InMemFunctionRegistry): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetFunctionRegistry and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetFunctionRegistry() *datasetres.InMemFunctionRegistry {
 	return e.functionRegistry
 }
@@ -215,6 +362,24 @@ func (e *Engine) GetFunctionRegistry() *datasetres.InMemFunctionRegistry {
 //
 // When can it be used:
 //   - Call when querying project identity and configuration.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*Project): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetProject and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetProject() *Project {
 	return e.project
 }
@@ -230,6 +395,24 @@ func (e *Engine) GetProject() *Project {
 //
 // When can it be used:
 //   - Call when accessing low-level adapter methods.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (adapter.Adapter): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetAdapter and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetAdapter() adapter.Adapter {
 	return e.adapter
 }
@@ -245,6 +428,24 @@ func (e *Engine) GetAdapter() adapter.Adapter {
 //
 // When can it be used:
 //   - Call when determining the target database name.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (string): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDatabaseName and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetDatabaseName() string {
 	if e.adapter == nil {
 		return "in-memory"
@@ -263,6 +464,24 @@ func (e *Engine) GetDatabaseName() string {
 //
 // When can it be used:
 //   - Call when raw database client access is required.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NativeClient and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) NativeClient() any {
 	if e.adapter == nil {
 		return nil
@@ -281,6 +500,24 @@ func (e *Engine) NativeClient() any {
 //
 // When can it be used:
 //   - Call when accessing raw database driver client.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (any): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetNativeClient and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetNativeClient() any {
 	return e.NativeClient()
 }
@@ -296,6 +533,24 @@ func (e *Engine) GetNativeClient() any {
 //
 // When can it be used:
 //   - Call when inspecting in-memory model definitions.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*registry.ModelRegistry): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetRegistry and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetRegistry() *registry.ModelRegistry {
 	return e.registry
 }
@@ -311,6 +566,24 @@ func (e *Engine) GetRegistry() *registry.ModelRegistry {
 //
 // When can it be used:
 //   - Call before loading or saving model definitions to database storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by EnsureMetadataTables and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) EnsureMetadataTables(ctx context.Context) error {
 	if e.adapter == nil {
 		return errors.New("no active adapter configured")
@@ -329,6 +602,25 @@ func (e *Engine) EnsureMetadataTables(ctx context.Context) error {
 //
 // When can it be used:
 //   - Call when reverse-engineering existing database schemas into the engine.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ImportLiveMetadata and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ImportLiveMetadata(ctx context.Context) (map[string]any, error) {
 	log.Println("[Schema Engine] [Import Start] Initiating live database schema import & registry synchronization...")
 	if e.adapter == nil {
@@ -422,6 +714,26 @@ func (e *Engine) ImportLiveMetadata(ctx context.Context) (map[string]any, error)
 //
 // When can it be used:
 //   - Call when creating a new data model definition.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CreateModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) CreateModelConfig(ctx context.Context, cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	if cfg == nil {
 		return nil, errors.New("model_config cannot be nil")
@@ -466,6 +778,27 @@ func (e *Engine) CreateModelConfig(ctx context.Context, cfg *model.ModelConfig) 
 //
 // When can it be used:
 //   - Call when altering model properties like name, table name, or schema.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - id (string): Input value used by the operation.
+//   - cfg (*model.ModelConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by UpdateModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) UpdateModelConfig(ctx context.Context, id string, cfg *model.ModelConfig) (*model.ModelConfig, error) {
 	cfg.ID = id
 	if err := validation.ValidateModelConfig(cfg); err != nil {
@@ -502,6 +835,26 @@ func (e *Engine) UpdateModelConfig(ctx context.Context, id string, cfg *model.Mo
 //
 // When can it be used:
 //   - Call when reading model configuration.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.ModelConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetModelConfig and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GetModelConfig(ctx context.Context, idOrName string) (*model.ModelConfig, error) {
 	return e.registry.GetModelConfig(idOrName)
 }
@@ -509,6 +862,26 @@ func (e *Engine) GetModelConfig(ctx context.Context, idOrName string) (*model.Mo
 // LoadModelOnDemand loads only one model's metadata from the adapter. It is
 // intentionally different from RestoreFromDB: request-time model resolution
 // must not hydrate every model for a tenant.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by LoadModelOnDemand and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) LoadModelOnDemand(ctx context.Context, idOrName string) (*model.Model, error) {
 	if e.adapter == nil {
 		return nil, fmt.Errorf("model %q cannot be loaded without a database adapter", idOrName)
@@ -572,6 +945,24 @@ func (e *Engine) LoadModelOnDemand(ctx context.Context, idOrName string) (*model
 //
 // When can it be used:
 //   - Call when displaying the model catalog.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.ModelConfig): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListModelConfigs and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 	if e.adapter != nil {
 		mcRef := model.ModelRef{StorageName: "model_configs", Name: "model_configs"}
@@ -618,6 +1009,26 @@ func (e *Engine) ListModelConfigs(ctx context.Context) []*model.ModelConfig {
 //
 // When can it be used:
 //   - Call when adding a new column or field to an existing model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AddDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) AddDataModel(ctx context.Context, dm *model.DataModel) (*model.DataModel, error) {
 	if dm != nil && dm.ID == "" {
 		dm.ID = mapping.GenerateUUID()
@@ -675,6 +1086,26 @@ func (e *Engine) AddDataModel(ctx context.Context, dm *model.DataModel) (*model.
 //
 // When can it be used:
 //   - Call when creating a model attribute.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - dm (*model.DataModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by CreateDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) CreateDataModel(ctx context.Context, dm *model.DataModel) (*model.DataModel, error) {
 	return e.AddDataModel(ctx, dm)
 }
@@ -690,6 +1121,27 @@ func (e *Engine) CreateDataModel(ctx context.Context, dm *model.DataModel) (*mod
 //
 // When can it be used:
 //   - Call when inspecting field settings.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.DataModel): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDataModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GetDataModel(ctx context.Context, modelID, fieldID string) (*model.DataModel, error) {
 	return e.registry.GetDataModel(modelID, fieldID)
 }
@@ -705,6 +1157,25 @@ func (e *Engine) GetDataModel(ctx context.Context, modelID, fieldID string) (*mo
 //
 // When can it be used:
 //   - Call when displaying column configurations.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*model.DataModel): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListDataModels and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ListDataModels(ctx context.Context, modelID string) []*model.DataModel {
 	return e.registry.ListDataModels(modelID)
 }
@@ -720,6 +1191,26 @@ func (e *Engine) ListDataModels(ctx context.Context, modelID string) []*model.Da
 //
 // When can it be used:
 //   - Call when removing an attribute from a model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - fieldID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DeleteDataModel and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) DeleteDataModel(ctx context.Context, modelID, fieldID string) error {
 	dm, _ := e.GetDataModel(ctx, modelID, fieldID)
 	actualID := fieldID
@@ -760,6 +1251,25 @@ func (e *Engine) DeleteDataModel(ctx context.Context, modelID, fieldID string) e
 //
 // When can it be used:
 //   - Call when deleting a data model.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - idOrName (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by DeleteModelConfig and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) DeleteModelConfig(ctx context.Context, idOrName string) error {
 	if e.adapter != nil {
 		_ = e.adapter.Delete(ctx, model.ModelRef{StorageName: "model_configs", Name: "model_configs"}, idOrName)
@@ -779,6 +1289,24 @@ func (e *Engine) DeleteModelConfig(ctx context.Context, idOrName string) error {
 //
 // When can it be used:
 //   - Call during bootstrap to restore saved model configurations from storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RestoreFromDB and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) RestoreFromDB(ctx context.Context) error {
 	if e.adapter == nil {
 		log.Println("[RestoreFromDB] Skipping restore: No database adapter attached.")
@@ -861,6 +1389,26 @@ func (e *Engine) RestoreFromDB(ctx context.Context) error {
 //
 // When can it be used:
 //   - Call when viewing live column names, types, and constraints directly from the database.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*schema.Schema): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetSchema and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GetSchema(ctx context.Context, modelID string) (*schema.Schema, error) {
 	m, err := e.getOrBuildDraftModel(modelID)
 	if err != nil {
@@ -880,6 +1428,27 @@ func (e *Engine) GetSchema(ctx context.Context, modelID string) (*schema.Schema,
 //
 // When can it be used:
 //   - Call to review pending schema modifications before generating a migration plan.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - hints (diff.DiffHints): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*diff.SchemaDiff): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetDiff and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GetDiff(ctx context.Context, modelID string, hints diff.DiffHints) (*diff.SchemaDiff, error) {
 	desiredModel, err := e.getOrBuildDraftModel(modelID)
 	if err != nil {
@@ -906,6 +1475,27 @@ func (e *Engine) GetDiff(ctx context.Context, modelID string, hints diff.DiffHin
 //
 // When can it be used:
 //   - Call to inspect native DDL commands before applying changes to live storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - hints (diff.DiffHints): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*plan.SchemaPreview): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by PreviewSchema and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) PreviewSchema(ctx context.Context, modelID string, hints diff.DiffHints) (*plan.SchemaPreview, error) {
 	desiredModel, err := e.getOrBuildDraftModel(modelID)
 	if err != nil {
@@ -932,6 +1522,27 @@ func (e *Engine) PreviewSchema(ctx context.Context, modelID string, hints diff.D
 //
 // When can it be used:
 //   - Call when applying schema migrations to the live database.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - req (service.ApplyRequest): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*service.ApplyResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplySchema and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ApplySchema(ctx context.Context, modelID string, req service.ApplyRequest) (*service.ApplyResult, error) {
 	desiredModel, err := e.getOrBuildDraftModel(modelID)
 	if err != nil {
@@ -1016,6 +1627,26 @@ func (e *Engine) ApplySchema(ctx context.Context, modelID string, req service.Ap
 //
 // When can it be used:
 //   - Call when pulling existing database columns into model definitions.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SyncSchema and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, error) {
 	m, err := e.getOrBuildDraftModel(modelID)
 	if err != nil {
@@ -1116,6 +1747,27 @@ func (e *Engine) SyncSchema(ctx context.Context, modelID string) (*model.Model, 
 //
 // When can it be used:
 //   - Call when inserting new records into a managed table or collection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Create and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Create(ctx context.Context, modelID string, data map[string]any) (map[string]any, error) {
 	m, err := e.getActiveModel(modelID)
 	if err != nil {
@@ -1167,6 +1819,28 @@ func (e *Engine) Create(ctx context.Context, modelID string, data map[string]any
 //
 // When can it be used:
 //   - Call when retrieving records matching filter conditions.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (int64): Returned value.
+//   - result3 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Find and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Find(ctx context.Context, modelID string, q query.Query) ([]map[string]any, int64, error) {
 	m, err := e.getActiveModel(modelID)
 	if err != nil {
@@ -1186,6 +1860,27 @@ func (e *Engine) Find(ctx context.Context, modelID string, q query.Query) ([]map
 //
 // When can it be used:
 //   - Call when retrieving a specific single record by ID.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOne and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) FindOne(ctx context.Context, modelID string, id any) (map[string]any, error) {
 	m, err := e.getActiveModel(modelID)
 	if err != nil {
@@ -1205,6 +1900,28 @@ func (e *Engine) FindOne(ctx context.Context, modelID string, id any) (map[strin
 //
 // When can it be used:
 //   - Call when updating attributes of an existing record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Update and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Update(ctx context.Context, modelID string, id any, data map[string]any) (map[string]any, error) {
 	m, err := e.getActiveModel(modelID)
 	if err != nil {
@@ -1265,6 +1982,28 @@ func (e *Engine) Update(ctx context.Context, modelID string, id any, data map[st
 //
 // When can it be used:
 //   - Call when patching selected attributes of a record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Patch and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Patch(ctx context.Context, modelID string, id any, data map[string]any) (map[string]any, error) {
 	return e.Update(ctx, modelID, id, data)
 }
@@ -1280,6 +2019,26 @@ func (e *Engine) Patch(ctx context.Context, modelID string, id any, data map[str
 //
 // When can it be used:
 //   - Call when removing a record from the database.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Delete(ctx context.Context, modelID string, id any) error {
 	m, err := e.getActiveModel(modelID)
 	if err != nil {
@@ -1314,6 +2073,25 @@ func (e *Engine) getActiveModel(modelID string) (*model.Model, error) {
 //
 // When can it be used:
 //   - Call when accessing the active or draft Model object for a model ID.
+//
+// Parameters:
+//   - modelID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*model.Model): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetOrBuildDraftModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) GetOrBuildDraftModel(modelID string) (*model.Model, error) {
 	return e.getOrBuildDraftModel(modelID)
 }
@@ -1329,6 +2107,26 @@ func (e *Engine) GetOrBuildDraftModel(modelID string) (*model.Model, error) {
 //
 // When can it be used:
 //   - Call when checking relationship integrity prior to persistence.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - modelID (string): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ValidateOrbitalReferences and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ValidateOrbitalReferences(ctx context.Context, modelID string, data map[string]any) error {
 	return e.validateOrbitalReferences(ctx, modelID, data)
 }
@@ -1527,6 +2325,26 @@ func (e *Engine) validateOrbitalReferences(ctx context.Context, modelID string, 
 //
 // When can it be used:
 //   - Call when declaring custom database functions or procedures.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - op (*operation.OperationConfig): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*operation.OperationConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RegisterOperation and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) RegisterOperation(ctx context.Context, op *operation.OperationConfig) (*operation.OperationConfig, error) {
 	if op == nil {
 		return nil, errors.New("operation cannot be nil")
@@ -1551,6 +2369,26 @@ func (e *Engine) RegisterOperation(ctx context.Context, op *operation.OperationC
 //
 // When can it be used:
 //   - Call before invoking a procedure to inspect its signature.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - nameOrID (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*operation.OperationConfig): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetOperation and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) GetOperation(ctx context.Context, nameOrID string) (*operation.OperationConfig, error) {
 	return e.registry.GetOperationConfig(nameOrID)
 }
@@ -1566,6 +2404,24 @@ func (e *Engine) GetOperation(ctx context.Context, nameOrID string) (*operation.
 //
 // When can it be used:
 //   - Call when cataloging available database routines.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*operation.OperationConfig): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListOperations and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ListOperations(ctx context.Context) []*operation.OperationConfig {
 	return e.registry.ListOperationConfigs()
 }
@@ -1581,6 +2437,27 @@ func (e *Engine) ListOperations(ctx context.Context) []*operation.OperationConfi
 //
 // When can it be used:
 //   - Call when running a stored procedure or custom database command.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - nameOrID (string): Input value used by the operation.
+//   - args (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*execution.ExecutionResult): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ExecuteOperation and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) ExecuteOperation(ctx context.Context, nameOrID string, args map[string]any) (*execution.ExecutionResult, error) {
 	op, err := e.registry.GetOperationConfig(nameOrID)
 	if err != nil {
@@ -1646,6 +2523,25 @@ func (e *Engine) ExecuteOperation(ctx context.Context, nameOrID string, args map
 //
 // When can it be used:
 //   - Call whenever executing multiple related writes that must succeed or fail together.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - fn (func(tx adapter.Transaction) error): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Transaction and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Transaction(ctx context.Context, fn func(tx adapter.Transaction) error) error {
 	tx, err := e.adapter.Begin(ctx)
 	if err != nil {

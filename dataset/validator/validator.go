@@ -3,10 +3,11 @@
 //
 // File: validator.go
 // Usage:
-//   This file implements the comprehensive DataSetValidator. It validates that dataset metadata,
-//   collection names, relational join paths, custom column formulas, operand counts, GROUP BY
-//   field constraints, and filter parameter declarations are valid, secure, and compatible
-//   with the target database dialect before any AST planning or SQL/MongoDB compilation occurs.
+//
+//	This file implements the comprehensive DataSetValidator. It validates that dataset metadata,
+//	collection names, relational join paths, custom column formulas, operand counts, GROUP BY
+//	field constraints, and filter parameter declarations are valid, secure, and compatible
+//	with the target database dialect before any AST planning or SQL/MongoDB compilation occurs.
 package validator
 
 import (
@@ -31,7 +32,8 @@ type DataSetValidator struct {
 // NewDataSetValidator creates a new validator instance.
 //
 // Purpose:
-//   Constructs a DataSetValidator wired to resolvers for models, fields, and functions.
+//
+//	Constructs a DataSetValidator wired to resolvers for models, fields, and functions.
 //
 // Where it is used:
 //   - Instantiated in DataSetService.NewDataSetService.
@@ -39,6 +41,26 @@ type DataSetValidator struct {
 //
 // When can it be used:
 //   - Can be used before any dataset is saved, previewed, or executed.
+//
+// Parameters:
+//   - mr (resolver.ModelResolver): Input value used by the operation.
+//   - fr (resolver.FieldResolver): Input value used by the operation.
+//   - fnr (resolver.FunctionResolver): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*DataSetValidator): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewDataSetValidator and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewDataSetValidator(mr resolver.ModelResolver, fr resolver.FieldResolver, fnr resolver.FunctionResolver) *DataSetValidator {
 	return &DataSetValidator{
 		modelResolver:    mr,
@@ -50,9 +72,10 @@ func NewDataSetValidator(mr resolver.ModelResolver, fr resolver.FieldResolver, f
 // Validate executes all validation passes on the dataset.
 //
 // Purpose:
-//   Executes all structural, semantic, relational, and aggregation integrity checks on a DataSet.
-//   Ensures valid identifiers, resolvable tables, ordered joins, valid operand counts, GROUP BY consistency,
-//   and unique non-empty parameter names.
+//
+//	Executes all structural, semantic, relational, and aggregation integrity checks on a DataSet.
+//	Ensures valid identifiers, resolvable tables, ordered joins, valid operand counts, GROUP BY consistency,
+//	and unique non-empty parameter names.
 //
 // Where it is used:
 //   - Invoked as the first step in DataSetService.Preview.
@@ -61,6 +84,25 @@ func NewDataSetValidator(mr resolver.ModelResolver, fr resolver.FieldResolver, f
 //
 // When can it be used:
 //   - Whenever a raw DataSet JSON payload is received from the UI or API and needs verification.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - ds (*domain.DataSet): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Validate and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) error {
 	if ds == nil {
 		return domain.NewError(domain.ErrDataSetNotFound, "dataset definition cannot be nil")

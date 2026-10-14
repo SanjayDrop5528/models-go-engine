@@ -48,6 +48,27 @@ type ModelRef struct {
 //
 // When can it be used:
 //   - When addressing a table, view, or collection on a database adapter.
+//
+// Parameters:
+//   - id (string): Input value used by the operation.
+//   - name (string): Input value used by the operation.
+//   - storageName (string): Input value used by the operation.
+//   - primaryKey (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (ModelRef): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewModelRef and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewModelRef(id, name, storageName, primaryKey string) ModelRef {
 	if storageName == "" {
 		storageName = id
@@ -190,6 +211,24 @@ type Model struct {
 //
 // When can it be used:
 //   - When an adapter method requires a model reference token.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (ModelRef): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Ref and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (m *Model) Ref() ModelRef {
 	storage := m.StorageName
 	if storage == "" {
@@ -233,6 +272,24 @@ func (m *Model) Ref() ModelRef {
 //
 // When can it be used:
 //   - When looking up an attribute by any of its configured names.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Attribute): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetAttribute and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (m *Model) GetAttribute(name string) *Attribute {
 	for i := range m.Attributes {
 		if strings.EqualFold(m.Attributes[i].Name, name) ||
@@ -256,6 +313,24 @@ func (m *Model) GetAttribute(name string) *Attribute {
 //
 // When can it be used:
 //   - When checking if a column is a primary key.
+//
+// Parameters:
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (bool): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by IsPrimaryKey and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (m *Model) IsPrimaryKey(name string) bool {
 	if m.PrimaryKey != nil {
 		for _, col := range m.PrimaryKey.Columns {
@@ -283,6 +358,24 @@ func (m *Model) IsPrimaryKey(name string) bool {
 //
 // When can it be used:
 //   - When constructing primary key constraints or extracting record identity.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 ([]Attribute): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GetPrimaryKeyAttributes and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (m *Model) GetPrimaryKeyAttributes() []Attribute {
 	var pks []Attribute
 	for _, attr := range m.Attributes {
@@ -393,6 +486,24 @@ type DataModel struct {
 //
 // When can it be used:
 //   - When materializing column metadata into an in-memory execution attribute.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (Attribute): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ToAttribute and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (dm *DataModel) ToAttribute() Attribute {
 	name := dm.ColumnName
 	if name == "" {
@@ -475,6 +586,27 @@ func (dm *DataModel) ToAttribute() Attribute {
 //
 // When can it be used:
 //   - When instantiating an active runtime model from database catalog definitions.
+//
+// Parameters:
+//   - cfg (*ModelConfig): Input value used by the operation.
+//   - fields ([]*DataModel): Input value used by the operation.
+//   - database (string): Input value used by the operation.
+//   - storageType (StorageType): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Model): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by BuildModel and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageType StorageType) *Model {
 	if cfg == nil {
 		return nil
@@ -574,6 +706,25 @@ func BuildModel(cfg *ModelConfig, fields []*DataModel, database string, storageT
 //
 // When can it be used:
 //   - When deriving foreign key or cross-collection relational join edges from metadata.
+//
+// Parameters:
+//   - fields ([]*DataModel): Input value used by the operation.
+//   - resolveTargetPK (func(targetModel string) string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]Relation): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by GenerateRelationsFromOrbitalReferences and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func GenerateRelationsFromOrbitalReferences(fields []*DataModel, resolveTargetPK func(targetModel string) string) []Relation {
 	var relations []Relation
 	relationNames := make(map[string]int)

@@ -48,6 +48,24 @@ type Engine struct {
 //
 // When can it be used:
 //   - Call when initializing runtime data manipulation services.
+//
+// Parameters:
+//   - adapters (*adapter.Registry): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*Engine): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewEngine and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewEngine(adapters *adapter.Registry) *Engine {
 	return &Engine{
 		adapters: adapters,
@@ -65,10 +83,45 @@ func NewEngine(adapters *adapter.Registry) *Engine {
 //
 // When can it be used:
 //   - Call when enabling cross-model relationship integrity checks during CRUD execution.
+//
+// Parameters:
+//   - v (OrbitalValidator): Input value used by the operation.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetOrbitalValidator and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) SetOrbitalValidator(v OrbitalValidator) {
 	e.orbitalValidator = v
 }
 
+// Parameters:
+//   - resolver (RelationModelResolver): Input value used by the operation.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by SetModelResolver and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (e *Engine) SetModelResolver(resolver RelationModelResolver) {
 	e.modelResolver = resolver
 }
@@ -84,6 +137,27 @@ func (e *Engine) SetModelResolver(resolver RelationModelResolver) {
 //
 // When can it be used:
 //   - Call whenever creating a new record in a registered model table or collection.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Create and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Create(ctx context.Context, m *model.Model, data map[string]any) (map[string]any, error) {
 	if m == nil {
 		return nil, errors.New("model cannot be nil")
@@ -125,6 +199,28 @@ func (e *Engine) Create(ctx context.Context, m *model.Model, data map[string]any
 //
 // When can it be used:
 //   - Call when retrieving a list of matching records along with total count.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]map[string]any): Returned value.
+//   - result2 (int64): Returned value.
+//   - result3 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Find and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Find(ctx context.Context, m *model.Model, q query.Query) ([]map[string]any, int64, error) {
 	if m == nil {
 		return nil, 0, errors.New("model cannot be nil")
@@ -165,6 +261,27 @@ func (e *Engine) Find(ctx context.Context, m *model.Model, q query.Query) ([]map
 //
 // When can it be used:
 //   - Call when fetching an individual entity by ID.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOne and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) FindOne(ctx context.Context, m *model.Model, id any) (map[string]any, error) {
 	return e.FindOneWithQuery(ctx, m, id, query.NewQuery())
 }
@@ -179,6 +296,28 @@ type findOneQueryAdapter interface {
 // FindOneWithQuery retrieves one record and applies projections or requested
 // orbital relations. Adapters without this optional capability fall back to a
 // normal Find query using the model's primary key.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - q (query.Query): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by FindOneWithQuery and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) FindOneWithQuery(ctx context.Context, m *model.Model, id any, q query.Query) (map[string]any, error) {
 	if m == nil {
 		return nil, errors.New("model cannot be nil")
@@ -697,6 +836,28 @@ func withAutomaticRelations(m *model.Model, q query.Query) query.Query {
 //
 // When can it be used:
 //   - Call when replacing or updating fields on an existing record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Update and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Update(ctx context.Context, m *model.Model, id any, data map[string]any) (map[string]any, error) {
 	if m == nil {
 		return nil, errors.New("model cannot be nil")
@@ -745,6 +906,28 @@ func (e *Engine) Update(ctx context.Context, m *model.Model, id any, data map[st
 //
 // When can it be used:
 //   - Call when partially modifying specific columns or attributes of an existing record.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//   - data (map[string]any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (map[string]any): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Patch and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Patch(ctx context.Context, m *model.Model, id any, data map[string]any) (map[string]any, error) {
 	return e.Update(ctx, m, id, data)
 }
@@ -760,6 +943,26 @@ func (e *Engine) Patch(ctx context.Context, m *model.Model, id any, data map[str
 //
 // When can it be used:
 //   - Call when deleting an existing record from storage.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - m (*model.Model): Input value used by the operation.
+//   - id (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by Delete and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (e *Engine) Delete(ctx context.Context, m *model.Model, id any) error {
 	if m == nil {
 		return errors.New("model cannot be nil")

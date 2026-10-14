@@ -39,6 +39,24 @@ type InMemFunctionRegistry struct {
 //
 // When can it be used:
 //   - Whenever dataset functions need to be resolved, validated, or listed.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+//   - result1 (*InMemFunctionRegistry): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewFunctionRegistry and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewFunctionRegistry() *InMemFunctionRegistry {
 	r := &InMemFunctionRegistry{
 		functions: make(map[string]*domain.FunctionDefinition),
@@ -60,6 +78,26 @@ func NewFunctionRegistry() *InMemFunctionRegistry {
 //
 // When can it be used:
 //   - Whenever verifying or compiling a custom calculation column.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - name (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*domain.FunctionDefinition): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ResolveFunction and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *InMemFunctionRegistry) ResolveFunction(ctx context.Context, name string) (*domain.FunctionDefinition, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -87,6 +125,25 @@ func (r *InMemFunctionRegistry) ResolveFunction(ctx context.Context, name string
 //
 // When can it be used:
 //   - When extending the dataset engine with organization-specific SQL calculations.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - fn (*domain.FunctionDefinition): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by RegisterFunction and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *InMemFunctionRegistry) RegisterFunction(ctx context.Context, fn *domain.FunctionDefinition) error {
 	if fn == nil || fn.Name == "" {
 		return domain.NewError(domain.ErrFunctionNotFound, "invalid function definition: name is required")
@@ -120,6 +177,26 @@ func (r *InMemFunctionRegistry) RegisterFunction(ctx context.Context, fn *domain
 //
 // When can it be used:
 //   - When exploring available functions by category (e.g. "Numeric", "Aggregate", "Date/Time").
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - category (domain.FunctionCategory): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]*domain.FunctionDefinition): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by ListFunctions and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (r *InMemFunctionRegistry) ListFunctions(ctx context.Context, category domain.FunctionCategory) ([]*domain.FunctionDefinition, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

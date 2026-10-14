@@ -34,6 +34,25 @@ type RelationJoin struct {
 //
 // When can it be used:
 //   - When preparing a relational JOIN between tables during query construction.
+//
+// Parameters:
+//   - rel (*Relation): Input value used by the operation.
+//   - joinModel (TableModel): Input value used by the operation.
+//
+// Returns:
+//   - result1 (*RelationJoin): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by NewRelationJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func NewRelationJoin(rel *Relation, joinModel TableModel) *RelationJoin {
 	return &RelationJoin{
 		Relation:         rel,
@@ -53,6 +72,24 @@ func NewRelationJoin(rel *Relation, joinModel TableModel) *RelationJoin {
 //
 // When can it be used:
 //   - When custom filtering or scoping is required on a joined table.
+//
+// Parameters:
+//   - q (any): Input value used by the operation.
+//
+// Returns:
+//   - None.
+//
+// Business Rules:
+//   - Follows the invariants documented by ApplyTo and its owning package.
+//
+// Side Effects:
+//   - May update receiver state, persistent storage, or configured external dependencies.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (j *RelationJoin) ApplyTo(q any) {
 	// Custom apply hook if provided
 }
@@ -68,6 +105,25 @@ func (j *RelationJoin) ApplyTo(q any) {
 //
 // When can it be used:
 //   - When serializing table aliases in SQL statements.
+//
+// Parameters:
+//   - gen (QueryGen): Input value used by the operation.
+//   - b ([]byte): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendAlias and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (j *RelationJoin) AppendAlias(gen QueryGen, b []byte) []byte {
 	if j.Relation != nil && j.Relation.JoinTable != nil {
 		alias := j.Relation.JoinTable.SQLAlias
@@ -93,6 +149,26 @@ func (j *RelationJoin) AppendAlias(gen QueryGen, b []byte) []byte {
 //
 // When can it be used:
 //   - When flattening multi-table query projections into a single result row.
+//
+// Parameters:
+//   - gen (QueryGen): Input value used by the operation.
+//   - b ([]byte): Input value used by the operation.
+//   - col (string): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendAliasColumn and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - This function does not return an error.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (j *RelationJoin) AppendAliasColumn(gen QueryGen, b []byte, col string) []byte {
 	alias := ""
 	if j.Relation != nil {
@@ -118,6 +194,27 @@ func (j *RelationJoin) AppendAliasColumn(gen QueryGen, b []byte, col string) []b
 //
 // When can it be used:
 //   - Whenever generating SQL for a belongs-to or has-one relational join.
+//
+// Parameters:
+//   - gen (QueryGen): Input value used by the operation.
+//   - b ([]byte): Input value used by the operation.
+//   - q (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 ([]byte): Returned value.
+//   - result2 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by AppendHasOneJoin and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - Callers should preserve the documented ownership and lifecycle of supplied values.
 func (j *RelationJoin) AppendHasOneJoin(gen QueryGen, b []byte, q any) ([]byte, error) {
 	if j.Relation == nil || j.Relation.JoinTable == nil {
 		return b, nil
@@ -183,6 +280,25 @@ func (j *RelationJoin) AppendHasOneJoin(gen QueryGen, b []byte, q any) ([]byte, 
 //
 // When can it be used:
 //   - When resolving HasMany relationship queries.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - q (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SelectMany and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (j *RelationJoin) SelectMany(ctx context.Context, q any) error {
 	name := "<unnamed>"
 	if j != nil && j.Relation != nil && j.Relation.Name != "" {
@@ -202,6 +318,25 @@ func (j *RelationJoin) SelectMany(ctx context.Context, q any) error {
 //
 // When can it be used:
 //   - When resolving ManyToMany relationship queries.
+//
+// Parameters:
+//   - ctx (context.Context): Input value used by the operation.
+//   - q (any): Input value used by the operation.
+//
+// Returns:
+//   - result1 (error): Returned value.
+//
+// Business Rules:
+//   - Follows the invariants documented by SelectM2M and its owning package.
+//
+// Side Effects:
+//   - Does not intentionally mutate caller-owned input; configured dependencies may still be consulted.
+//
+// Errors:
+//   - Returns validation, configuration, context, or underlying dependency errors.
+//
+// Note:
+//   - The context controls cancellation and request lifetime.
 func (j *RelationJoin) SelectM2M(ctx context.Context, q any) error {
 	name := "<unnamed>"
 	if j != nil && j.Relation != nil && j.Relation.Name != "" {

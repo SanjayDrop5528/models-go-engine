@@ -4,6 +4,28 @@
 
 `models-go-engine` contains the core domain models, AST query planner, validator, function resolver, repository interfaces, and execution pipeline for multi-database operations.
 
+## Prerequisites
+
+- Go 1.20 or newer.
+- A Go workspace that can resolve this module and its adapter dependencies.
+- A model, field, and function resolver when using dataset validation.
+
+## Usage Steps
+
+1. From this directory, run `go test ./...`.
+2. Create a `domain.DataSet` with a base collection, selected fields, joins, filters, and parameters.
+3. Validate it with `dataset/validator`.
+4. Build a database-independent `QueryAST` with `dataset/planner`.
+5. Register a dialect compiler and call `Preview`, `Save`, or `Execute` through `dataset/service`.
+
+## Core Functionality
+
+- Dataset validation and parameter checking.
+- Dialect-independent query AST planning.
+- Ordered joins, projections, grouping, filtering, and custom functions.
+- Preview, persistence, and runtime execution orchestration.
+- Common adapter, execution, operation, and schema-plan contracts.
+
 ---
 
 ## 🏛️ Core Package Architecture

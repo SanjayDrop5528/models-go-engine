@@ -47,10 +47,13 @@ type ASTJoin struct {
 	ToField       string
 	Alias         string
 	JoinFilter    map[string]any
-	ConvertString bool
-	CastMode      string
-	Cardinality   string
-	OutputFormat  string
+	ConvertString     bool
+	CastMode          string
+	FromFieldDataType string
+	ToFieldDataType   string
+	RelationshipOp    string
+	Cardinality       string
+	OutputFormat      string
 }
 
 // ASTProjection represents a selected result column.

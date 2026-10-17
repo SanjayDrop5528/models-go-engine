@@ -87,7 +87,10 @@ type JoinCollection struct {
 	JoinType            JoinType `json:"joinType,omitempty"` // Default is LEFT
 	ConvertToString     bool     `json:"convert_To_String,omitempty"`
 	CastMode            string   `json:"cast_mode,omitempty"` // "BOTH", "FROM_ONLY", "TO_ONLY"
-	Filter              any      `json:"filter,omitempty"`    // Join filter applied on the ON clause
+	FromFieldDataType   string   `json:"fromFieldDataType,omitempty"`
+	ToFieldDataType     string   `json:"toFieldDataType,omitempty"`
+	RelationshipOp      string   `json:"relationshipOp,omitempty"` // "=", "ANY", "&&", "@>", "<@", "?", "EXISTS", etc.
+	Filter              any      `json:"filter,omitempty"`         // Join filter applied on the ON clause
 	Cardinality         string   `json:"cardinality,omitempty"`
 	OutputFormat        string   `json:"outputFormat,omitempty"`
 }

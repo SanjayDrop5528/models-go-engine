@@ -129,19 +129,40 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		}
 		fromTbl = resolveTableAlias(fromTbl, tableAliases)
 
+		fromDataType := j.FromFieldDataType
+		toDataType := j.ToFieldDataType
+		if fromDataType == "" || toDataType == "" {
+			for _, sel := range ds.SelectedList {
+				fldLower := strings.ToLower(sel.Field)
+				fromFull := strings.ToLower(fromTbl + "." + j.FromCollectionField)
+				fromColl := strings.ToLower(j.FromCollection + "." + j.FromCollectionField)
+				if fromDataType == "" && (fldLower == fromFull || fldLower == fromColl || strings.EqualFold(sel.Field, j.FromCollectionField)) {
+					fromDataType = sel.DataType
+				}
+				toFull := strings.ToLower(alias + "." + j.ToCollectionField)
+				toColl := strings.ToLower(j.ToCollection + "." + j.ToCollectionField)
+				if toDataType == "" && (fldLower == toFull || fldLower == toColl || strings.EqualFold(sel.Field, j.ToCollectionField)) {
+					toDataType = sel.DataType
+				}
+			}
+		}
+
 		ast.Joins = append(ast.Joins, ASTJoin{
-			Schema:        j.Schema,
-			Type:          jType,
-			FromTable:     fromTbl,
-			FromField:     j.FromCollectionField,
-			ToTable:       j.ToCollection,
-			ToField:       j.ToCollectionField,
-			Alias:         alias,
-			JoinFilter:    normalizeFilterToMap(j.Filter),
-			ConvertString: j.ConvertToString,
-			CastMode:      j.CastMode,
-			Cardinality:   j.Cardinality,
-			OutputFormat:  j.OutputFormat,
+			Schema:            j.Schema,
+			Type:              jType,
+			FromTable:         fromTbl,
+			FromField:         j.FromCollectionField,
+			ToTable:           j.ToCollection,
+			ToField:           j.ToCollectionField,
+			Alias:             alias,
+			JoinFilter:        normalizeFilterToMap(j.Filter),
+			ConvertString:     j.ConvertToString,
+			CastMode:          j.CastMode,
+			FromFieldDataType: fromDataType,
+			ToFieldDataType:   toDataType,
+			RelationshipOp:    j.RelationshipOp,
+			Cardinality:       j.Cardinality,
+			OutputFormat:      j.OutputFormat,
 		})
 		tableAliases[strings.ToLower(j.ToCollection)] = alias
 		if j.Schema != "" {

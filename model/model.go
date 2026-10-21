@@ -472,6 +472,9 @@ type DataModel struct {
 	CreatedBy                  string                `json:"created_by"`                             // Created By
 	UpdatedAt                  time.Time             `json:"updated_at"`                             // Updated
 	UpdatedBy                  string                `json:"updated_by"`                             // Updated By
+
+	// Verified database type, preserving array elements and JSON versus JSONB.
+	PhysicalDataType string `json:"physical_data_type,omitempty"`
 }
 
 // ToAttribute converts a DataModel field to an execution Attribute.

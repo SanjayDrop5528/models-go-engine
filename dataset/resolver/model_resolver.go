@@ -154,7 +154,15 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 
 	// Fallback to core registry if present
 	if r.registry != nil {
-		if act, err := r.registry.GetActive(collection); err == nil && act != nil {
+		lookup := collection
+		if schema != "" {
+			lookup = schema + "." + collection
+		}
+		act, err := r.registry.GetActive(lookup)
+		if err != nil {
+			act, err = r.registry.GetActive(collection)
+		}
+		if err == nil && act != nil && (schema == "" || act.Schema == "" || strings.EqualFold(schema, act.Schema)) {
 			md := &ModelDefinition{
 				ID:      act.ID,
 				Schema:  schema,
@@ -162,7 +170,14 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 				RefName: act.Name,
 				Fields:  make(map[string]*FieldDefinition),
 			}
+			if md.Schema == "" {
+				md.Schema = act.Schema
+			}
 			for _, attr := range act.Attributes {
+				dataType := string(attr.Type)
+				if attr.Type == "ARRAY" && attr.Validation != nil && attr.Validation.Items != nil && attr.Validation.Items.Type != "" {
+					dataType = string(attr.Validation.Items.Type) + "[]"
+				}
 				col := attr.ColumnName
 				if col == "" {
 					col = attr.Name
@@ -170,7 +185,7 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 				md.Fields[strings.ToLower(col)] = &FieldDefinition{
 					Name:         attr.Name,
 					ColumnName:   col,
-					DataType:     string(attr.Type),
+					DataType:     dataType,
 					IsPrimaryKey: attr.IsPrimaryKey,
 					IsNullable:   attr.Nullable,
 					IsUnique:     attr.Unique,

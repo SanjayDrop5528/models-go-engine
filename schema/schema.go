@@ -24,6 +24,7 @@ type SchemaAttribute struct {
 	AutoIncrement bool           `json:"auto_increment"`
 	Comment       string         `json:"comment,omitempty"`
 	Extra         map[string]any `json:"extra,omitempty"`
+	ElementType   model.DataType `json:"element_type,omitempty"`
 }
 
 // SchemaKey defines a primary or unique key constraint.
@@ -209,6 +210,9 @@ func FromModel(m *model.Model) *Schema {
 			Unique:        attr.Unique,
 			AutoIncrement: attr.AutoIncrement,
 			Comment:       attr.Comment,
+		}
+		if attr.Type == model.TypeArray && attr.Validation != nil && attr.Validation.Items != nil {
+			sAttr.ElementType = attr.Validation.Items.Type
 		}
 		if isPK {
 			already := false

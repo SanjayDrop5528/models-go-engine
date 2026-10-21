@@ -752,6 +752,12 @@ func validateArrayItem(fieldName string, idx int, itm any, rule *model.ItemRule)
 		return nil
 	}
 	normType := model.NormalizeDataType(string(rule.Type))
+	if normType == model.TypeUUID || normType == model.TypeReference {
+		value, ok := itm.(string)
+		if !ok || !uuidRegex.MatchString(value) {
+			return NewValidationError(fieldName, fmt.Sprintf("field '%s' array item at index %d must be a valid UUID string", fieldName, idx))
+		}
+	}
 	if normType == model.TypeString || normType == model.TypeText {
 		strVal, ok := itm.(string)
 		if !ok {

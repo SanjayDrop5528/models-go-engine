@@ -39,14 +39,14 @@ type ASTBaseTable struct {
 
 // ASTJoin represents a relational JOIN with its specific ON join filter.
 type ASTJoin struct {
-	Schema        string
-	Type          domain.JoinType
-	FromTable     string
-	FromField     string
-	ToTable       string
-	ToField       string
-	Alias         string
-	JoinFilter    map[string]any
+	Schema            string
+	Type              domain.JoinType
+	FromTable         string
+	FromField         string
+	ToTable           string
+	ToField           string
+	Alias             string
+	JoinFilter        map[string]any
 	ConvertString     bool
 	CastMode          string
 	FromFieldDataType string
@@ -54,6 +54,9 @@ type ASTJoin struct {
 	RelationshipOp    string
 	Cardinality       string
 	OutputFormat      string
+	VerifiedTypes     bool
+	SourceJSONPath    []string
+	TargetJSONPath    []string
 }
 
 // ASTProjection represents a selected result column.

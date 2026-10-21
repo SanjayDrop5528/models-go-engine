@@ -518,10 +518,24 @@ func (dm *DataModel) ToAttribute() Attribute {
 	}
 
 	normType := NormalizeDataType(string(dm.DataType))
+	items := dm.Items
+	if items != nil {
+		copyItems := *items
+		copyItems.Type = NormalizeDataType(string(items.Type))
+		items = &copyItems
+	}
+	if dm.IsArray && normType != TypeArray {
+		if items == nil {
+			items = &ItemRule{}
+		}
+		// data_type describes the element when is_array is set.
+		items.Type = normType
+		normType = TypeArray
+	}
 
 	isRequired := dm.IsRequired && !dm.IsPrimaryKey
 	var ruleSet *RuleSet
-	if isRequired || dm.Min != nil || dm.Max != nil || dm.MinLength != nil || dm.MaxLength != nil || dm.Pattern != "" || len(dm.Enum) > 0 || dm.Precision != nil || dm.Scale != nil || dm.Items != nil {
+	if isRequired || dm.Min != nil || dm.Max != nil || dm.MinLength != nil || dm.MaxLength != nil || dm.Pattern != "" || len(dm.Enum) > 0 || dm.Precision != nil || dm.Scale != nil || items != nil {
 		ruleSet = &RuleSet{
 			Required:  isRequired,
 			Min:       dm.Min,
@@ -532,7 +546,7 @@ func (dm *DataModel) ToAttribute() Attribute {
 			Enum:      dm.Enum,
 			Precision: dm.Precision,
 			Scale:     dm.Scale,
-			Items:     dm.Items,
+			Items:     items,
 		}
 	}
 

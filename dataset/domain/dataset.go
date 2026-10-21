@@ -93,6 +93,8 @@ type JoinCollection struct {
 	Filter              any      `json:"filter,omitempty"`         // Join filter applied on the ON clause
 	Cardinality         string   `json:"cardinality,omitempty"`
 	OutputFormat        string   `json:"outputFormat,omitempty"`
+	SourceJSONPath      []string `json:"source_json_path,omitempty"`
+	TargetJSONPath      []string `json:"target_json_path,omitempty"`
 }
 
 // DataSetCustomField defines a field reference within a custom column expression.
@@ -160,13 +162,13 @@ type FilterParam struct {
 //	    ]
 //	}
 type ExecuteRequest struct {
-	Start        int   `json:"start"`
-	Limit        int   `json:"limit"`
-	Filter       []any `json:"filter,omitempty"`
-	Sort         []any `json:"sort,omitempty"`
-	FilterParams any   `json:"filterParams"`
-	AppendFilter string`json:"appendfilter,omitempty"` // "first" or "last", default is "last"
-	UserToken    any   `json:"userToken,omitempty"`
+	Start        int    `json:"start"`
+	Limit        int    `json:"limit"`
+	Filter       []any  `json:"filter,omitempty"`
+	Sort         []any  `json:"sort,omitempty"`
+	FilterParams any    `json:"filterParams"`
+	AppendFilter string `json:"appendfilter,omitempty"` // "first" or "last", default is "last"
+	UserToken    any    `json:"userToken,omitempty"`
 }
 
 // NormalizeToSlice converts raw JSON (array, map, string, or scalar) into a standardized []any slice.

@@ -111,7 +111,7 @@ func NewDataSetService(
 	adp adapter.Adapter,
 ) *DataSetService {
 	val := validator.NewDataSetValidator(mr, fr, fnr)
-	pln := planner.NewPlanner(fnr)
+	pln := planner.NewMetadataPlanner(fnr, mr, fr)
 
 	return &DataSetService{
 		repo:             repo,
@@ -333,6 +333,7 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		res, err := s.adapter.Execute(ctx, execReq)
 		if err != nil {
 			log.Printf("[DataSetService] Preview query execution failed: %v", err)
+			return nil, fmt.Errorf("dataset preview query execution failed: %w", err)
 		} else if res != nil {
 			if resMap, ok := res.Data.(map[string]any); ok {
 				if resRows, ok := resMap["rows"].([]map[string]any); ok {

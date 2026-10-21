@@ -23,6 +23,13 @@ import (
 // DataSetPlanner converts validated DataSet domain models into QueryAST execution plans.
 type DataSetPlanner struct {
 	functionResolver resolver.FunctionResolver
+	modelResolver    resolver.ModelResolver
+	fieldResolver    resolver.FieldResolver
+}
+
+// NewMetadataPlanner resolves JOIN fields from server metadata before compilation.
+func NewMetadataPlanner(fnr resolver.FunctionResolver, mr resolver.ModelResolver, fr resolver.FieldResolver) *DataSetPlanner {
+	return &DataSetPlanner{functionResolver: fnr, modelResolver: mr, fieldResolver: fr}
 }
 
 // NewPlanner creates a new DataSetPlanner.
@@ -163,6 +170,8 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			RelationshipOp:    j.RelationshipOp,
 			Cardinality:       j.Cardinality,
 			OutputFormat:      j.OutputFormat,
+			SourceJSONPath:    j.SourceJSONPath,
+			TargetJSONPath:    j.TargetJSONPath,
 		})
 		tableAliases[strings.ToLower(j.ToCollection)] = alias
 		if j.Schema != "" {
@@ -354,7 +363,69 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 		ast.WhereFilters = p.parseFilterSlice(ds.Filter, ds.BaseCollection.Collection, tableAliases, ds.SelectedList)
 	}
 
+	if p.modelResolver != nil && p.fieldResolver != nil && strings.EqualFold(ds.Driver, "postgres") {
+		if err := p.resolveJoinMetadata(ctx, ast); err != nil {
+			return nil, err
+		}
+	}
 	return ast, nil
+}
+
+func (p *DataSetPlanner) resolveJoinMetadata(ctx context.Context, ast *QueryAST) error {
+	if len(ast.Joins) == 0 {
+		return nil
+	}
+	base, err := p.modelResolver.ResolveModel(ctx, ast.BaseTable.Schema, ast.BaseTable.Table)
+	if err != nil {
+		return err
+	}
+	if base != nil {
+		if base.Table != "" {
+			ast.BaseTable.Table = base.Table
+		}
+		if base.Schema != "" {
+			ast.BaseTable.Schema = base.Schema
+		}
+	}
+	models := map[string]*resolver.ModelDefinition{strings.ToLower(ast.BaseTable.Alias): base}
+	for i := range ast.Joins {
+		j := &ast.Joins[i]
+		source := models[strings.ToLower(j.FromTable)]
+		if source == nil {
+			return fmt.Errorf("join %q: source model %q is not resolved", j.Alias, j.FromTable)
+		}
+		target, err := p.modelResolver.ResolveModel(ctx, j.Schema, j.ToTable)
+		if err != nil {
+			return err
+		}
+		from, err := p.fieldResolver.ResolveField(ctx, source, j.FromField)
+		if err != nil {
+			return err
+		}
+		to, err := p.fieldResolver.ResolveField(ctx, target, j.ToField)
+		if err != nil {
+			return err
+		}
+		if from == nil || to == nil || from.DataType == "" || to.DataType == "" || strings.EqualFold(from.DataType, "ANY") || strings.EqualFold(to.DataType, "ANY") {
+			return fmt.Errorf("join %q: source and target fields must exist in model metadata", j.Alias)
+		}
+		j.FromField, j.ToField = from.ColumnName, to.ColumnName
+		if j.FromField == "" {
+			j.FromField = from.Name
+		}
+		if j.ToField == "" {
+			j.ToField = to.Name
+		}
+		if target.Table != "" {
+			j.ToTable = target.Table
+		}
+		if target.Schema != "" {
+			j.Schema = target.Schema
+		}
+		j.FromFieldDataType, j.ToFieldDataType = from.DataType, to.DataType
+		models[strings.ToLower(j.Alias)] = target
+	}
+	return nil
 }
 
 // normalizeFilterToMap converts any filter representation (map[string]any, []any, etc.) into a flat map[string]any.

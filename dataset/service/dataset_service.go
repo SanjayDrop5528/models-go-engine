@@ -1747,6 +1747,17 @@ func buildProjectionTree(ds *domain.DataSet) *projNode {
 		// Also index by HeaderName if provided
 		if sel.HeaderName != "" && !strings.EqualFold(sel.HeaderName, field) {
 			addPathToTree(root, []string{sel.HeaderName}, sel.HeaderName)
+			// SQL JSON projections may already use the selected alias as the
+			// nested key. Keep that path as well as the original field path;
+			// otherwise a successful relationship becomes an empty object.
+			if len(parts) > 1 {
+				aliasedParts := append([]string(nil), parts[:len(parts)-1]...)
+				aliasedParts = append(aliasedParts, sel.HeaderName)
+				addPathToTree(root, aliasedParts, sel.HeaderName)
+				if baseColl != "" && strings.EqualFold(parts[0], baseColl) && len(aliasedParts) > 2 {
+					addPathToTree(root, aliasedParts[1:], sel.HeaderName)
+				}
+			}
 		}
 	}
 

@@ -163,12 +163,19 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 			act, err = r.registry.GetActive(collection)
 		}
 		if err == nil && act != nil && (schema == "" || act.Schema == "" || strings.EqualFold(schema, act.Schema)) {
+			isAttrRef := false
+			if cfg, cfgErr := r.registry.GetModelConfig(act.ID); cfgErr == nil && cfg != nil {
+				isAttrRef = cfg.IsAttributeReference
+			} else if cfg, cfgErr := r.registry.GetModelConfig(collection); cfgErr == nil && cfg != nil {
+				isAttrRef = cfg.IsAttributeReference
+			}
 			md := &ModelDefinition{
-				ID:      act.ID,
-				Schema:  schema,
-				Table:   act.Table,
-				RefName: act.Name,
-				Fields:  make(map[string]*FieldDefinition),
+				ID:                   act.ID,
+				Schema:               schema,
+				Table:                act.Table,
+				RefName:              act.Name,
+				IsAttributeReference: isAttrRef,
+				Fields:               make(map[string]*FieldDefinition),
 			}
 			if md.Schema == "" {
 				md.Schema = act.Schema
@@ -191,6 +198,35 @@ func (r *DynamicModelResolver) ResolveModel(ctx context.Context, schema, collect
 					IsUnique:     attr.Unique,
 				}
 				md.Fields[strings.ToLower(attr.Name)] = md.Fields[strings.ToLower(col)]
+
+				// When an attribute is mapped to an attribute reference, load the attribute reference fields also in the table's fields
+				customType := strings.TrimSpace(attr.CustomType)
+				if customType != "" && r.registry != nil {
+					if subAct, subErr := r.registry.GetActive(customType); subErr == nil && subAct != nil {
+						for _, subAttr := range subAct.Attributes {
+							subCol := subAttr.ColumnName
+							if subCol == "" {
+								subCol = subAttr.Name
+							}
+							nestedCol := fmt.Sprintf("%s.%s", col, subCol)
+							subDataType := string(subAttr.Type)
+							if subAttr.Type == "ARRAY" && subAttr.Validation != nil && subAttr.Validation.Items != nil && subAttr.Validation.Items.Type != "" {
+								subDataType = string(subAttr.Validation.Items.Type) + "[]"
+							}
+							nestedDef := &FieldDefinition{
+								Name:         nestedCol,
+								ColumnName:   nestedCol,
+								DataType:     subDataType,
+								IsPrimaryKey: false,
+								IsNullable:   subAttr.Nullable,
+								IsUnique:     subAttr.Unique,
+							}
+							md.Fields[strings.ToLower(nestedCol)] = nestedDef
+							nestedName := fmt.Sprintf("%s.%s", attr.Name, subAttr.Name)
+							md.Fields[strings.ToLower(nestedName)] = nestedDef
+						}
+					}
+				}
 			}
 			return md, nil
 		}

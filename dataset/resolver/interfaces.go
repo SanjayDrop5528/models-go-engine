@@ -18,12 +18,13 @@ import (
 
 // ModelDefinition represents resolved metadata about a database entity / table.
 type ModelDefinition struct {
-	ID      string
-	Schema  string
-	Table   string
-	RefName string
-	Driver  string
-	Fields  map[string]*FieldDefinition
+	ID                   string
+	Schema               string
+	Table                string
+	RefName              string
+	Driver               string
+	IsAttributeReference bool
+	Fields               map[string]*FieldDefinition
 }
 
 // FieldDefinition represents resolved metadata about a single column / attribute.

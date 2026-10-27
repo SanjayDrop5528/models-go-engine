@@ -1199,3 +1199,78 @@ func TestPreview_NormalizesRawJSONAndPostgresArrayRows(t *testing.T) {
 		t.Fatalf("expected 2 uuids, got %#v", servicesVal)
 	}
 }
+
+func TestValidation_RejectAttributeReferenceAsBaseCollectionAndJoin(t *testing.T) {
+	repo := repository.NewDataSetRepository()
+	fnRegistry := resolver.NewFunctionRegistry()
+	modelResolver := resolver.NewModelResolver(nil)
+
+	// Regular model
+	modelResolver.RegisterModel(&resolver.ModelDefinition{
+		Table: "employees",
+		Fields: map[string]*resolver.FieldDefinition{
+			"id":   {Name: "id", ColumnName: "id", DataType: "uuid", IsPrimaryKey: true},
+			"name": {Name: "name", ColumnName: "name", DataType: "string"},
+		},
+	})
+	// Embedded / attribute reference model
+	modelResolver.RegisterModel(&resolver.ModelDefinition{
+		Table:                "embedded_address",
+		IsAttributeReference: true,
+		Fields: map[string]*resolver.FieldDefinition{
+			"street": {Name: "street", ColumnName: "street", DataType: "string"},
+			"city":   {Name: "city", ColumnName: "city", DataType: "string"},
+		},
+	})
+
+	svc := service.NewDataSetService(repo, modelResolver, modelResolver, fnRegistry, nil)
+	svc.RegisterCompiler("postgres", &testPostgresCompiler{})
+
+	// Case 1: Attribute reference used as Base Collection -> should be rejected
+	dsBase := &domain.DataSet{
+		Name:          "invalid_base_attr_ref",
+		ReferenceName: "invalid_base_attr_ref",
+		Driver:        "postgres",
+		BaseCollection: domain.BaseCollection{
+			Collection: "embedded_address",
+		},
+		SelectedList: []domain.SelectedField{
+			{Field: "embedded_address.street", HeaderName: "street"},
+		},
+	}
+	_, err := svc.Save(context.Background(), dsBase)
+	if err == nil {
+		t.Fatalf("expected error when using attribute reference model as base collection, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot be an attribute reference model") {
+		t.Fatalf("expected error mentioning attribute reference model, got: %v", err)
+	}
+
+	// Case 2: Attribute reference used as Join target -> should be rejected
+	dsJoin := &domain.DataSet{
+		Name:          "invalid_join_attr_ref",
+		ReferenceName: "invalid_join_attr_ref",
+		Driver:        "postgres",
+		BaseCollection: domain.BaseCollection{
+			Collection: "employees",
+		},
+		JoinCollections: []domain.JoinCollection{
+			{
+				FromCollectionField: "id",
+				ToCollection:        "embedded_address",
+				ToCollectionField:   "street",
+				NamedAs:             "addr_alias",
+			},
+		},
+		SelectedList: []domain.SelectedField{
+			{Field: "employees.id", HeaderName: "id"},
+		},
+	}
+	_, err = svc.Save(context.Background(), dsJoin)
+	if err == nil {
+		t.Fatalf("expected error when joining attribute reference model, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot be an attribute reference model") {
+		t.Fatalf("expected error mentioning attribute reference model, got: %v", err)
+	}
+}

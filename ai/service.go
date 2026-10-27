@@ -488,6 +488,9 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 			if strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusInactive)) || strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusArchived)) {
 				return nil, fmt.Errorf("permission denied: model '%s' is inactive", baseTable)
 			}
+			if cfg.IsAttributeReference {
+				return nil, fmt.Errorf("cannot use model '%s' as base collection: it is marked as is_attribute_reference=true", baseTable)
+			}
 			if baseSchema == "" && cfg.Schema != "" {
 				baseSchema = cfg.Schema
 			}
@@ -538,6 +541,9 @@ func (s *AIService) PlanToDataSet(plan *AIQueryPlan, driver string) (*domain.Dat
 				// Permission Validator
 				if strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusInactive)) || strings.EqualFold(string(cfg.Status), string(model.ModelConfigStatusArchived)) {
 					return nil, fmt.Errorf("permission denied: joined model '%s' is inactive", toTbl)
+				}
+				if cfg.IsAttributeReference {
+					return nil, fmt.Errorf("cannot join model '%s': it is marked as is_attribute_reference=true", toTbl)
 				}
 				if cfg.Schema != "" {
 					schema = cfg.Schema

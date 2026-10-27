@@ -139,8 +139,12 @@ func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) err
 		return domain.NewErrorf(domain.ErrModelNotFound, "invalid base collection name '%s'", ds.BaseCollection.Collection)
 	}
 
-	if _, err := v.modelResolver.ResolveModel(ctx, ds.BaseCollection.Schema, ds.BaseCollection.Collection); err != nil {
+	baseDef, err := v.modelResolver.ResolveModel(ctx, ds.BaseCollection.Schema, ds.BaseCollection.Collection)
+	if err != nil {
 		return domain.WrapError(domain.ErrModelNotFound, fmt.Sprintf("base collection '%s' failed to resolve", ds.BaseCollection.Collection), err)
+	}
+	if baseDef != nil && baseDef.IsAttributeReference {
+		return domain.NewErrorf(domain.ErrModelNotFound, "base collection '%s' cannot be an attribute reference model (is_attribute_reference=true)", ds.BaseCollection.Collection)
 	}
 
 	// 3. Joins
@@ -154,6 +158,10 @@ func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) err
 	for i, j := range ds.JoinCollections {
 		if strings.TrimSpace(j.ToCollection) == "" {
 			return domain.NewErrorf(domain.ErrInvalidJoin, "join[%d] 'toCollection' is required", i)
+		}
+		targetDef, err := v.modelResolver.ResolveModel(ctx, j.Schema, j.ToCollection)
+		if err == nil && targetDef != nil && targetDef.IsAttributeReference {
+			return domain.NewErrorf(domain.ErrInvalidJoin, "join[%d] target collection '%s' cannot be an attribute reference model (is_attribute_reference=true)", i, j.ToCollection)
 		}
 		if strings.TrimSpace(j.FromCollectionField) == "" {
 			return domain.NewErrorf(domain.ErrInvalidJoin, "join[%d] 'fromCollectionField' is required", i)

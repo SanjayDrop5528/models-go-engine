@@ -268,6 +268,10 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 		return nil, err
 	}
 
+	if ds.IsRawDataset() {
+		return s.previewRawDataset(ctx, ds)
+	}
+
 	// 2. Build AST
 	ast, err := s.planner.BuildAST(ctx, ds)
 	if err != nil {
@@ -369,6 +373,103 @@ func (s *DataSetService) Preview(ctx context.Context, ds *domain.DataSet) (*Prev
 	}, nil
 }
 
+// previewRawDataset executes a raw SQL or MongoDB aggregation pipeline and returns sample rows and columns.
+func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataSet) (*PreviewResponse, error) {
+	targetQuery := strings.TrimSpace(ds.Pipeline)
+	if targetQuery == "" {
+		targetQuery = strings.TrimSpace(ds.ReferencePipeline)
+	}
+	if targetQuery == "" {
+		return nil, domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+	}
+
+	// Substitute default parameter values if parameterized
+	if len(ds.FilterParams) > 0 {
+		effectiveParams := make([]domain.FilterParam, len(ds.FilterParams))
+		copy(effectiveParams, ds.FilterParams)
+		for i := range effectiveParams {
+			if effectiveParams[i].Paramvalue == nil && effectiveParams[i].DefaultValue != nil {
+				effectiveParams[i].Paramvalue = effectiveParams[i].DefaultValue
+			}
+		}
+		if ds.Driver == "mongodb" {
+			targetQuery = domain.CreateFilterParams(effectiveParams, targetQuery, nil)
+		} else {
+			targetQuery, _ = domain.RenderSQLFilterParams(effectiveParams, targetQuery)
+		}
+	}
+
+	var rows []map[string]any
+	if s.adapter != nil {
+		execReq := execution.ExecutionRequest{
+			Operation: operation.OpQuery,
+			Target:    targetQuery,
+			Options: map[string]any{
+				"preview":    true,
+				"collection": ds.BaseCollection.Collection,
+				"schema":     ds.BaseCollection.Schema,
+			},
+			Arguments: map[string]any{
+				"collection": ds.BaseCollection.Collection,
+			},
+		}
+		res, err := s.adapter.Execute(ctx, execReq)
+		if err != nil {
+			log.Printf("[DataSetService] Raw dataset preview execution failed: %v", err)
+			return nil, fmt.Errorf("raw dataset preview query execution failed: %w", err)
+		} else if res != nil {
+			if resMap, ok := res.Data.(map[string]any); ok {
+				if resRows, ok := resMap["rows"].([]map[string]any); ok {
+					rows = resRows
+				}
+			} else if rowSlice, ok := res.Data.([]map[string]any); ok {
+				rows = rowSlice
+			} else if sliceAny, ok := res.Data.([]any); ok {
+				for _, item := range sliceAny {
+					if m, ok := item.(map[string]any); ok {
+						rows = append(rows, m)
+					}
+				}
+			}
+		}
+	}
+
+	if rows == nil {
+		rows = make([]map[string]any, 0)
+	}
+	rows = s.normalizeAndDecryptDatasetRows(ctx, rows)
+
+	cols := ds.SelectedList
+	if len(cols) == 0 && len(rows) > 0 {
+		seen := make(map[string]bool)
+		for _, r := range rows {
+			for k := range r {
+				if !seen[k] {
+					seen[k] = true
+					cols = append(cols, domain.SelectedField{
+						Field:      k,
+						HeaderName: k,
+						DataType:   "STRING",
+					})
+				}
+			}
+		}
+	}
+
+	refPipeline := ds.ReferencePipeline
+	if refPipeline == "" {
+		refPipeline = ds.Pipeline
+	}
+
+	return &PreviewResponse{
+		Columns:           cols,
+		Rows:              rows,
+		Pipeline:          targetQuery,
+		ReferencePipeline: refPipeline,
+		Parameters:        ds.FilterParams,
+	}, nil
+}
+
 // Save validates, compiles pipelines, executes DDL (procedures/functions), and persists dataset metadata.
 //
 // Purpose:
@@ -407,6 +508,10 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 	// 1. Validate
 	if err := s.validator.Validate(ctx, ds); err != nil {
 		return nil, err
+	}
+
+	if ds.IsRawDataset() {
+		return s.saveRawDataset(ctx, ds)
 	}
 
 	// 2. Build AST
@@ -448,6 +553,29 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 		return nil, err
 	}
 
+	return ds, nil
+}
+
+// saveRawDataset persists a raw SQL query or native MongoDB aggregation pipeline dataset.
+func (s *DataSetService) saveRawDataset(ctx context.Context, ds *domain.DataSet) (*domain.DataSet, error) {
+	if ds.Pipeline == "" {
+		ds.Pipeline = ds.ReferencePipeline
+	}
+	if ds.ReferencePipeline == "" {
+		ds.ReferencePipeline = ds.Pipeline
+	}
+	if ds.DatasetType == "" {
+		ds.DatasetType = "RAW"
+	}
+	ds.IsRaw = true
+	if ds.Status == "" {
+		ds.Status = "ACTIVE"
+	}
+	ds.UpdatedAt = time.Now()
+
+	if err := s.repo.Save(ctx, ds); err != nil {
+		return nil, err
+	}
 	return ds, nil
 }
 

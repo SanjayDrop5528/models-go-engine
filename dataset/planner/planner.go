@@ -315,8 +315,11 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			if fldName == "" {
 				fldName = f.Name
 			}
-			if fldName == "" && f.Value != "" {
-				fldName = f.Value
+			if fldName == "" && f.Value != nil {
+				valStr := f.GetValueString()
+				if valStr != "" {
+					fldName = valStr
+				}
 			}
 			isLit := f.IsLiteral || tbl == "" || tbl == "_LITERAL_"
 			isCustomRef := false
@@ -347,11 +350,15 @@ func (p *DataSetPlanner) BuildAST(ctx context.Context, ds *domain.DataSet) (*Que
 			if tbl != "" {
 				tbl = resolveTableAlias(tbl, tableAliases)
 			}
+			var litVal any = fldName
+			if isLit && f.Value != nil {
+				litVal = f.Value
+			}
 			astCol.Operands = append(astCol.Operands, ASTOperand{
 				SourceTable: tbl,
 				SourceField: fldName,
 				IsLiteral:   isLit || isCustomRef,
-				LiteralVal:  fldName,
+				LiteralVal:  litVal,
 			})
 		}
 

@@ -131,6 +131,31 @@ func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) err
 		return domain.NewErrorf(domain.ErrUnsupportedSaveMode, "unsupported save mode '%s': must be PROCEDURE, FUNCTION, or QUERY", ds.SaveMode)
 	}
 
+	// If this is a Raw Dataset (directly supplied SQL or native aggregation pipeline),
+	// validate the raw pipeline/query and parameters without requiring visual builder steps.
+	if ds.IsRawDataset() {
+		if strings.TrimSpace(ds.Pipeline) == "" && strings.TrimSpace(ds.ReferencePipeline) == "" {
+			return domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+		}
+		if strings.TrimSpace(ds.BaseCollection.Collection) != "" {
+			if !validIdentifierRe.MatchString(ds.BaseCollection.Collection) {
+				return domain.NewErrorf(domain.ErrModelNotFound, "invalid base collection name '%s'", ds.BaseCollection.Collection)
+			}
+		}
+		paramNames := make(map[string]bool)
+		for _, p := range ds.FilterParams {
+			pName := strings.TrimSpace(p.ParamName)
+			if pName == "" {
+				return domain.NewError(domain.ErrFieldNotFound, "filter_param 'paramName' is required")
+			}
+			if paramNames[strings.ToLower(pName)] {
+				return domain.NewErrorf(domain.ErrDuplicateField, "duplicate filter_param '%s'", pName)
+			}
+			paramNames[strings.ToLower(pName)] = true
+		}
+		return nil
+	}
+
 	// 2. Base Collection
 	if strings.TrimSpace(ds.BaseCollection.Collection) == "" {
 		return domain.NewError(domain.ErrModelNotFound, "base_collection 'collection' name is required")

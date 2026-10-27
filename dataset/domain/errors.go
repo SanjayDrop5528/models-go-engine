@@ -39,6 +39,7 @@ const (
 	ErrPipelineExecutionFailed   DataSetErrorCode = "PIPELINE_EXECUTION_FAILED"
 	ErrProcedureCreationFailed   DataSetErrorCode = "PROCEDURE_CREATION_FAILED"
 	ErrFunctionCreationFailed    DataSetErrorCode = "FUNCTION_CREATION_FAILED"
+	ErrDuplicateField            DataSetErrorCode = "DUPLICATE_FIELD"
 )
 
 // DataSetError wraps a typed error code and detailed message with metadata.

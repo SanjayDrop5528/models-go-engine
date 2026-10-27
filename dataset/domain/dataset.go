@@ -31,7 +31,10 @@ type DataSet struct {
 	ID                string           `json:"id"`
 	Name              string           `json:"name"`
 	ReferenceName     string           `json:"reference_name"`
-	Driver            string           `json:"driver"` // "postgres", "mysql", "mongodb", "memory"
+	Description       string           `json:"description,omitempty"`
+	DatasetType       string           `json:"dataset_type,omitempty"` // "BUILDER" or "RAW"
+	IsRaw             bool             `json:"is_raw,omitempty"`       // true if raw pipeline / query dataset
+	Driver            string           `json:"driver"`                 // "postgres", "mysql", "mongodb", "memory"
 	ConversationID    string           `json:"conversation_id,omitempty"`
 	BaseCollection    BaseCollection   `json:"base_collection"`
 	JoinCollections   []JoinCollection `json:"join_collections,omitempty"`
@@ -48,6 +51,26 @@ type DataSet struct {
 	Status            string           `json:"status"` // "ACTIVE", "DRAFT", "ARCHIVED"
 	CreatedAt         time.Time        `json:"created_at"`
 	UpdatedAt         time.Time        `json:"updated_at"`
+}
+
+// IsRawDataset returns true if the dataset is explicitly marked as raw, or has a raw pipeline without builder definitions.
+func (ds *DataSet) IsRawDataset() bool {
+	if ds == nil {
+		return false
+	}
+	if ds.IsRaw || strings.EqualFold(ds.DatasetType, "RAW") {
+		return true
+	}
+	// Also treat as raw if pipeline or reference_pipeline is provided and visual builder components are absent
+	if (strings.TrimSpace(ds.Pipeline) != "" || strings.TrimSpace(ds.ReferencePipeline) != "") &&
+		len(ds.JoinCollections) == 0 &&
+		len(ds.CustomColumns) == 0 &&
+		len(ds.GroupByFields) == 0 &&
+		len(ds.SchematicTable) == 0 &&
+		(strings.TrimSpace(ds.BaseCollection.Collection) == "" || len(ds.SelectedList) == 0) {
+		return true
+	}
+	return false
 }
 
 // SchematicEntry represents a typed metadata schema entry (variable, param, function/procedure signature).
@@ -105,7 +128,19 @@ type DataSetCustomField struct {
 	TableName    string `json:"tableName"`
 	Type         string `json:"type"`
 	IsLiteral    bool   `json:"isLiteral,omitempty"`
-	Value        string `json:"value,omitempty"`
+	Value        any    `json:"value,omitempty"`
+}
+
+// GetValueString returns a string representation of Value, handling numeric and string literals.
+func (f DataSetCustomField) GetValueString() string {
+	if f.Value == nil {
+		return ""
+	}
+	s := fmt.Sprintf("%v", f.Value)
+	if s == "<nil>" {
+		return ""
+	}
+	return s
 }
 
 // CustomColumn defines calculated/virtual fields or function applications.
@@ -136,11 +171,71 @@ type SelectedField struct {
 
 // FilterParam defines a parameter placeholder that can be supplied at runtime.
 type FilterParam struct {
-	ParamName     string      `json:"paramName"`
-	ParamDataType string      `json:"paramDataType"` // "string", "int", "decimal", "boolean", "date", "timestamp"
-	DefaultValue  interface{} `json:"defaultValue,omitempty"`
-	Paramvalue    interface{} `json:"paramValue,omitempty"` // Runtime value or value override
-	Required      bool        `json:"required"`
+	ParamName       string      `json:"paramName"`
+	ParamDataType   string      `json:"paramDataType"` // "string", "int", "decimal", "boolean", "date", "timestamp"
+	DefaultValue    interface{} `json:"defaultValue,omitempty"`
+	Paramvalue      interface{} `json:"paramValue,omitempty"` // Runtime value or value override
+	Required        bool        `json:"required"`
+	ConvertToString bool        `json:"convert_To_String,omitempty"`
+}
+
+// UnmarshalJSON normalizes casing variants for FilterParam properties.
+func (fp *FilterParam) UnmarshalJSON(data []byte) error {
+	type Alias FilterParam
+	aux := struct {
+		*Alias
+		AltParamName1       string      `json:"ParamName"`
+		AltParamDataType1   string      `json:"ParamDataType"`
+		AltParamDataType2   string      `json:"paramDatatype"`
+		AltParamDataType3   string      `json:"parmsDataType"`
+		AltDefaultValue1    interface{} `json:"DefaultValue"`
+		AltParamValue1      interface{} `json:"paramvalue"`
+		AltParamValue2      interface{} `json:"ParamValue"`
+		AltParamValue3      interface{} `json:"Paramsvalue"`
+		AltRequired1        bool        `json:"Required"`
+		AltConvertToString1 bool        `json:"convertToString"`
+		AltConvertToString2 bool        `json:"ConvertToString"`
+	}{
+		Alias: (*Alias)(fp),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if fp.ParamName == "" && aux.AltParamName1 != "" {
+		fp.ParamName = aux.AltParamName1
+	}
+	if fp.ParamDataType == "" {
+		if aux.AltParamDataType1 != "" {
+			fp.ParamDataType = aux.AltParamDataType1
+		} else if aux.AltParamDataType2 != "" {
+			fp.ParamDataType = aux.AltParamDataType2
+		} else if aux.AltParamDataType3 != "" {
+			fp.ParamDataType = aux.AltParamDataType3
+		}
+	}
+	if fp.DefaultValue == nil && aux.AltDefaultValue1 != nil {
+		fp.DefaultValue = aux.AltDefaultValue1
+	}
+	if fp.Paramvalue == nil {
+		if aux.AltParamValue1 != nil {
+			fp.Paramvalue = aux.AltParamValue1
+		} else if aux.AltParamValue2 != nil {
+			fp.Paramvalue = aux.AltParamValue2
+		} else if aux.AltParamValue3 != nil {
+			fp.Paramvalue = aux.AltParamValue3
+		}
+	}
+	if !fp.Required && aux.AltRequired1 {
+		fp.Required = aux.AltRequired1
+	}
+	if !fp.ConvertToString {
+		if aux.AltConvertToString1 {
+			fp.ConvertToString = aux.AltConvertToString1
+		} else if aux.AltConvertToString2 {
+			fp.ConvertToString = aux.AltConvertToString2
+		}
+	}
+	return nil
 }
 
 // ExecuteRequest defines the standardized runtime execution request payload.
@@ -207,13 +302,26 @@ func NormalizeToSlice(raw []byte) ([]any, error) {
 	return []any{s}, nil
 }
 
-// UnmarshalJSON unmarshals DataSet normalizing Filter and Sort into []any slices.
+// UnmarshalJSON unmarshals DataSet normalizing Filter and Sort into []any slices
+// and supporting casing variants for pipeline, reference_pipeline, and description.
 func (ds *DataSet) UnmarshalJSON(data []byte) error {
 	type Alias DataSet
 	aux := struct {
 		*Alias
-		RawFilter json.RawMessage `json:"filter"`
-		RawSort   json.RawMessage `json:"sort"`
+		RawFilter           json.RawMessage `json:"filter"`
+		RawSort             json.RawMessage `json:"sort"`
+		AltRefPipeline1     string          `json:"Reference_pipeline"`
+		AltRefPipeline2     string          `json:"referencePipeline"`
+		AltRefPipeline3     string          `json:"reference_pipeline"`
+		AltPipeline1        string          `json:"Pipeline"`
+		AltPipeline2        string          `json:"pipeline"`
+		AltDescription1     string          `json:"description"`
+		AltDescription2     string          `json:"dataSetDescription"`
+		AltFilterParams     []FilterParam   `json:"FilterParams"`
+		AltSelectedList     []SelectedField `json:"SelectedList"`
+		AltBaseCollection   string          `json:"dataSetBaseCollection"`
+		AltDataSetName      string          `json:"dataSetName"`
+		AltStatus           string          `json:"Status"`
 	}{
 		Alias: (*Alias)(ds),
 	}
@@ -238,6 +346,49 @@ func (ds *DataSet) UnmarshalJSON(data []byte) error {
 	} else if ds.Sort == nil {
 		ds.Sort = []any{}
 	}
+
+	if ds.ReferencePipeline == "" {
+		if aux.AltRefPipeline1 != "" {
+			ds.ReferencePipeline = aux.AltRefPipeline1
+		} else if aux.AltRefPipeline2 != "" {
+			ds.ReferencePipeline = aux.AltRefPipeline2
+		} else if aux.AltRefPipeline3 != "" {
+			ds.ReferencePipeline = aux.AltRefPipeline3
+		}
+	}
+	if ds.Pipeline == "" {
+		if aux.AltPipeline1 != "" {
+			ds.Pipeline = aux.AltPipeline1
+		} else if aux.AltPipeline2 != "" {
+			ds.Pipeline = aux.AltPipeline2
+		}
+	}
+	if ds.Description == "" {
+		if aux.AltDescription1 != "" {
+			ds.Description = aux.AltDescription1
+		} else if aux.AltDescription2 != "" {
+			ds.Description = aux.AltDescription2
+		}
+	}
+	if len(ds.FilterParams) == 0 && len(aux.AltFilterParams) > 0 {
+		ds.FilterParams = aux.AltFilterParams
+	}
+	if len(ds.SelectedList) == 0 && len(aux.AltSelectedList) > 0 {
+		ds.SelectedList = aux.AltSelectedList
+	}
+	if ds.BaseCollection.Collection == "" && aux.AltBaseCollection != "" {
+		ds.BaseCollection.Collection = aux.AltBaseCollection
+	}
+	if ds.Name == "" && aux.AltDataSetName != "" {
+		ds.Name = aux.AltDataSetName
+	}
+	if ds.ReferenceName == "" && aux.AltDataSetName != "" {
+		ds.ReferenceName = aux.AltDataSetName
+	}
+	if ds.Status == "" && aux.AltStatus != "" {
+		ds.Status = aux.AltStatus
+	}
+
 	return nil
 }
 

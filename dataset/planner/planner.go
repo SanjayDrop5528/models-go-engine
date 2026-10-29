@@ -643,7 +643,7 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 			Value:    v,
 		}
 
-		// Check if value is a parameter reference
+		// Check if value is a parameter reference or Mongo-style operator map
 		if valMap, ok := v.(map[string]any); ok {
 			pName := ""
 			if pn, exists := valMap["paramName"].(string); exists {
@@ -658,6 +658,44 @@ func (p *DataSetPlanner) parseFilterMap(filter map[string]any, defaultTable stri
 					cond.ParamDataType = pType
 				} else if pType, typeExists := valMap["parmsDataType"].(string); typeExists {
 					cond.ParamDataType = pType
+				}
+			} else {
+				for opKey, opVal := range valMap {
+					switch strings.ToLower(opKey) {
+					case "$gt":
+						cond.Operator = ">"
+						cond.Value = opVal
+					case "$gte":
+						cond.Operator = ">="
+						cond.Value = opVal
+					case "$lt":
+						cond.Operator = "<"
+						cond.Value = opVal
+					case "$lte":
+						cond.Operator = "<="
+						cond.Value = opVal
+					case "$ne":
+						cond.Operator = "!="
+						cond.Value = opVal
+					case "$in":
+						cond.Operator = "IN"
+						cond.Value = opVal
+					case "$nin":
+						cond.Operator = "NOT IN"
+						cond.Value = opVal
+					case "$like":
+						cond.Operator = "LIKE"
+						cond.Value = opVal
+					case "$ilike":
+						cond.Operator = "ILIKE"
+						cond.Value = opVal
+					case "$null":
+						cond.Operator = "IS NULL"
+						cond.Value = nil
+					case "$notnull":
+						cond.Operator = "IS NOT NULL"
+						cond.Value = nil
+					}
 				}
 			}
 		}

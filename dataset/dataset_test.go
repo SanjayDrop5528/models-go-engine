@@ -14,6 +14,7 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/dataset/repository"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
 	"github.com/SanjayDrop5528/models-go-engine/dataset/service"
+	"github.com/SanjayDrop5528/models-go-engine/dataset/validator"
 	"github.com/SanjayDrop5528/models-go-engine/execution"
 )
 
@@ -1274,3 +1275,122 @@ func TestValidation_RejectAttributeReferenceAsBaseCollectionAndJoin(t *testing.T
 		t.Fatalf("expected error mentioning attribute reference model, got: %v", err)
 	}
 }
+
+func TestBaseCollection_StringAndObjectSerialization(t *testing.T) {
+	// 1. Plain string unmarshal (MongoDB style)
+	jsonStr := `{"name":"mongo_ds","driver":"mongodb","base_collection":"employees"}`
+	var ds domain.DataSet
+	if err := json.Unmarshal([]byte(jsonStr), &ds); err != nil {
+		t.Fatalf("failed to unmarshal dataset with string base_collection: %v", err)
+	}
+	if ds.BaseCollection.Collection != "employees" || ds.BaseCollection.Schema != "" {
+		t.Fatalf("expected Collection='employees', Schema='', got %+v", ds.BaseCollection)
+	}
+
+	// 2. Marshal MongoDB dataset with empty schema -> serializes base_collection as simple string
+	bytes, err := json.Marshal(ds.BaseCollection)
+	if err != nil {
+		t.Fatalf("failed to marshal base_collection: %v", err)
+	}
+	if string(bytes) != `"employees"` {
+		t.Fatalf("expected marshaled string '\"employees\"', got: %s", string(bytes))
+	}
+
+	// 3. Schema dot string unmarshal: "iam.employees"
+	jsonStr2 := `{"name":"pg_ds","driver":"postgres","base_collection":"iam.employees"}`
+	var ds2 domain.DataSet
+	if err := json.Unmarshal([]byte(jsonStr2), &ds2); err != nil {
+		t.Fatalf("failed to unmarshal dataset with dot string base_collection: %v", err)
+	}
+	if ds2.BaseCollection.Collection != "employees" || ds2.BaseCollection.Schema != "iam" {
+		t.Fatalf("expected Collection='employees', Schema='iam', got %+v", ds2.BaseCollection)
+	}
+
+	// 4. Full object unmarshal with schema
+	jsonStr3 := `{"name":"pg_ds2","driver":"postgres","base_collection":{"schema":"fleet","collection":"drivers"}}`
+	var ds3 domain.DataSet
+	if err := json.Unmarshal([]byte(jsonStr3), &ds3); err != nil {
+		t.Fatalf("failed to unmarshal dataset with object base_collection: %v", err)
+	}
+	if ds3.BaseCollection.Collection != "drivers" || ds3.BaseCollection.Schema != "fleet" {
+		t.Fatalf("expected Collection='drivers', Schema='fleet', got %+v", ds3.BaseCollection)
+	}
+
+	// 5. User's exact curl preview payload with string base_collection
+	curlPayload := `{"name":"sdasd","reference_name":"sdasd","driver":"mongodb","save_mode":"QUERY","base_collection":"shop","join_collections":[],"custom_columns":[],"group_by_fields":[],"schematic_table":[],"filter_params":[],"selected_list":[],"dataset_type":"BUILDER","is_raw":false,"_filterRules":[],"_filterClause":"AND","filter":{}}`
+	var dsCurl domain.DataSet
+	if err := json.Unmarshal([]byte(curlPayload), &dsCurl); err != nil {
+		t.Fatalf("failed to unmarshal curl preview payload: %v", err)
+	}
+	if dsCurl.BaseCollection.Collection != "shop" {
+		t.Fatalf("expected Collection='shop', got %s", dsCurl.BaseCollection.Collection)
+	}
+
+	// 6. MongoDB document format with _id, dataSetName, and dataSetBaseCollection
+	mongoDoc := `{
+		"_id": "getMyReferrals-user",
+		"dataSetName": "getMyReferrals-user",
+		"dataSetBaseCollection": "shop_referral",
+		"pipeline": "",
+		"Reference_pipeline": "",
+		"name": "getMyReferrals-user",
+		"status": "ACTIVE",
+		"save_mode": "QUERY",
+		"reference_name": "getMyReferrals-user",
+		"driver": "mongodb"
+	}`
+	var dsMongo domain.DataSet
+	if err := json.Unmarshal([]byte(mongoDoc), &dsMongo); err != nil {
+		t.Fatalf("failed to unmarshal mongo document payload: %v", err)
+	}
+	if dsMongo.ID != "getMyReferrals-user" {
+		t.Fatalf("expected ID='getMyReferrals-user', got %s", dsMongo.ID)
+	}
+	if dsMongo.BaseCollection.Collection != "shop_referral" {
+		t.Fatalf("expected Collection='shop_referral', got %s", dsMongo.BaseCollection.Collection)
+	}
+
+	// 7. Validate reference_name with hyphens like 'getMyReferrals-user'
+	v := validator.NewDataSetValidator(nil, nil, nil)
+	if err := v.Validate(context.Background(), &dsMongo); err != nil {
+		t.Fatalf("expected valid reference_name with hyphen 'getMyReferrals-user', got: %v", err)
+	}
+
+	// 8. Verify AST planner includes both base filter and overall filter
+	dsWithFilters := domain.DataSet{
+		Name:          "Shop Referral Dataset",
+		ReferenceName: "shop_referrals",
+		Driver:        "mongodb",
+		BaseCollection: domain.BaseCollection{
+			Collection: "shop_referral",
+			Filter:     map[string]any{"status": "ACTIVE"},
+		},
+		Filter: []any{
+			map[string]any{"shop_referral.rating": map[string]any{"$gte": "4"}},
+		},
+		SelectedList: []domain.SelectedField{
+			{Field: "shop_referral._id", HeaderName: "_id"},
+			{Field: "shop_referral.rating", HeaderName: "rating"},
+		},
+	}
+	p := planner.NewPlanner(nil)
+	ast, err := p.BuildAST(context.Background(), &dsWithFilters)
+	if err != nil {
+		t.Fatalf("failed to build AST with base filter and overall filter: %v", err)
+	}
+	if ast.BaseTable.Filter["status"] != "ACTIVE" {
+		t.Fatalf("expected base table filter status=ACTIVE, got: %+v", ast.BaseTable.Filter)
+	}
+	foundRatingFilter := false
+	for _, wf := range ast.WhereFilters {
+		if wf.Column == "rating" && (wf.Operator == ">=" || wf.Operator == "EQUALS") {
+			foundRatingFilter = true
+			break
+		}
+	}
+	if !foundRatingFilter {
+		t.Fatalf("expected WhereFilter on rating, got: %+v", ast.WhereFilters)
+	}
+}
+
+

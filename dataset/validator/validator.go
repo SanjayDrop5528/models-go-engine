@@ -20,7 +20,7 @@ import (
 	"github.com/SanjayDrop5528/models-go-engine/dataset/resolver"
 )
 
-var validIdentifierRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_\.]*$`)
+var validIdentifierRe = regexp.MustCompile(`^[a-zA-Z0-9_\-][a-zA-Z0-9_\-\.]*$`)
 
 // DataSetValidator performs comprehensive, security-hardened validation of dataset definitions.
 type DataSetValidator struct {
@@ -116,7 +116,7 @@ func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) err
 		return domain.NewError(domain.ErrDataSetNotFound, "dataset 'reference_name' is required")
 	}
 	if !validIdentifierRe.MatchString(ds.ReferenceName) {
-		return domain.NewErrorf(domain.ErrDataSetNotFound, "invalid reference_name '%s': must match [a-zA-Z_][a-zA-Z0-9_]*", ds.ReferenceName)
+		return domain.NewErrorf(domain.ErrDataSetNotFound, "invalid reference_name '%s': must match [a-zA-Z0-9_-][a-zA-Z0-9_.-]*", ds.ReferenceName)
 	}
 
 	driver := strings.ToLower(strings.TrimSpace(ds.Driver))
@@ -135,7 +135,9 @@ func (v *DataSetValidator) Validate(ctx context.Context, ds *domain.DataSet) err
 	// validate the raw pipeline/query and parameters without requiring visual builder steps.
 	if ds.IsRawDataset() {
 		if strings.TrimSpace(ds.Pipeline) == "" && strings.TrimSpace(ds.ReferencePipeline) == "" {
-			return domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+			if !strings.EqualFold(ds.Driver, "mongodb") {
+				return domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+			}
 		}
 		if strings.TrimSpace(ds.BaseCollection.Collection) != "" {
 			if !validIdentifierRe.MatchString(ds.BaseCollection.Collection) {

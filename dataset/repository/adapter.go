@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -128,8 +129,29 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 		return nil
 	}
 
-	baseColJSON, _ := json.Marshal(ds.BaseCollection)
-	joinsJSON, _ := json.Marshal(ds.JoinCollections)
+	isMongo := strings.EqualFold(ds.Driver, "mongodb") || (r.adp != nil && strings.EqualFold(r.adp.Name(), "mongodb"))
+
+	baseCol := ds.BaseCollection
+	var baseColVal any
+	if isMongo {
+		// For MongoDB, base_collection is purely a string holding the collection name (no object)
+		baseColVal = baseCol.Collection
+	} else {
+		baseColJSON, _ := json.Marshal(baseCol)
+		baseColVal = string(baseColJSON)
+	}
+
+	cleanJoins := make([]domain.JoinCollection, len(ds.JoinCollections))
+	copy(cleanJoins, ds.JoinCollections)
+	if isMongo {
+		for i := range cleanJoins {
+			cleanJoins[i].Schema = ""
+			if domain.IsFilterEmpty(cleanJoins[i].Filter) {
+				cleanJoins[i].Filter = nil
+			}
+		}
+	}
+	joinsJSON, _ := json.Marshal(cleanJoins)
 	customColsJSON, _ := json.Marshal(ds.CustomColumns)
 	groupByJSON, _ := json.Marshal(ds.GroupByFields)
 	schematicJSON, _ := json.Marshal(ds.SchematicTable)
@@ -138,11 +160,10 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 	selectedListJSON, _ := json.Marshal(ds.SelectedList)
 
 	data := map[string]any{
-		"id":                 ds.ID,
 		"name":               ds.Name,
 		"reference_name":     ds.ReferenceName,
 		"driver":             ds.Driver,
-		"base_collection":    string(baseColJSON),
+		"base_collection":    baseColVal,
 		"join_collections":   string(joinsJSON),
 		"custom_columns":     string(customColsJSON),
 		"group_by_fields":    string(groupByJSON),
@@ -155,6 +176,12 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 		"reference_pipeline": ds.ReferencePipeline,
 		"status":             ds.Status,
 		"updated_at":         ds.UpdatedAt.Format(time.RFC3339),
+	}
+
+	if isMongo {
+		data["_id"] = ds.ID
+	} else {
+		data["id"] = ds.ID
 	}
 
 	// Try Update first; if not found, Create
@@ -251,6 +278,10 @@ func (r *AdapterDataSetRepository) FindByReferenceName(ctx context.Context, refN
 		results, _, err := r.adp.Find(ctx, r.dsRef, q)
 		if err == nil && len(results) > 0 {
 			return mapToDataSet(results[0]), nil
+		}
+		// Also check by ID if not found by reference_name
+		if ds, err := r.FindByID(ctx, refName); err == nil && ds != nil && ds.ReferenceName != "" {
+			return ds, nil
 		}
 	}
 	return r.inMem.FindByReferenceName(ctx, refName)
@@ -360,15 +391,50 @@ func (r *AdapterDataSetRepository) Delete(ctx context.Context, idOrRef string) e
 // When can it be used:
 //   - Invoked whenever transforming raw adapter query results into domain models.
 func mapToDataSet(rec map[string]any) *domain.DataSet {
+	idVal := rec["id"]
+	if idVal == nil || fmt.Sprintf("%v", idVal) == "" || fmt.Sprintf("%v", idVal) == "<nil>" {
+		idVal = rec["_id"]
+	}
+
+	nameVal := rec["name"]
+	if nameVal == nil || fmt.Sprintf("%v", nameVal) == "" || fmt.Sprintf("%v", nameVal) == "<nil>" {
+		nameVal = rec["dataSetName"]
+	}
+
+	refVal := rec["reference_name"]
+	if refVal == nil || fmt.Sprintf("%v", refVal) == "" || fmt.Sprintf("%v", refVal) == "<nil>" {
+		refVal = rec["dataSetName"]
+	}
+
+	refPipeVal := rec["reference_pipeline"]
+	if refPipeVal == nil || fmt.Sprintf("%v", refPipeVal) == "" || fmt.Sprintf("%v", refPipeVal) == "<nil>" {
+		refPipeVal = rec["Reference_pipeline"]
+	}
+
+	driverVal := rec["driver"]
+	if driverVal == nil || fmt.Sprintf("%v", driverVal) == "<nil>" {
+		driverVal = ""
+	}
+
+	saveModeVal := rec["save_mode"]
+	if saveModeVal == nil || fmt.Sprintf("%v", saveModeVal) == "<nil>" || fmt.Sprintf("%v", saveModeVal) == "" {
+		saveModeVal = string(domain.SaveModeQuery)
+	}
+
+	statusVal := rec["status"]
+	if statusVal == nil || fmt.Sprintf("%v", statusVal) == "<nil>" || fmt.Sprintf("%v", statusVal) == "" {
+		statusVal = "ACTIVE"
+	}
+
 	ds := &domain.DataSet{
-		ID:                fmt.Sprintf("%v", rec["id"]),
-		Name:              fmt.Sprintf("%v", rec["name"]),
-		ReferenceName:     fmt.Sprintf("%v", rec["reference_name"]),
-		Driver:            fmt.Sprintf("%v", rec["driver"]),
-		SaveMode:          domain.SaveMode(fmt.Sprintf("%v", rec["save_mode"])),
+		ID:                fmt.Sprintf("%v", idVal),
+		Name:              fmt.Sprintf("%v", nameVal),
+		ReferenceName:     fmt.Sprintf("%v", refVal),
+		Driver:            fmt.Sprintf("%v", driverVal),
+		SaveMode:          domain.SaveMode(fmt.Sprintf("%v", saveModeVal)),
 		Pipeline:          fmt.Sprintf("%v", rec["pipeline"]),
-		ReferencePipeline: fmt.Sprintf("%v", rec["reference_pipeline"]),
-		Status:            fmt.Sprintf("%v", rec["status"]),
+		ReferencePipeline: fmt.Sprintf("%v", refPipeVal),
+		Status:            fmt.Sprintf("%v", statusVal),
 	}
 
 	parseJSON := func(val any, target any) {
@@ -377,9 +443,25 @@ func mapToDataSet(rec map[string]any) *domain.DataSet {
 		}
 		switch v := val.(type) {
 		case string:
-			_ = json.Unmarshal([]byte(v), target)
+			trimmed := strings.TrimSpace(v)
+			if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "\"") {
+				_ = json.Unmarshal([]byte(trimmed), target)
+			} else if len(trimmed) > 0 {
+				quoted := `"` + trimmed + `"`
+				if err := json.Unmarshal([]byte(quoted), target); err != nil {
+					_ = json.Unmarshal([]byte(trimmed), target)
+				}
+			}
 		case []byte:
-			_ = json.Unmarshal(v, target)
+			trimmed := strings.TrimSpace(string(v))
+			if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "\"") {
+				_ = json.Unmarshal(v, target)
+			} else if len(trimmed) > 0 {
+				quoted := `"` + trimmed + `"`
+				if err := json.Unmarshal([]byte(quoted), target); err != nil {
+					_ = json.Unmarshal(v, target)
+				}
+			}
 		default:
 			if b, err := json.Marshal(v); err == nil {
 				_ = json.Unmarshal(b, target)
@@ -387,7 +469,11 @@ func mapToDataSet(rec map[string]any) *domain.DataSet {
 		}
 	}
 
-	parseJSON(rec["base_collection"], &ds.BaseCollection)
+	baseColVal := rec["base_collection"]
+	if baseColVal == nil || fmt.Sprintf("%v", baseColVal) == "" || fmt.Sprintf("%v", baseColVal) == "<nil>" {
+		baseColVal = rec["dataSetBaseCollection"]
+	}
+	parseJSON(baseColVal, &ds.BaseCollection)
 	parseJSON(rec["join_collections"], &ds.JoinCollections)
 	parseJSON(rec["custom_columns"], &ds.CustomColumns)
 	parseJSON(rec["group_by_fields"], &ds.GroupByFields)
@@ -397,4 +483,27 @@ func mapToDataSet(rec map[string]any) *domain.DataSet {
 	parseJSON(rec["selected_list"], &ds.SelectedList)
 
 	return ds
+}
+
+// isFilterEmpty detects if a filter object/slice/string holds no actual filter conditions.
+func isFilterEmpty(f any) bool {
+	if f == nil {
+		return true
+	}
+	switch v := f.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		return trimmed == "" || trimmed == "{}" || trimmed == "[]"
+	case []any:
+		return len(v) == 0
+	case map[string]any:
+		return len(v) == 0
+	case []map[string]any:
+		return len(v) == 0
+	}
+	rv := reflect.ValueOf(f)
+	if (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Map) && rv.Len() == 0 {
+		return true
+	}
+	return false
 }

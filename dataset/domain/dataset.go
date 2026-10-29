@@ -13,6 +13,7 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -61,13 +62,13 @@ func (ds *DataSet) IsRawDataset() bool {
 	if ds.IsRaw || strings.EqualFold(ds.DatasetType, "RAW") {
 		return true
 	}
-	// Also treat as raw if pipeline or reference_pipeline is provided and visual builder components are absent
-	if (strings.TrimSpace(ds.Pipeline) != "" || strings.TrimSpace(ds.ReferencePipeline) != "") &&
-		len(ds.JoinCollections) == 0 &&
+	// Also treat as raw if visual builder components are absent and either pipeline/reference_pipeline is provided or driver is mongodb
+	if len(ds.JoinCollections) == 0 &&
 		len(ds.CustomColumns) == 0 &&
 		len(ds.GroupByFields) == 0 &&
 		len(ds.SchematicTable) == 0 &&
-		(strings.TrimSpace(ds.BaseCollection.Collection) == "" || len(ds.SelectedList) == 0) {
+		len(ds.SelectedList) == 0 &&
+		(strings.TrimSpace(ds.Pipeline) != "" || strings.TrimSpace(ds.ReferencePipeline) != "" || strings.EqualFold(ds.Driver, "mongodb")) {
 		return true
 	}
 	return false
@@ -322,6 +323,7 @@ func (ds *DataSet) UnmarshalJSON(data []byte) error {
 		AltBaseCollection   string          `json:"dataSetBaseCollection"`
 		AltDataSetName      string          `json:"dataSetName"`
 		AltStatus           string          `json:"Status"`
+		AltID               string          `json:"_id"`
 	}{
 		Alias: (*Alias)(ds),
 	}
@@ -388,12 +390,67 @@ func (ds *DataSet) UnmarshalJSON(data []byte) error {
 	if ds.Status == "" && aux.AltStatus != "" {
 		ds.Status = aux.AltStatus
 	}
+	if ds.ID == "" && aux.AltID != "" {
+		ds.ID = aux.AltID
+	}
 
 	return nil
 }
 
-// UnmarshalJSON unmarshals BaseCollection normalizing Filter into []any or map.
+// IsFilterEmpty detects if a filter object/slice/string holds no actual filter conditions.
+func IsFilterEmpty(f any) bool {
+	if f == nil {
+		return true
+	}
+	switch v := f.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		return trimmed == "" || trimmed == "{}" || trimmed == "[]"
+	case []any:
+		return len(v) == 0
+	case map[string]any:
+		return len(v) == 0
+	case []map[string]any:
+		return len(v) == 0
+	}
+	rv := reflect.ValueOf(f)
+	if (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Map) && rv.Len() == 0 {
+		return true
+	}
+	return false
+}
+
+// MarshalJSON marshals BaseCollection to a simple string if schema is empty and filter is empty,
+// which is standard for MongoDB and schemaless storage engines (no object).
+func (bc BaseCollection) MarshalJSON() ([]byte, error) {
+	if bc.Schema == "" && IsFilterEmpty(bc.Filter) {
+		return json.Marshal(bc.Collection)
+	}
+	type Alias BaseCollection
+	return json.Marshal((*Alias)(&bc))
+}
+
+// UnmarshalJSON unmarshals BaseCollection normalizing Filter into []any or map,
+// and supporting string collection names ("employees") as well as JSON objects.
 func (bc *BaseCollection) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	// If it's a JSON string: "employees" or "public.employees"
+	if len(trimmed) >= 2 && trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		parts := strings.Split(s, ".")
+		if len(parts) == 2 {
+			bc.Schema = parts[0]
+			bc.Collection = parts[1]
+		} else {
+			bc.Collection = s
+			bc.Schema = ""
+		}
+		return nil
+	}
+
 	type Alias BaseCollection
 	aux := struct {
 		*Alias

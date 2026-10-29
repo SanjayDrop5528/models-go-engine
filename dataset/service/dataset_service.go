@@ -380,7 +380,11 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 		targetQuery = strings.TrimSpace(ds.ReferencePipeline)
 	}
 	if targetQuery == "" {
-		return nil, domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+		if strings.EqualFold(ds.Driver, "mongodb") {
+			targetQuery = "[]"
+		} else {
+			return nil, domain.NewError(domain.ErrFieldNotFound, "raw dataset requires 'pipeline' or 'reference_pipeline'")
+		}
 	}
 
 	// Substitute default parameter values if parameterized
@@ -563,6 +567,10 @@ func (s *DataSetService) saveRawDataset(ctx context.Context, ds *domain.DataSet)
 	}
 	if ds.ReferencePipeline == "" {
 		ds.ReferencePipeline = ds.Pipeline
+	}
+	if ds.Pipeline == "" && strings.EqualFold(ds.Driver, "mongodb") {
+		ds.Pipeline = "[]"
+		ds.ReferencePipeline = "[]"
 	}
 	if ds.DatasetType == "" {
 		ds.DatasetType = "RAW"

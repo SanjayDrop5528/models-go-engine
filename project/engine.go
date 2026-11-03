@@ -1342,10 +1342,54 @@ func (e *Engine) DeleteDataModel(ctx context.Context, modelID, fieldID string) e
 // Note:
 //   - The context controls cancellation and request lifetime.
 func (e *Engine) DeleteModelConfig(ctx context.Context, idOrName string) error {
-	if e.adapter != nil {
-		_ = e.adapter.Delete(ctx, model.ModelRef{StorageName: "model_configs", Name: "model_configs"}, idOrName)
+	var modelIDsToDelete []string
+	modelIDsToDelete = append(modelIDsToDelete, idOrName)
+
+	if cfg, err := e.registry.GetModelConfig(idOrName); err == nil && cfg != nil {
+		if cfg.ID != "" && cfg.ID != idOrName {
+			modelIDsToDelete = append(modelIDsToDelete, cfg.ID)
+		}
+		if cfg.Name != "" && cfg.Name != idOrName {
+			modelIDsToDelete = append(modelIDsToDelete, cfg.Name)
+		}
+		if cfg.Table != "" && cfg.Table != idOrName {
+			modelIDsToDelete = append(modelIDsToDelete, cfg.Table)
+		}
 	}
-	return e.registry.Delete(idOrName)
+
+	if e.adapter != nil {
+		dmRef := model.ModelRef{StorageName: "data_models", Name: "data_models"}
+		for _, mid := range modelIDsToDelete {
+			// Find and delete all data_models persisted in storage for this model
+			q := query.NewQuery().Where("model_id", query.OpEq, mid).LimitOffset(10000, 0)
+			if rows, _, err := e.adapter.Find(ctx, dmRef, q); err == nil && len(rows) > 0 {
+				for _, r := range rows {
+					if dmID, ok := r["id"].(string); ok && dmID != "" {
+						_ = e.adapter.Delete(ctx, dmRef, dmID)
+					}
+				}
+			}
+
+			// Also delete any fields found in in-memory registry
+			for _, dm := range e.registry.ListDataModels(mid) {
+				if dm != nil && dm.ID != "" {
+					_ = e.adapter.Delete(ctx, dmRef, dm.ID)
+				}
+			}
+		}
+
+		// Delete model_config record(s) from storage
+		for _, mid := range modelIDsToDelete {
+			_ = e.adapter.Delete(ctx, model.ModelRef{StorageName: "model_configs", Name: "model_configs"}, mid)
+		}
+	}
+
+	// Delete from in-memory registry (removes model_config and associated data_models)
+	for _, mid := range modelIDsToDelete {
+		_ = e.registry.Delete(mid)
+	}
+
+	return nil
 }
 
 // RestoreFromDB queries the database for stored model_configs and data_models,

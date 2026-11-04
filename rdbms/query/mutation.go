@@ -346,6 +346,9 @@ func (q *CreateTableQuery) Exec(ctx context.Context) (sql.Result, error) {
 	}
 	columns := make([]string, 0, modelType.NumField())
 	collectDDLFields(modelType, &columns)
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("rdbms: cannot create table %s without columns", inferTable(q.modelType, ""))
+	}
 	prefix := "CREATE TABLE "
 	if q.ifNotExists {
 		prefix += "IF NOT EXISTS "

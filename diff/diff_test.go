@@ -35,6 +35,38 @@ func TestDiff_CreateTable(t *testing.T) {
 	}
 }
 
+func TestDiff_CreateTable_EmptyAttributes(t *testing.T) {
+	engine := diff.NewDiffEngine()
+
+	desired := &schema.Schema{
+		Name:        "procurement.purchase_requisition_items",
+		StorageType: model.StorageRelational,
+		Attributes:  []schema.SchemaAttribute{},
+	}
+
+	diffRes, err := engine.Compare(nil, desired, diff.DiffHints{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !diffRes.HasChanges {
+		t.Fatal("expected has_changes to be true for new table even without attributes")
+	}
+	if len(diffRes.Operations) != 1 {
+		t.Fatalf("expected 1 operation, got %d", len(diffRes.Operations))
+	}
+	if diffRes.Operations[0].Type != diff.OpCreateTable {
+		t.Fatalf("expected OpCreateTable, got %s", diffRes.Operations[0].Type)
+	}
+	createdSchema, ok := diffRes.Operations[0].After.(*schema.Schema)
+	if !ok || len(createdSchema.Attributes) == 0 {
+		t.Fatal("expected created schema to have at least a default id attribute")
+	}
+	if createdSchema.Attributes[0].Name != "id" || !createdSchema.Attributes[0].PrimaryKey {
+		t.Fatalf("expected default id primary key, got: %+v", createdSchema.Attributes[0])
+	}
+}
+
 func TestDiff_AddColumn_OnlyMinimalChange(t *testing.T) {
 	engine := diff.NewDiffEngine()
 

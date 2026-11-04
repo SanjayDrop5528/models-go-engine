@@ -101,7 +101,24 @@ func (e *DiffEngine) Compare(current *schema.Schema, desired *schema.Schema, hin
 
 	// Case 1: Brand new model/table
 	if current == nil || len(current.Attributes) == 0 {
-		if desired != nil && len(desired.Attributes) > 0 {
+		if desired != nil {
+			// Ensure table has at least an id column if no attributes are specified yet
+			if len(desired.Attributes) == 0 {
+				desired.Attributes = []schema.SchemaAttribute{
+					{
+						Name:       "id",
+						Type:       model.TypeUUID,
+						PrimaryKey: true,
+						Nullable:   false,
+					},
+				}
+				if desired.PrimaryKey == nil {
+					desired.PrimaryKey = &schema.SchemaKey{
+						Columns: []string{"id"},
+					}
+				}
+			}
+
 			diffResult.Operations = append(diffResult.Operations, SchemaOperation{
 				Type:        OpCreateTable,
 				TargetTable: desired.Name,

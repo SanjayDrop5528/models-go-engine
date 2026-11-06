@@ -501,6 +501,39 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 		return "STRING"
 	}
 
+	findHeaderName := func(colName string) string {
+		cleanName := strings.TrimSpace(colName)
+		if modelDef != nil && len(modelDef.Fields) > 0 {
+			// 1. Direct match
+			if fld, ok := modelDef.Fields[cleanName]; ok && fld != nil && fld.Name != "" {
+				return fld.Name
+			}
+			// 2. Case-insensitive / column name match
+			for k, fld := range modelDef.Fields {
+				if strings.EqualFold(k, cleanName) || (fld != nil && strings.EqualFold(fld.ColumnName, cleanName)) {
+					if fld != nil && fld.Name != "" {
+						return fld.Name
+					}
+				}
+			}
+			// 3. Suffix match if dotted (e.g. "users.id" -> "id")
+			if idx := strings.LastIndex(cleanName, "."); idx >= 0 {
+				suffix := cleanName[idx+1:]
+				if fld, ok := modelDef.Fields[suffix]; ok && fld != nil && fld.Name != "" {
+					return fld.Name
+				}
+				for k, fld := range modelDef.Fields {
+					if strings.EqualFold(k, suffix) || (fld != nil && strings.EqualFold(fld.ColumnName, suffix)) {
+						if fld != nil && fld.Name != "" {
+							return fld.Name
+						}
+					}
+				}
+			}
+		}
+		return colName
+	}
+
 	// In raw mode, no need for selected column list: extract columns dynamically from the query response
 	var cols []domain.SelectedField
 	if len(rows) > 0 {
@@ -511,7 +544,7 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 					seen[k] = true
 					cols = append(cols, domain.SelectedField{
 						Field:      k,
-						HeaderName: k,
+						HeaderName: findHeaderName(k),
 						DataType:   findDataType(k, val),
 					})
 				}
@@ -521,12 +554,18 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 		// When no rows were returned, populate columns from model config
 		for fldName, fldDef := range modelDef.Fields {
 			dt := "STRING"
-			if fldDef != nil && fldDef.DataType != "" {
-				dt = fldDef.DataType
+			hdr := fldName
+			if fldDef != nil {
+				if fldDef.DataType != "" {
+					dt = fldDef.DataType
+				}
+				if fldDef.Name != "" {
+					hdr = fldDef.Name
+				}
 			}
 			cols = append(cols, domain.SelectedField{
 				Field:      fldName,
-				HeaderName: fldName,
+				HeaderName: hdr,
 				DataType:   dt,
 			})
 		}

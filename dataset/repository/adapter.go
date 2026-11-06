@@ -159,9 +159,21 @@ func (r *AdapterDataSetRepository) Save(ctx context.Context, ds *domain.DataSet)
 	filterParamsJSON, _ := json.Marshal(ds.FilterParams)
 	selectedListJSON, _ := json.Marshal(ds.SelectedList)
 
+	pipeMode := strings.ToLower(strings.TrimSpace(ds.PipelineMode))
+	if pipeMode == "" {
+		if ds.IsRawDataset() {
+			pipeMode = "raw"
+		} else {
+			pipeMode = "builder"
+		}
+	}
+
 	data := map[string]any{
 		"name":               ds.Name,
 		"reference_name":     ds.ReferenceName,
+		"description":        ds.Description,
+		"conversation_id":    ds.ConversationID,
+		"pipeline_mode":      pipeMode,
 		"driver":             ds.Driver,
 		"base_collection":    baseColVal,
 		"join_collections":   string(joinsJSON),
@@ -426,15 +438,39 @@ func mapToDataSet(rec map[string]any) *domain.DataSet {
 		statusVal = "ACTIVE"
 	}
 
+	pipelineModeVal := rec["pipeline_mode"]
+	if pipelineModeVal == nil || fmt.Sprintf("%v", pipelineModeVal) == "" || fmt.Sprintf("%v", pipelineModeVal) == "<nil>" {
+		pipelineModeVal = rec["pipelineMode"]
+	}
+	// Fallback to legacy fields if pipeline_mode was empty
+	if pipelineModeVal == nil || fmt.Sprintf("%v", pipelineModeVal) == "" || fmt.Sprintf("%v", pipelineModeVal) == "<nil>" {
+		if isRawVal, ok := rec["is_raw"]; ok && (isRawVal == true || fmt.Sprintf("%v", isRawVal) == "true" || fmt.Sprintf("%v", isRawVal) == "1") {
+			pipelineModeVal = "raw"
+		} else if dtVal, ok := rec["dataset_type"]; ok && strings.EqualFold(fmt.Sprintf("%v", dtVal), "raw") {
+			pipelineModeVal = "raw"
+		}
+	}
+	pipelineMode := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", pipelineModeVal)))
+	if pipelineMode != "raw" {
+		pipelineMode = "builder"
+	}
+
 	ds := &domain.DataSet{
 		ID:                fmt.Sprintf("%v", idVal),
 		Name:              fmt.Sprintf("%v", nameVal),
 		ReferenceName:     fmt.Sprintf("%v", refVal),
+		PipelineMode:      pipelineMode,
 		Driver:            fmt.Sprintf("%v", driverVal),
 		SaveMode:          domain.SaveMode(fmt.Sprintf("%v", saveModeVal)),
 		Pipeline:          fmt.Sprintf("%v", rec["pipeline"]),
 		ReferencePipeline: fmt.Sprintf("%v", refPipeVal),
 		Status:            fmt.Sprintf("%v", statusVal),
+	}
+	if descVal, ok := rec["description"]; ok && descVal != nil && fmt.Sprintf("%v", descVal) != "<nil>" {
+		ds.Description = fmt.Sprintf("%v", descVal)
+	}
+	if convVal, ok := rec["conversation_id"]; ok && convVal != nil && fmt.Sprintf("%v", convVal) != "<nil>" {
+		ds.ConversationID = fmt.Sprintf("%v", convVal)
 	}
 
 	parseJSON := func(val any, target any) {

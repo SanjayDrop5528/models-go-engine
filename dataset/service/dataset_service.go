@@ -387,7 +387,8 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 		}
 	}
 
-	// Substitute default parameter values if parameterized
+	// Substitute default parameter values if parameterized strictly for preview execution
+	queryToRun := targetQuery
 	if len(ds.FilterParams) > 0 {
 		effectiveParams := make([]domain.FilterParam, len(ds.FilterParams))
 		copy(effectiveParams, ds.FilterParams)
@@ -397,9 +398,9 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 			}
 		}
 		if ds.Driver == "mongodb" {
-			targetQuery = domain.CreateFilterParams(effectiveParams, targetQuery, nil)
+			queryToRun = domain.CreateFilterParams(effectiveParams, targetQuery, nil)
 		} else {
-			targetQuery, _ = domain.RenderSQLFilterParams(effectiveParams, targetQuery)
+			queryToRun, _ = domain.RenderSQLFilterParams(effectiveParams, targetQuery)
 		}
 	}
 
@@ -407,7 +408,7 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 	if s.adapter != nil {
 		execReq := execution.ExecutionRequest{
 			Operation: operation.OpQuery,
-			Target:    targetQuery,
+			Target:    queryToRun,
 			Options: map[string]any{
 				"preview":    true,
 				"collection": ds.BaseCollection.Collection,
@@ -443,32 +444,109 @@ func (s *DataSetService) previewRawDataset(ctx context.Context, ds *domain.DataS
 	}
 	rows = s.normalizeAndDecryptDatasetRows(ctx, rows)
 
-	cols := ds.SelectedList
-	if len(cols) == 0 && len(rows) > 0 {
+	// Resolve model definition config to resolve column types
+	var modelDef *resolver.ModelDefinition
+	if s.modelResolver != nil && strings.TrimSpace(ds.BaseCollection.Collection) != "" {
+		modelDef, _ = s.modelResolver.ResolveModel(ctx, ds.BaseCollection.Schema, ds.BaseCollection.Collection)
+	}
+
+	findDataType := func(colName string, sampleVal any) string {
+		cleanName := strings.TrimSpace(colName)
+		if modelDef != nil && len(modelDef.Fields) > 0 {
+			// 1. Direct match
+			if fld, ok := modelDef.Fields[cleanName]; ok && fld != nil && fld.DataType != "" {
+				return fld.DataType
+			}
+			// 2. Case-insensitive / column name match
+			for k, fld := range modelDef.Fields {
+				if strings.EqualFold(k, cleanName) || (fld != nil && strings.EqualFold(fld.ColumnName, cleanName)) {
+					if fld != nil && fld.DataType != "" {
+						return fld.DataType
+					}
+				}
+			}
+			// 3. Suffix match if dotted (e.g. "users.id" -> "id")
+			if idx := strings.LastIndex(cleanName, "."); idx >= 0 {
+				suffix := cleanName[idx+1:]
+				if fld, ok := modelDef.Fields[suffix]; ok && fld != nil && fld.DataType != "" {
+					return fld.DataType
+				}
+				for k, fld := range modelDef.Fields {
+					if strings.EqualFold(k, suffix) || (fld != nil && strings.EqualFold(fld.ColumnName, suffix)) {
+						if fld != nil && fld.DataType != "" {
+							return fld.DataType
+						}
+					}
+				}
+			}
+		}
+
+		// 4. Value-based type inference
+		if sampleVal != nil {
+			switch sampleVal.(type) {
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+				return "INTEGER"
+			case float32, float64:
+				return "NUMBER"
+			case bool:
+				return "BOOLEAN"
+			case time.Time:
+				return "TIMESTAMP"
+			case []any, []map[string]any:
+				return "ARRAY"
+			case map[string]any:
+				return "OBJECT"
+			}
+		}
+		return "STRING"
+	}
+
+	// In raw mode, no need for selected column list: extract columns dynamically from the query response
+	var cols []domain.SelectedField
+	if len(rows) > 0 {
 		seen := make(map[string]bool)
 		for _, r := range rows {
-			for k := range r {
+			for k, val := range r {
 				if !seen[k] {
 					seen[k] = true
 					cols = append(cols, domain.SelectedField{
 						Field:      k,
 						HeaderName: k,
-						DataType:   "STRING",
+						DataType:   findDataType(k, val),
 					})
 				}
 			}
 		}
+	} else if modelDef != nil && len(modelDef.Fields) > 0 {
+		// When no rows were returned, populate columns from model config
+		for fldName, fldDef := range modelDef.Fields {
+			dt := "STRING"
+			if fldDef != nil && fldDef.DataType != "" {
+				dt = fldDef.DataType
+			}
+			cols = append(cols, domain.SelectedField{
+				Field:      fldName,
+				HeaderName: fldName,
+				DataType:   dt,
+			})
+		}
+	} else if len(ds.SelectedList) > 0 {
+		cols = ds.SelectedList
 	}
 
 	refPipeline := ds.ReferencePipeline
 	if refPipeline == "" {
 		refPipeline = ds.Pipeline
 	}
+	pipeline := ds.Pipeline
+	if pipeline == "" {
+		pipeline = refPipeline
+	}
 
 	return &PreviewResponse{
 		Columns:           cols,
 		Rows:              rows,
-		Pipeline:          targetQuery,
+		Pipeline:          pipeline,
 		ReferencePipeline: refPipeline,
 		Parameters:        ds.FilterParams,
 	}, nil
@@ -515,7 +593,13 @@ func (s *DataSetService) Save(ctx context.Context, ds *domain.DataSet) (*domain.
 	}
 
 	if ds.IsRawDataset() {
+		if ds.PipelineMode == "" {
+			ds.PipelineMode = "raw"
+		}
 		return s.saveRawDataset(ctx, ds)
+	}
+	if ds.PipelineMode == "" {
+		ds.PipelineMode = "builder"
 	}
 
 	// 2. Build AST
@@ -572,10 +656,9 @@ func (s *DataSetService) saveRawDataset(ctx context.Context, ds *domain.DataSet)
 		ds.Pipeline = "[]"
 		ds.ReferencePipeline = "[]"
 	}
-	if ds.DatasetType == "" {
-		ds.DatasetType = "RAW"
+	if ds.PipelineMode == "" {
+		ds.PipelineMode = "raw"
 	}
-	ds.IsRaw = true
 	if ds.Status == "" {
 		ds.Status = "ACTIVE"
 	}

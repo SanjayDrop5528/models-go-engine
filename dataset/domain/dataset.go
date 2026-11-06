@@ -33,8 +33,7 @@ type DataSet struct {
 	Name              string           `json:"name"`
 	ReferenceName     string           `json:"reference_name"`
 	Description       string           `json:"description,omitempty"`
-	DatasetType       string           `json:"dataset_type,omitempty"` // "BUILDER" or "RAW"
-	IsRaw             bool             `json:"is_raw,omitempty"`       // true if raw pipeline / query dataset
+	PipelineMode      string           `json:"pipeline_mode,omitempty"` // "builder" or "raw"
 	Driver            string           `json:"driver"`                 // "postgres", "mysql", "mongodb", "memory"
 	ConversationID    string           `json:"conversation_id,omitempty"`
 	BaseCollection    BaseCollection   `json:"base_collection"`
@@ -59,8 +58,11 @@ func (ds *DataSet) IsRawDataset() bool {
 	if ds == nil {
 		return false
 	}
-	if ds.IsRaw || strings.EqualFold(ds.DatasetType, "RAW") {
+	if strings.EqualFold(strings.TrimSpace(ds.PipelineMode), "raw") {
 		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(ds.PipelineMode), "builder") {
+		return false
 	}
 	// Also treat as raw if visual builder components are absent and either pipeline/reference_pipeline is provided or driver is mongodb
 	if len(ds.JoinCollections) == 0 &&
@@ -316,6 +318,15 @@ func (ds *DataSet) UnmarshalJSON(data []byte) error {
 		AltRefPipeline3     string          `json:"reference_pipeline"`
 		AltPipeline1        string          `json:"Pipeline"`
 		AltPipeline2        string          `json:"pipeline"`
+		AltPipelineMode1    string          `json:"pipeline_mode"`
+		AltPipelineMode2    string          `json:"pipelineMode"`
+		AltPipelineMode3    string          `json:"PipelineMode"`
+		AltDatasetType1     string          `json:"dataset_type"`
+		AltDatasetType2     string          `json:"datasetType"`
+		AltDatasetType3     string          `json:"DatasetType"`
+		AltIsRaw1           *bool           `json:"is_raw"`
+		AltIsRaw2           *bool           `json:"isRaw"`
+		AltIsRaw3           *bool           `json:"IsRaw"`
 		AltDescription1     string          `json:"description"`
 		AltDescription2     string          `json:"dataSetDescription"`
 		AltFilterParams     []FilterParam   `json:"FilterParams"`
@@ -392,6 +403,36 @@ func (ds *DataSet) UnmarshalJSON(data []byte) error {
 	}
 	if ds.ID == "" && aux.AltID != "" {
 		ds.ID = aux.AltID
+	}
+
+	mode := aux.AltPipelineMode1
+	if mode == "" {
+		mode = aux.AltPipelineMode2
+	}
+	if mode == "" {
+		mode = aux.AltPipelineMode3
+	}
+	if mode == "" {
+		mode = ds.PipelineMode
+	}
+
+	// Legacy backward compatibility fallback if old payload passed dataset_type or is_raw
+	if mode == "" {
+		if (aux.AltIsRaw1 != nil && *aux.AltIsRaw1) || (aux.AltIsRaw2 != nil && *aux.AltIsRaw2) || (aux.AltIsRaw3 != nil && *aux.AltIsRaw3) {
+			mode = "raw"
+		} else if strings.EqualFold(aux.AltDatasetType1, "raw") || strings.EqualFold(aux.AltDatasetType2, "raw") || strings.EqualFold(aux.AltDatasetType3, "raw") {
+			mode = "raw"
+		} else if strings.EqualFold(aux.AltDatasetType1, "builder") || strings.EqualFold(aux.AltDatasetType2, "builder") || strings.EqualFold(aux.AltDatasetType3, "builder") {
+			mode = "builder"
+		}
+	}
+
+	if strings.EqualFold(strings.TrimSpace(mode), "raw") {
+		ds.PipelineMode = "raw"
+	} else if strings.EqualFold(strings.TrimSpace(mode), "builder") {
+		ds.PipelineMode = "builder"
+	} else if mode != "" {
+		ds.PipelineMode = strings.ToLower(strings.TrimSpace(mode))
 	}
 
 	return nil
